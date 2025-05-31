@@ -102,6 +102,8 @@ export class MemStorage implements IStorage {
       ...insertUser,
       id: this.currentUserId++,
       password: hashedPassword,
+      specialization: insertUser.specialization || null,
+      isActive: insertUser.isActive ?? true,
       createdAt: new Date(),
     };
     this.users.set(user.id, user);
@@ -125,6 +127,11 @@ export class MemStorage implements IStorage {
     const patient: Patient = {
       ...insertPatient,
       id: this.currentPatientId++,
+      email: insertPatient.email || null,
+      address: insertPatient.address || null,
+      emergencyContactName: insertPatient.emergencyContactName || null,
+      emergencyContactPhone: insertPatient.emergencyContactPhone || null,
+      medicalHistory: insertPatient.medicalHistory || null,
       createdAt: new Date(),
     };
     this.patients.set(patient.id, patient);
@@ -163,6 +170,8 @@ export class MemStorage implements IStorage {
     const appointment: Appointment = {
       ...insertAppointment,
       id: this.currentAppointmentId++,
+      status: insertAppointment.status || "scheduled",
+      notes: insertAppointment.notes || null,
       createdAt: new Date(),
     };
     this.appointments.set(appointment.id, appointment);
@@ -201,6 +210,11 @@ export class MemStorage implements IStorage {
     const prescription: Prescription = {
       ...insertPrescription,
       id: this.currentPrescriptionId++,
+      duration: insertPrescription.duration || null,
+      quantity: insertPrescription.quantity || null,
+      instructions: insertPrescription.instructions || null,
+      notes: insertPrescription.notes || null,
+      isActive: insertPrescription.isActive ?? true,
       createdAt: new Date(),
     };
     this.prescriptions.set(prescription.id, prescription);
@@ -220,6 +234,8 @@ export class MemStorage implements IStorage {
     const payment: Payment = {
       ...insertPayment,
       id: this.currentPaymentId++,
+      status: insertPayment.status || "completed",
+      appointmentId: insertPayment.appointmentId || null,
       createdAt: new Date(),
     };
     this.paymentsMap.set(payment.id, payment);
@@ -239,8 +255,12 @@ export class MemStorage implements IStorage {
   // Doctor availability methods
   async setDoctorAvailability(insertAvailability: InsertDoctorAvailability): Promise<DoctorAvailability> {
     const availability: DoctorAvailability = {
-      ...insertAvailability,
       id: this.currentAvailabilityId++,
+      doctorId: insertAvailability.doctorId,
+      dayOfWeek: insertAvailability.dayOfWeek,
+      startTime: insertAvailability.startTime,
+      endTime: insertAvailability.endTime,
+      isAvailable: insertAvailability.isAvailable ?? true,
     };
     this.availability.set(availability.id, availability);
     return availability;
