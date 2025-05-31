@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 222 84% 4.9%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 46.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 84% 4.9%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --primary: 221 83% 53%; /* Medical Blue */
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 84% 4.9%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 84% 4.9%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 221 83% 53%;
+  --radius: 0.5rem;
+  
+  /* Medical theme colors */
+  --medical-blue: 221 83% 53%; /* #3B82F6 */
+  --medical-green: 158 64% 52%; /* #10B981 */
+  --medical-light: 221 100% 97%; /* #EFF6FF */
+  --medical-dark: 215 25% 26%; /* #1E293B */
+}
+
+.dark {
+  --background: 222 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --popover: 222 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --card: 222 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 221 83% 53%;
+  
+  --medical-blue: 221 83% 53%;
+  --medical-green: 158 64% 52%;
+  --medical-light: 215 25% 26%;
+  --medical-dark: 210 40% 98%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer utilities {
+  .medical-gradient {
+    background: linear-gradient(135deg, hsl(var(--medical-light)), hsl(221 100% 96%));
+  }
+  
+  .medical-blue {
+    color: hsl(var(--medical-blue));
+  }
+  
+  .medical-green {
+    color: hsl(var(--medical-green));
+  }
+  
+  .bg-medical-blue {
+    background-color: hsl(var(--medical-blue));
+  }
+  
+  .bg-medical-green {
+    background-color: hsl(var(--medical-green));
+  }
+  
+  .bg-medical-light {
+    background-color: hsl(var(--medical-light));
+  }
+  
+  .text-medical-dark {
+    color: hsl(var(--medical-dark));
+  }
+}
