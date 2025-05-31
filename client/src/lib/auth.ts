@@ -1,45 +1,86 @@
-interface User {
+import { apiRequest } from "./queryClient";
+
+export interface User {
   id: number;
   email: string;
-  role: string;
+  role: 'doctor' | 'receptionist';
   firstName: string;
   lastName: string;
   specialization?: string;
+  isActive: boolean;
 }
 
-interface AuthResponse {
+export interface AuthResponse {
   token: string;
   user: User;
 }
 
-export const getStoredToken = (): string | null => {
-  return localStorage.getItem('token');
+export const authService = {
+  login: async (email: string, password: string, role: string): Promise<AuthResponse> => {
+    const response = await apiRequest('POST', '/api/auth/login', {
+      email,
+      password,
+      role,
+    });
+    return response.json();
+  },
+
+  register: async (userData: any) => {
+    const response = await apiRequest('POST', '/api/auth/register', userData);
+    return response.json();
+  },
+
+  getCurrentUser: async (): Promise<{ user: User }> => {
+    const response = await apiRequest('GET', '/api/auth/me');
+    return response.json();
+  },
+
+  logout: () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  },
+
+  getToken: (): string | null => {
+    return localStorage.getItem('token');
+  },
+
+  setAuth: (token: string, user: User) => {
+    localStorage.setItem('token', token);
+    localStorage.setItem('user', JSON.stringify(user));
+  },
+
+  getStoredUser: (): User | null => {
+    const userStr = localStorage.getItem('user');
+    return userStr ? JSON.parse(userStr) : null;
+  },
+
+  isAuthenticated: (): boolean => {
+    return !!authService.getToken();
+  },
 };
 
-export const getStoredUser = (): User | null => {
-  const userStr = localStorage.getItem('user');
-  return userStr ? JSON.parse(userStr) : null;
-};
-
-export const setAuthData = (token: string, user: User): void => {
-  localStorage.setItem('token', token);
-  localStorage.setItem('user', JSON.stringify(user));
-};
-
-export const clearAuthData = (): void => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-};
-
-export const isAuthenticated = (): boolean => {
-  return !!getStoredToken();
-};
-
-export const hasRole = (role: string): boolean => {
-  const user = getStoredUser();
-  return user?.role === role;
-};
-
-export const getCurrentUser = (): User | null => {
-  return getStoredUser();
+// Setup axios interceptor for auth
+export const setupAuthInterceptor = () => {
+  const originalFetch = window.fetch;
+  
+  window.fetch = async (url: RequestInfo | URL, options: RequestInit = {}) => {
+    const token = authService.getToken();
+    
+    if (token && typeof url === 'string' && url.startsWith('/api')) {
+      options.headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${token}`,
+      };
+    }
+    
+    const response = await originalFetch(url, options);
+    
+    // If token is expired, logout
+    if (response.status === 401 || response.status === 403) {
+      authService.logout();
+      window.location.href = '/';
+    }
+    
+    return response;
+  };
 };

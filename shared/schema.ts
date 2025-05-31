@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -9,8 +9,9 @@ export const users = pgTable("users", {
   role: text("role").notNull(), // 'doctor' | 'receptionist'
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  specialization: text("specialization"), // Only for doctors
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  specialization: text("specialization"), // For doctors
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const patients = pgTable("patients", {
@@ -22,65 +23,57 @@ export const patients = pgTable("patients", {
   phone: text("phone").notNull(),
   email: text("email"),
   address: text("address"),
-  bloodType: text("blood_type"),
-  allergies: text("allergies"),
-  medicalHistory: text("medical_history"),
   emergencyContactName: text("emergency_contact_name"),
-  emergencyContactRelation: text("emergency_contact_relation"),
   emergencyContactPhone: text("emergency_contact_phone"),
-  patientId: text("patient_id").notNull().unique(), // PAT001, PAT002, etc.
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  medicalHistory: text("medical_history"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const appointments = pgTable("appointments", {
   id: serial("id").primaryKey(),
-  patientId: integer("patient_id").notNull().references(() => patients.id),
-  doctorId: integer("doctor_id").notNull().references(() => users.id),
-  appointmentDate: text("appointment_date").notNull(),
-  appointmentTime: text("appointment_time").notNull(),
-  reason: text("reason"),
-  status: text("status").notNull().default("scheduled"), // 'scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled'
+  patientId: integer("patient_id").notNull(),
+  doctorId: integer("doctor_id").notNull(),
+  datetime: timestamp("datetime").notNull(),
+  type: text("type").notNull(), // 'consultation', 'checkup', 'follow-up'
+  status: text("status").notNull().default("scheduled"), // 'scheduled', 'confirmed', 'completed', 'cancelled'
   notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const prescriptions = pgTable("prescriptions", {
   id: serial("id").primaryKey(),
-  patientId: integer("patient_id").notNull().references(() => patients.id),
-  doctorId: integer("doctor_id").notNull().references(() => users.id),
-  appointmentId: integer("appointment_id").references(() => appointments.id),
-  medications: text("medications").notNull(), // JSON string of medication details
+  patientId: integer("patient_id").notNull(),
+  doctorId: integer("doctor_id").notNull(),
+  medication: text("medication").notNull(),
+  dosage: text("dosage").notNull(),
+  frequency: text("frequency").notNull(),
+  duration: text("duration"),
+  quantity: integer("quantity"),
   instructions: text("instructions"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
-  patientId: integer("patient_id").notNull().references(() => patients.id),
-  appointmentId: integer("appointment_id").references(() => appointments.id),
-  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
-  service: text("service").notNull(),
-  paymentMethod: text("payment_method").notNull().default("cash"),
-  status: text("status").notNull().default("paid"), // 'paid', 'pending', 'refunded'
-  receiptNumber: text("receipt_number").notNull().unique(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  patientId: integer("patient_id").notNull(),
+  appointmentId: integer("appointment_id"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  method: text("method").notNull(), // 'cash', 'card', 'insurance'
+  status: text("status").notNull().default("completed"), // 'pending', 'completed', 'refunded'
+  receiptNumber: text("receipt_number").notNull(),
+  processedBy: integer("processed_by").notNull(), // User ID of receptionist
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const doctorAvailability = pgTable("doctor_availability", {
   id: serial("id").primaryKey(),
-  doctorId: integer("doctor_id").notNull().references(() => users.id),
-  dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday, 1 = Monday, etc.
+  doctorId: integer("doctor_id").notNull(),
+  dayOfWeek: integer("day_of_week").notNull(), // 0-6 (Sunday-Saturday)
   startTime: text("start_time").notNull(),
   endTime: text("end_time").notNull(),
-  isAvailable: boolean("is_available").notNull().default(true),
-});
-
-export const doctorLeaves = pgTable("doctor_leaves", {
-  id: serial("id").primaryKey(),
-  doctorId: integer("doctor_id").notNull().references(() => users.id),
-  leaveDate: text("leave_date").notNull(),
-  reason: text("reason"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  isAvailable: boolean("is_available").default(true),
 });
 
 // Insert schemas
@@ -91,7 +84,6 @@ export const insertUserSchema = createInsertSchema(users).omit({
 
 export const insertPatientSchema = createInsertSchema(patients).omit({
   id: true,
-  patientId: true,
   createdAt: true,
 });
 
@@ -107,7 +99,6 @@ export const insertPrescriptionSchema = createInsertSchema(prescriptions).omit({
 
 export const insertPaymentSchema = createInsertSchema(payments).omit({
   id: true,
-  receiptNumber: true,
   createdAt: true,
 });
 
@@ -115,46 +106,24 @@ export const insertDoctorAvailabilitySchema = createInsertSchema(doctorAvailabil
   id: true,
 });
 
-export const insertDoctorLeaveSchema = createInsertSchema(doctorLeaves).omit({
-  id: true,
-  createdAt: true,
+// Login schema
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+  role: z.enum(['doctor', 'receptionist']),
 });
 
 // Types
-export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
-
-export type InsertPatient = z.infer<typeof insertPatientSchema>;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 export type Patient = typeof patients.$inferSelect;
-
-export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+export type InsertPatient = z.infer<typeof insertPatientSchema>;
 export type Appointment = typeof appointments.$inferSelect;
-
-export type InsertPrescription = z.infer<typeof insertPrescriptionSchema>;
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 export type Prescription = typeof prescriptions.$inferSelect;
-
-export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type InsertPrescription = z.infer<typeof insertPrescriptionSchema>;
 export type Payment = typeof payments.$inferSelect;
-
-export type InsertDoctorAvailability = z.infer<typeof insertDoctorAvailabilitySchema>;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type DoctorAvailability = typeof doctorAvailability.$inferSelect;
-
-export type InsertDoctorLeave = z.infer<typeof insertDoctorLeaveSchema>;
-export type DoctorLeave = typeof doctorLeaves.$inferSelect;
-
-// Extended types for API responses
-export type AppointmentWithDetails = Appointment & {
-  patient: Patient;
-  doctor: User;
-};
-
-export type PrescriptionWithDetails = Prescription & {
-  patient: Patient;
-  doctor: User;
-  appointment?: Appointment;
-};
-
-export type PaymentWithDetails = Payment & {
-  patient: Patient;
-  appointment?: Appointment;
-};
+export type InsertDoctorAvailability = z.infer<typeof insertDoctorAvailabilitySchema>;
+export type LoginRequest = z.infer<typeof loginSchema>;

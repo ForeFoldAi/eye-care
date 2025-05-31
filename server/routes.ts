@@ -4,9 +4,8 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
 import { 
-  insertUserSchema, insertPatientSchema, insertAppointmentSchema,
-  insertPrescriptionSchema, insertPaymentSchema, insertDoctorAvailabilitySchema,
-  insertDoctorLeaveSchema
+  loginSchema, insertPatientSchema, insertAppointmentSchema, 
+  insertPrescriptionSchema, insertPaymentSchema, insertUserSchema 
 } from "@shared/schema";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
@@ -29,7 +28,7 @@ const authenticateToken = (req: any, res: any, next: any) => {
   });
 };
 
-// Middleware to check user role
+// Middleware to check role
 const requireRole = (roles: string[]) => {
   return (req: any, res: any, next: any) => {
     if (!roles.includes(req.user.role)) {
@@ -40,50 +39,32 @@ const requireRole = (roles: string[]) => {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication routes
+  
+  // Auth routes
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { email, password } = req.body;
+      const loginData = loginSchema.parse(req.body);
+      const user = await storage.getUserByEmail(loginData.email);
       
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
-      }
-
-      const user = await storage.getUserByEmail(email);
-      if (!user) {
+      if (!user || user.role !== loginData.role) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
+      const isPasswordValid = await bcrypt.compare(loginData.password, user.password);
+      if (!isPasswordValid) {
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
       const token = jwt.sign(
-        { 
-          id: user.id, 
-          email: user.email, 
-          role: user.role,
-          firstName: user.firstName,
-          lastName: user.lastName 
-        },
+        { id: user.id, email: user.email, role: user.role },
         JWT_SECRET,
         { expiresIn: '24h' }
       );
 
-      res.json({
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          specialization: user.specialization
-        }
-      });
+      const { password, ...userWithoutPassword } = user;
+      res.json({ token, user: userWithoutPassword });
     } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
+      res.status(400).json({ message: "Invalid request data" });
     }
   });
 
@@ -94,100 +75,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(userData.email);
       if (existingUser) {
-        return res.status(400).json({ message: "User already exists" });
+        return res.status(409).json({ message: "User already exists" });
       }
 
-      // Hash password
-      const saltRounds = 10;
-      const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
-
-      const user = await storage.createUser({
-        ...userData,
-        password: hashedPassword
-      });
-
-      const token = jwt.sign(
-        { 
-          id: user.id, 
-          email: user.email, 
-          role: user.role,
-          firstName: user.firstName,
-          lastName: user.lastName 
-        },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
-      res.status(201).json({
-        token,
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          specialization: user.specialization
-        }
-      });
+      const user = await storage.createUser(userData);
+      const { password, ...userWithoutPassword } = user;
+      res.status(201).json({ user: userWithoutPassword });
     } catch (error) {
-      res.status(400).json({ message: "Invalid user data" });
+      res.status(400).json({ message: "Invalid request data" });
     }
   });
 
-  app.get("/api/auth/me", authenticateToken, async (req, res) => {
+  app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
     try {
-      const user = await storage.getUser(req.user.id);
+      const user = await storage.getUserById(req.user.id);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-
-      res.json({
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        specialization: user.specialization
-      });
+      
+      const { password, ...userWithoutPassword } = user;
+      res.json({ user: userWithoutPassword });
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // Patient routes
-  app.get("/api/patients", authenticateToken, async (req, res) => {
-    try {
-      const { search } = req.query;
-      let patients;
-      
-      if (search) {
-        patients = await storage.searchPatients(search as string);
-      } else {
-        patients = await storage.getAllPatients();
-      }
-      
-      res.json(patients);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.get("/api/patients/:id", authenticateToken, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const patient = await storage.getPatient(id);
-      
-      if (!patient) {
-        return res.status(404).json({ message: "Patient not found" });
-      }
-      
-      res.json(patient);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.post("/api/patients", authenticateToken, requireRole(['receptionist', 'doctor']), async (req, res) => {
+  app.post("/api/patients", authenticateToken, async (req: any, res) => {
     try {
       const patientData = insertPatientSchema.parse(req.body);
       const patient = await storage.createPatient(patientData);
@@ -197,11 +111,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/patients/:id", authenticateToken, requireRole(['receptionist', 'doctor']), async (req, res) => {
+  app.get("/api/patients", authenticateToken, async (req: any, res) => {
+    try {
+      const patients = await storage.getAllPatients();
+      res.json(patients);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/patients/search", authenticateToken, async (req: any, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query) {
+        return res.status(400).json({ message: "Search query required" });
+      }
+      
+      const patients = await storage.searchPatients(query);
+      res.json(patients);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/patients/:id", authenticateToken, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const updates = insertPatientSchema.partial().parse(req.body);
-      const patient = await storage.updatePatient(id, updates);
+      const patient = await storage.getPatientById(id);
       
       if (!patient) {
         return res.status(404).json({ message: "Patient not found" });
@@ -209,49 +145,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json(patient);
     } catch (error) {
-      res.status(400).json({ message: "Invalid patient data" });
+      res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // Appointment routes
-  app.get("/api/appointments", authenticateToken, async (req, res) => {
-    try {
-      const { date, doctorId, patientId } = req.query;
-      let appointments;
-      
-      if (doctorId) {
-        appointments = await storage.getAppointmentsByDoctor(
-          parseInt(doctorId as string), 
-          date as string
-        );
-      } else if (patientId) {
-        appointments = await storage.getAppointmentsByPatient(parseInt(patientId as string));
-      } else {
-        appointments = await storage.getAllAppointments(date as string);
-      }
-      
-      res.json(appointments);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.get("/api/appointments/:id", authenticateToken, async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const appointment = await storage.getAppointment(id);
-      
-      if (!appointment) {
-        return res.status(404).json({ message: "Appointment not found" });
-      }
-      
-      res.json(appointment);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.post("/api/appointments", authenticateToken, requireRole(['receptionist', 'doctor']), async (req, res) => {
+  app.post("/api/appointments", authenticateToken, async (req: any, res) => {
     try {
       const appointmentData = insertAppointmentSchema.parse(req.body);
       const appointment = await storage.createAppointment(appointmentData);
@@ -261,17 +160,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/appointments/:id/status", authenticateToken, async (req, res) => {
+  app.get("/api/appointments", authenticateToken, async (req: any, res) => {
+    try {
+      const { doctorId, patientId, date } = req.query;
+      
+      let appointments;
+      if (doctorId) {
+        appointments = await storage.getAppointmentsByDoctor(parseInt(doctorId as string));
+      } else if (patientId) {
+        appointments = await storage.getAppointmentsByPatient(parseInt(patientId as string));
+      } else if (date) {
+        appointments = await storage.getAppointmentsByDate(date as string);
+      } else {
+        // If user is doctor, only show their appointments
+        if (req.user.role === 'doctor') {
+          appointments = await storage.getAppointmentsByDoctor(req.user.id);
+        } else {
+          // For receptionists, show today's appointments by default
+          const today = new Date().toISOString().split('T')[0];
+          appointments = await storage.getAppointmentsByDate(today);
+        }
+      }
+      
+      res.json(appointments);
+    } catch (error) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/appointments/:id/status", authenticateToken, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const { status } = req.body;
       
-      if (!status) {
-        return res.status(400).json({ message: "Status is required" });
-      }
-      
       const appointment = await storage.updateAppointmentStatus(id, status);
-      
       if (!appointment) {
         return res.status(404).json({ message: "Appointment not found" });
       }
@@ -282,33 +204,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/appointments/:id", authenticateToken, requireRole(['receptionist', 'doctor']), async (req, res) => {
+  // Prescription routes
+  app.post("/api/prescriptions", authenticateToken, requireRole(['doctor']), async (req: any, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const success = await storage.cancelAppointment(id);
+      const prescriptionData = {
+        ...insertPrescriptionSchema.parse(req.body),
+        doctorId: req.user.id
+      };
       
-      if (!success) {
-        return res.status(404).json({ message: "Appointment not found" });
-      }
-      
-      res.json({ message: "Appointment cancelled successfully" });
+      const prescription = await storage.createPrescription(prescriptionData);
+      res.status(201).json(prescription);
     } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
+      res.status(400).json({ message: "Invalid prescription data" });
     }
   });
 
-  // Prescription routes
-  app.get("/api/prescriptions", authenticateToken, async (req, res) => {
+  app.get("/api/prescriptions", authenticateToken, async (req: any, res) => {
     try {
-      const { doctorId, patientId } = req.query;
-      let prescriptions;
+      const { patientId } = req.query;
       
-      if (doctorId) {
-        prescriptions = await storage.getPrescriptionsByDoctor(parseInt(doctorId as string));
-      } else if (patientId) {
+      let prescriptions;
+      if (patientId) {
         prescriptions = await storage.getPrescriptionsByPatient(parseInt(patientId as string));
+      } else if (req.user.role === 'doctor') {
+        prescriptions = await storage.getPrescriptionsByDoctor(req.user.id);
       } else {
-        prescriptions = await storage.getAllPrescriptions();
+        return res.status(403).json({ message: "Access denied" });
       }
       
       res.json(prescriptions);
@@ -317,26 +238,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/prescriptions", authenticateToken, requireRole(['doctor']), async (req, res) => {
+  // Payment routes
+  app.post("/api/payments", authenticateToken, requireRole(['receptionist']), async (req: any, res) => {
     try {
-      const prescriptionData = insertPrescriptionSchema.parse(req.body);
-      const prescription = await storage.createPrescription(prescriptionData);
-      res.status(201).json(prescription);
+      const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      
+      const paymentData = {
+        ...insertPaymentSchema.parse(req.body),
+        receiptNumber,
+        processedBy: req.user.id
+      };
+      
+      const payment = await storage.createPayment(paymentData);
+      res.status(201).json(payment);
     } catch (error) {
-      res.status(400).json({ message: "Invalid prescription data" });
+      res.status(400).json({ message: "Invalid payment data" });
     }
   });
 
-  // Payment routes
-  app.get("/api/payments", authenticateToken, async (req, res) => {
+  app.get("/api/payments", authenticateToken, async (req: any, res) => {
     try {
-      const { date, patientId } = req.query;
-      let payments;
+      const { patientId, date } = req.query;
       
+      let payments;
       if (patientId) {
         payments = await storage.getPaymentsByPatient(parseInt(patientId as string));
+      } else if (date) {
+        payments = await storage.getPaymentsByDate(date as string);
       } else {
-        payments = await storage.getAllPayments(date as string);
+        // Show today's payments by default
+        const today = new Date().toISOString().split('T')[0];
+        payments = await storage.getPaymentsByDate(today);
       }
       
       res.json(payments);
@@ -345,136 +277,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/payments", authenticateToken, requireRole(['receptionist']), async (req, res) => {
+  // Doctor routes
+  app.get("/api/doctors", authenticateToken, async (req: any, res) => {
     try {
-      const paymentData = insertPaymentSchema.parse(req.body);
-      const payment = await storage.createPayment(paymentData);
-      res.status(201).json(payment);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid payment data" });
-    }
-  });
-
-  app.get("/api/payments/revenue/:date", authenticateToken, requireRole(['receptionist']), async (req, res) => {
-    try {
-      const { date } = req.params;
-      const revenue = await storage.getRevenueByDate(date);
-      res.json({ revenue });
+      const doctors = await storage.getAllDoctors();
+      const doctorsWithoutPassword = doctors.map(({ password, ...doctor }) => doctor);
+      res.json(doctorsWithoutPassword);
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // Doctor availability routes
-  app.get("/api/doctors", authenticateToken, async (req, res) => {
-    try {
-      const doctors = await storage.getDoctors();
-      res.json(doctors);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.get("/api/doctors/:id/availability", authenticateToken, async (req, res) => {
-    try {
-      const doctorId = parseInt(req.params.id);
-      const availability = await storage.getDoctorAvailability(doctorId);
-      res.json(availability);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.post("/api/doctors/:id/availability", authenticateToken, requireRole(['doctor']), async (req, res) => {
-    try {
-      const doctorId = parseInt(req.params.id);
-      
-      // Ensure doctor can only set their own availability
-      if (req.user.role === 'doctor' && req.user.id !== doctorId) {
-        return res.status(403).json({ message: "Can only set your own availability" });
-      }
-      
-      const availabilityData = insertDoctorAvailabilitySchema.parse({
-        ...req.body,
-        doctorId
-      });
-      
-      const availability = await storage.setDoctorAvailability(availabilityData);
-      res.status(201).json(availability);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid availability data" });
-    }
-  });
-
-  app.get("/api/doctors/:id/leaves", authenticateToken, async (req, res) => {
-    try {
-      const doctorId = parseInt(req.params.id);
-      const leaves = await storage.getDoctorLeaves(doctorId);
-      res.json(leaves);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.post("/api/doctors/:id/leaves", authenticateToken, requireRole(['doctor']), async (req, res) => {
-    try {
-      const doctorId = parseInt(req.params.id);
-      
-      // Ensure doctor can only set their own leave
-      if (req.user.role === 'doctor' && req.user.id !== doctorId) {
-        return res.status(403).json({ message: "Can only set your own leave" });
-      }
-      
-      const leaveData = insertDoctorLeaveSchema.parse({
-        ...req.body,
-        doctorId
-      });
-      
-      const leave = await storage.addDoctorLeave(leaveData);
-      res.status(201).json(leave);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid leave data" });
     }
   });
 
   // Dashboard stats routes
-  app.get("/api/dashboard/stats", authenticateToken, async (req, res) => {
+  app.get("/api/dashboard/stats", authenticateToken, async (req: any, res) => {
     try {
       const today = new Date().toISOString().split('T')[0];
       
-      let stats: any = {};
-      
       if (req.user.role === 'doctor') {
-        const todayAppointments = await storage.getAppointmentsByDoctor(req.user.id, today);
-        const totalPatients = await storage.getAllPatients();
-        const doctorPrescriptions = await storage.getPrescriptionsByDoctor(req.user.id);
+        const todayAppointments = await storage.getAppointmentsByDate(today);
+        const doctorAppointments = todayAppointments.filter(apt => apt.doctorId === req.user.id);
+        const recentPrescriptions = await storage.getPrescriptionsByDoctor(req.user.id);
         
-        stats = {
-          todayAppointments: todayAppointments.length,
-          totalPatients: totalPatients.length,
-          prescriptions: doctorPrescriptions.length,
-          pendingReviews: todayAppointments.filter(apt => apt.status === 'waiting').length
-        };
-      } else if (req.user.role === 'receptionist') {
-        const todayAppointments = await storage.getAllAppointments(today);
+        res.json({
+          todayAppointments: doctorAppointments.length,
+          totalPatients: (await storage.getAllPatients()).length,
+          prescriptions: recentPrescriptions.filter(p => p.isActive).length,
+          revenue: 0 // Doctors don't track revenue directly
+        });
+      } else {
+        const todayAppointments = await storage.getAppointmentsByDate(today);
+        const todayPayments = await storage.getPaymentsByDate(today);
         const allPatients = await storage.getAllPatients();
-        const todayPayments = await storage.getAllPayments(today);
-        const revenue = await storage.getRevenueByDate(today);
         
-        // Calculate new patients today (you might want to add a date filter)
-        const newPatientsToday = allPatients.filter(patient => 
-          patient.createdAt.toISOString().split('T')[0] === today
-        ).length;
+        const totalRevenue = todayPayments.reduce((sum, payment) => 
+          sum + parseFloat(payment.amount), 0
+        );
         
-        stats = {
-          newPatientsToday,
-          appointmentsToday: todayAppointments.length,
-          revenueToday: revenue,
-          pendingPayments: todayPayments.filter(payment => payment.status === 'pending').length
-        };
+        res.json({
+          todayAppointments: todayAppointments.length,
+          newPatients: allPatients.filter(p => 
+            p.createdAt && p.createdAt.toISOString().split('T')[0] === today
+          ).length,
+          paymentsToday: totalRevenue,
+          cancellations: todayAppointments.filter(apt => apt.status === 'cancelled').length
+        });
       }
-      
-      res.json(stats);
     } catch (error) {
       res.status(500).json({ message: "Internal server error" });
     }
