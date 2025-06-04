@@ -418,6 +418,15 @@ export default function ReceptionistDashboard() {
               onClose={() => setShowAppointmentModal(false)}
             />
           )}
+
+          {showReceiptModal && lastPayment && (
+            <ReceiptModal
+              isOpen={showReceiptModal}
+              onClose={() => setShowReceiptModal(false)}
+              payment={lastPayment}
+              patient={patients?.find((p: any) => p.id === lastPayment.patientId)}
+            />
+          )}
         </Layout>
       )}
     </ProtectedRoute>
