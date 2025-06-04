@@ -155,8 +155,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const appointmentData = insertAppointmentSchema.parse(req.body);
       const appointment = await storage.createAppointment(appointmentData);
       res.status(201).json(appointment);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid appointment data" });
+    } catch (error: any) {
+      console.error('Appointment validation error:', error);
+      res.status(400).json({ 
+        message: error.message || "Invalid appointment data",
+        errors: error.errors || []
+      });
     }
   });
 
@@ -251,8 +255,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const payment = await storage.createPayment(paymentData);
       res.status(201).json(payment);
-    } catch (error) {
-      res.status(400).json({ message: "Invalid payment data" });
+    } catch (error: any) {
+      console.error('Payment validation error:', error);
+      res.status(400).json({ 
+        message: error.message || "Invalid payment data",
+        errors: error.errors || []
+      });
     }
   });
 

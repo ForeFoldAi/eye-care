@@ -90,6 +90,8 @@ export const insertPatientSchema = createInsertSchema(patients).omit({
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   id: true,
   createdAt: true,
+}).extend({
+  datetime: z.string().or(z.date()),
 });
 
 export const insertPrescriptionSchema = createInsertSchema(prescriptions).omit({
