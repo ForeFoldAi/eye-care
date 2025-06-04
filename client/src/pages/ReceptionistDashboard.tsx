@@ -4,6 +4,7 @@ import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PatientRegistrationModal from "@/components/PatientRegistrationModal";
 import AppointmentBookingModal from "@/components/AppointmentBookingModal";
+import ReceiptModal from "@/components/ReceiptModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,9 @@ import { useToast } from "@/hooks/use-toast";
 export default function ReceptionistDashboard() {
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [lastPayment, setLastPayment] = useState(null);
   const [paymentData, setPaymentData] = useState({
     patientId: "",
     amount: "",
@@ -61,10 +64,12 @@ export default function ReceptionistDashboard() {
       if (!response.ok) throw new Error('Failed to process payment');
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (payment) => {
       queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      setLastPayment(payment);
       setPaymentData({ patientId: "", amount: "", method: "" });
+      setShowReceiptModal(true);
       toast({
         title: "Payment Processed",
         description: "Payment has been successfully processed and receipt generated.",
@@ -116,6 +121,15 @@ export default function ReceptionistDashboard() {
       toast({
         title: "Invalid Payment Data",
         description: "Please fill in all payment fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (parseFloat(paymentData.amount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount greater than 0.",
         variant: "destructive",
       });
       return;
