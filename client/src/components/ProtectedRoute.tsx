@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authService, User } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
+import { Navigate } from "react-router-dom";
 
 interface ProtectedRouteProps {
   children: (user: User) => ReactNode;
@@ -11,13 +12,15 @@ interface ProtectedRouteProps {
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
   const { data, isLoading, error } = useQuery({
     queryKey: ['/api/auth/me'],
+    queryFn: () => authService.getCurrentUser(),
     enabled: authService.isAuthenticated(),
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // If not authenticated, redirect to login
   if (!authService.isAuthenticated()) {
-    window.location.href = '/';
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   if (isLoading) {
@@ -33,8 +36,7 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   if (error || !data?.user) {
     authService.logout();
-    window.location.href = '/';
-    return null;
+    return <Navigate to="/login" replace />;
   }
 
   const user = data.user;

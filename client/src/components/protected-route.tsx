@@ -1,19 +1,57 @@
-import { Navigate } from "wouter";
-import { isAuthenticated, hasRole } from "@/lib/auth";
+import { ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { authService, type User } from "@/lib/auth";
+import { Loader2 } from "lucide-react";
+import { Navigate } from "react-router-dom";
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
-  requiredRole?: string;
+  children: (user: User) => ReactNode;
+  requiredRole?: 'doctor' | 'receptionist';
 }
 
 export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" />;
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['/api/auth/me'],
+    queryFn: () => authService.getCurrentUser(),
+    enabled: authService.isAuthenticated(),
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // If not authenticated, redirect to login
+  if (!authService.isAuthenticated()) {
+    return <Navigate to="/login" replace />;
   }
 
-  if (requiredRole && !hasRole(requiredRole)) {
-    return <Navigate to="/unauthorized" />;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-medical-blue-500" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  return <>{children}</>;
+  if (error || !data?.user) {
+    authService.logout();
+    return <Navigate to="/login" replace />;
+  }
+
+  const user = data.user;
+
+  // Check role requirements
+  if (requiredRole && user.role !== requiredRole) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600">You don't have permission to access this page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children(user)}</>;
 }

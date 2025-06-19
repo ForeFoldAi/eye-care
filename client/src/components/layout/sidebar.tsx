@@ -1,7 +1,7 @@
-import { Link, useLocation } from "wouter";
+import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { getCurrentUser, clearAuthData } from "@/lib/auth";
+import { authService } from "@/lib/auth";
 import { ROLES } from "@/lib/constants";
 import {
   LayoutDashboard,
@@ -33,8 +33,8 @@ const receptionistMenuItems = [
 ];
 
 export function Sidebar() {
-  const [location] = useLocation();
-  const user = getCurrentUser();
+  const location = useLocation();
+  const user = authService.getStoredUser();
 
   if (!user) return null;
 
@@ -43,7 +43,7 @@ export function Sidebar() {
   const UserIcon = userIcon;
 
   const handleLogout = () => {
-    clearAuthData();
+    authService.logout();
     window.location.href = "/login";
   };
 
@@ -72,10 +72,14 @@ export function Sidebar() {
         <nav className="flex-1 px-4 py-6 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location === item.href;
+            const isActive = location.pathname === item.href;
             
             return (
-              <Link key={item.href} href={item.href}>
+              <Link 
+                key={item.href} 
+                to={item.href} 
+                className="block"
+              >
                 <Button
                   variant={isActive ? "default" : "ghost"}
                   className={cn(

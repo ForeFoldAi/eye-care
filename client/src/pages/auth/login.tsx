@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Navigate } from "wouter";
+import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
-import { setAuthData, isAuthenticated } from "@/lib/auth";
+import { authService } from "@/lib/auth";
 import { ROLES } from "@/lib/constants";
 
 import {
@@ -40,9 +40,11 @@ type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
-  if (isAuthenticated()) {
-    return <Navigate to="/dashboard" />;
+  if (authService.isAuthenticated()) {
+    navigate("/dashboard");
+    return null;
   }
 
   const form = useForm<LoginForm>({
@@ -61,7 +63,7 @@ export default function Login() {
       return response.json();
     },
     onSuccess: (data) => {
-      setAuthData(data.token, data.user);
+      authService.setAuth(data.token, data.user);
       toast({
         title: "Success",
         description: "Logged in successfully",

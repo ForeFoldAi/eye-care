@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation } from "react-router-dom";
 import { authService, User } from "@/lib/auth";
 import { 
   Heart, 
@@ -20,15 +20,15 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, user }: LayoutProps) {
-  const [location] = useLocation();
+  const location = useLocation();
 
   const handleLogout = () => {
     authService.logout();
     window.location.href = '/';
   };
 
-  const isDoctorRoute = location.startsWith('/doctor');
-  const isReceptionistRoute = location.startsWith('/receptionist');
+  const isDoctorRoute = location.pathname.startsWith('/doctor');
+  const isReceptionistRoute = location.pathname.startsWith('/receptionist');
 
   const doctorNavItems = [
     { href: '/doctor', icon: BarChart3, label: 'Dashboard' },
@@ -105,19 +105,21 @@ export default function Layout({ children, user }: LayoutProps) {
 
           <div className="space-y-1 px-3">
             {navItems.map((item) => {
-              const isActive = location === item.href;
+              const isActive = location.pathname === item.href;
               const Icon = item.icon;
               
               return (
-                <Link key={item.href} href={item.href}>
-                  <a className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                <Link 
+                  key={item.href} 
+                  to={item.href}
+                  className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     isActive 
                       ? 'bg-medical-blue-50 text-medical-blue-700' 
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}>
+                  }`}
+                >
                     <Icon className="w-5 h-5 mr-3" />
                     {item.label}
-                  </a>
                 </Link>
               );
             })}
@@ -137,7 +139,7 @@ export default function Layout({ children, user }: LayoutProps) {
       </div>
 
       {/* Main Content */}
-      <div className="ml-64">
+      <div className="ml-60">
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">

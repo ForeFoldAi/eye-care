@@ -49,22 +49,23 @@ export function PatientRegistrationModal({ trigger }: PatientRegistrationModalPr
       firstName: "",
       lastName: "",
       dateOfBirth: "",
-      gender: "",
+      gender: "male",
       phone: "",
       email: "",
       address: "",
-      bloodType: "",
-      allergies: "",
       medicalHistory: "",
       emergencyContactName: "",
-      emergencyContactRelation: "",
       emergencyContactPhone: "",
     },
   });
 
   const createPatientMutation = useMutation({
     mutationFn: async (data: InsertPatient) => {
-      const response = await apiRequest("POST", "/api/patients", data);
+      const formattedData = {
+        ...data,
+        dateOfBirth: new Date(data.dateOfBirth).toISOString(),
+      };
+      const response = await apiRequest("POST", "/api/patients", formattedData);
       return response.json();
     },
     onSuccess: () => {
@@ -139,11 +140,16 @@ export function PatientRegistrationModal({ trigger }: PatientRegistrationModalPr
                 <FormField
                   control={form.control}
                   name="dateOfBirth"
-                  render={({ field }) => (
+                  render={({ field: { value, onChange, ...field } }) => (
                     <FormItem>
                       <FormLabel>Date of Birth *</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} />
+                        <Input 
+                          type="date" 
+                          {...field}
+                          value={value ? new Date(value).toISOString().split('T')[0] : ''}
+                          onChange={(e) => onChange(e.target.value)}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -155,7 +161,7 @@ export function PatientRegistrationModal({ trigger }: PatientRegistrationModalPr
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Gender *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select gender" />
@@ -228,43 +234,6 @@ export function PatientRegistrationModal({ trigger }: PatientRegistrationModalPr
               <div className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="bloodType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Blood Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select blood type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {BLOOD_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="allergies"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Allergies</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} rows={2} placeholder="List any known allergies..." />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="medicalHistory"
                   render={({ field }) => (
                     <FormItem>
@@ -289,19 +258,6 @@ export function PatientRegistrationModal({ trigger }: PatientRegistrationModalPr
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Contact Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="emergencyContactRelation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Relationship</FormLabel>
                       <FormControl>
                         <Input {...field} />
                       </FormControl>

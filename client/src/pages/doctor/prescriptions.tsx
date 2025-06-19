@@ -1,195 +1,245 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import PrescriptionModal from "@/components/PrescriptionModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { PrescriptionFormModal } from "@/components/modals/prescription-form";
-import { getCurrentUser } from "@/lib/auth";
-import { Search, FileText, User, Calendar, Pill } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  Search,
+  FileText,
+  Calendar,
+  User,
+  Plus,
+  Download,
+  Eye
+} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { apiRequest } from "@/lib/queryClient";
+import { authService } from "@/lib/auth";
 
-export default function DoctorPrescriptions() {
+interface Patient {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  email?: string;
+  patientId?: string;
+}
+
+interface Medication {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration?: string;
+  quantity?: number;
+}
+
+interface Prescription {
+  _id: string;
+  patientId: string;
+  doctorId: string;
+  medications: Medication[];
+  instructions?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  patient?: Patient;
+}
+
+type PatientFilter = 'all' | string;
+
+export default function DoctorPrescriptionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const user = getCurrentUser();
+  const [selectedPatientId, setSelectedPatientId] = useState<PatientFilter>("all");
+  const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
-  const { data: prescriptions = [], isLoading } = useQuery({
-    queryKey: ["/api/prescriptions", { doctorId: user?.id }],
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/auth/me'],
+    queryFn: () => authService.getCurrentUser().then(res => res.user),
   });
 
-  const filteredPrescriptions = prescriptions.filter((prescription: any) => {
-    if (!searchQuery) return true;
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      prescription.patient.firstName.toLowerCase().includes(searchLower) ||
-      prescription.patient.lastName.toLowerCase().includes(searchLower) ||
-      prescription.patient.patientId.toLowerCase().includes(searchLower) ||
-      prescription.medications.toLowerCase().includes(searchLower)
-    );
+  const { data: prescriptions = [] } = useQuery<Prescription[]>({
+    queryKey: ['/api/prescriptions'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/prescriptions");
+      return response.json();
+    },
+    enabled: !!currentUser?.id,
   });
 
-  const getInitials = (firstName: string, lastName: string) => {
-    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  const { data: patients = [] } = useQuery<Patient[]>({
+    queryKey: ['/api/patients'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/patients");
+      return response.json();
+    },
+  });
+
+  const filteredPrescriptions = prescriptions.filter(prescription => {
+    const patient = prescription.patient || patients.find(p => p._id === prescription.patientId);
+    
+    const matchesSearch = searchQuery === "" || 
+      patient?.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      patient?.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      prescription.medications.some(med => 
+        med.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+    const matchesPatient = selectedPatientId === "all" || prescription.patientId === selectedPatientId;
+
+    return matchesSearch && matchesPatient;
+  });
+
+  const getPatientName = (patientId: string) => {
+    const patient = patients.find(p => p._id === patientId);
+    return patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown Patient';
   };
 
-  const parseMedications = (medicationsJson: string) => {
+  const handleDownload = async (prescriptionId: string) => {
     try {
-      return JSON.parse(medicationsJson);
-    } catch {
-      return [];
+      const response = await apiRequest("GET", `/api/prescriptions/${prescriptionId}/download`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `prescription-${prescriptionId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+    toast({
+        title: "Error",
+        description: "Failed to download prescription",
+        variant: "destructive",
+    });
     }
   };
 
+  const handleView = (prescriptionId: string) => {
+    navigate(`/doctor/prescriptions/${prescriptionId}`);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      
-      <div className="ml-64 flex-1">
-        <Header 
-          title="Prescriptions" 
-          action={<PrescriptionFormModal />}
-        />
-        
-        <main className="p-6">
-          {/* Search */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5" />
-                Search Prescriptions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  placeholder="Search by patient name, ID, or medication..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Prescriptions List */}
-          {isLoading ? (
-            <div className="text-center py-8">Loading prescriptions...</div>
-          ) : filteredPrescriptions.length === 0 ? (
+    <div className="space-y-6">
             <Card>
-              <CardContent className="text-center py-12">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">
-                  {searchQuery ? "No prescriptions found matching your search" : "No prescriptions yet"}
-                </p>
-                {!searchQuery && (
-                  <PrescriptionFormModal
-                    trigger={
-                      <Button className="mt-4 bg-medical-blue hover:bg-blue-600">
-                        Write First Prescription
-                      </Button>
-                    }
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-2xl font-bold">Prescriptions</CardTitle>
+                <div className="flex items-center space-x-2">
+                      <Input
+                        placeholder="Search prescriptions..."
+                    className="max-w-sm"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                   />
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {filteredPrescriptions.map((prescription: any) => (
-                <Card key={prescription.id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start space-x-4 flex-1">
-                        <div className="h-12 w-12 bg-medical-blue rounded-full flex items-center justify-center">
-                          <span className="text-white font-medium">
-                            {getInitials(prescription.patient.firstName, prescription.patient.lastName)}
-                          </span>
-                        </div>
-                        
-                        <div className="flex-1">
-                          <div className="flex items-center gap-4 mb-3">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                              {prescription.patient.firstName} {prescription.patient.lastName}
-                            </h3>
-                            <Badge variant="outline" className="text-xs">
-                              {prescription.patient.patientId}
-                            </Badge>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <Calendar className="h-4 w-4" />
-                              <span>Prescribed: {new Date(prescription.createdAt).toLocaleDateString()}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-gray-600">
-                              <User className="h-4 w-4" />
-                              <span>Patient Age: {prescription.patient.dateOfBirth ? 
-                                new Date().getFullYear() - new Date(prescription.patient.dateOfBirth).getFullYear() : 'N/A'} years</span>
-                            </div>
-                          </div>
-
-                          {/* Medications */}
-                          <div className="mb-4">
-                            <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center gap-2">
-                              <Pill className="h-4 w-4" />
-                              Medications
-                            </h4>
-                            <div className="space-y-2">
-                              {parseMedications(prescription.medications).map((med: any, index: number) => (
-                                <div key={index} className="bg-blue-50 p-3 rounded-lg">
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                                    <div>
-                                      <span className="font-medium text-gray-700">Name:</span>
-                                      <p className="text-gray-900">{med.name}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-gray-700">Dosage:</span>
-                                      <p className="text-gray-900">{med.dosage}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-gray-700">Frequency:</span>
-                                      <p className="text-gray-900">{med.frequency}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-gray-700">Duration:</span>
-                                      <p className="text-gray-900">{med.duration}</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Instructions */}
-                          {prescription.instructions && (
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-900 mb-2">Instructions</h4>
-                              <p className="text-sm text-gray-700 bg-green-50 p-3 rounded-lg">
-                                {prescription.instructions}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="ml-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="border-medical-blue text-medical-blue hover:bg-blue-50"
-                        >
-                          View Details
-                        </Button>
-                      </div>
+            <Select
+              value={selectedPatientId}
+              onValueChange={(value: PatientFilter) => setSelectedPatientId(value)}
+            >
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Filter by Patient" />
+                    </SelectTrigger>
+                    <SelectContent>
+                <SelectItem value="all">All Patients</SelectItem>
+                      {patients.map((patient) => (
+                  <SelectItem key={patient._id} value={patient._id}>
+                          {patient.firstName} {patient.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={() => setShowPrescriptionModal(true)} size="sm">
+              <FileText className="w-4 h-4 mr-2" /> New Prescription
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+          <div className="space-y-4">
+            {filteredPrescriptions.map((prescription) => (
+              <div
+                key={prescription._id}
+                className="flex items-center justify-between p-4 rounded-lg border border-gray-100 hover:border-medical-blue-200 transition-colors"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 bg-medical-blue-50 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-medical-blue-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900">
+                      {getPatientName(prescription.patientId)}
+                    </h3>
+                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                      {prescription.medications.map((med, index) => (
+                        <span key={index}>
+                          {med.name} {med.dosage} • {med.frequency}
+                          {index < prescription.medications.length - 1 && " | "}
+                        </span>
+                      ))}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </main>
-      </div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge
+                    variant={prescription.isActive ? "default" : "secondary"}
+                    className={prescription.isActive ? "bg-green-100 text-green-800" : ""}
+                  >
+                    {prescription.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleView(prescription._id)}
+                  >
+                    <Eye className="w-4 h-4 mr-2" />
+                    View
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDownload(prescription._id)}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            {filteredPrescriptions.length === 0 && (
+              <div className="text-center py-12">
+                <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-1">No Prescriptions Found</h3>
+                <p className="text-gray-500">
+                  {searchQuery || selectedPatientId !== "all"
+                    ? "Try adjusting your search or filters"
+                    : "Start by creating a new prescription"}
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {showPrescriptionModal && (
+          <PrescriptionModal
+            isOpen={showPrescriptionModal}
+            onClose={() => setShowPrescriptionModal(false)}
+            onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/prescriptions'] });
+            setShowPrescriptionModal(false);
+            toast({
+              title: "Success",
+              description: "Prescription created successfully",
+            });
+            }}
+          />
+      )}
     </div>
   );
 }

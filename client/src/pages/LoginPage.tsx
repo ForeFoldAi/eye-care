@@ -1,146 +1,188 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { authService, setupAuthInterceptor } from "@/lib/auth";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { authService } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Heart, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
-  role: z.enum(['doctor', 'receptionist'], {
-    required_error: "Please select a role",
-  }),
-});
-
-type LoginForm = z.infer<typeof loginSchema>;
+import { Heart } from "lucide-react";
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  
-  const form = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-      role: undefined,
-    },
-  });
+  const navigate = useNavigate();
 
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginForm) => {
-      return authService.login(data.email, data.password, data.role);
-    },
-    onSuccess: (response) => {
-      authService.setAuth(response.token, response.user);
-      setupAuthInterceptor();
-      
-      // Redirect based on role
-      if (response.user.role === 'doctor') {
-        window.location.href = '/doctor';
-      } else {
-        window.location.href = '/receptionist';
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (authService.isAuthenticated()) {
+        try {
+          const { user } = await authService.getCurrentUser();
+          if (user.role === 'doctor') {
+            navigate('/doctor', { replace: true });
+          } else if (user.role === 'receptionist') {
+            navigate('/receptionist', { replace: true });
+          }
+        } catch (error) {
+          // If getCurrentUser fails, clear auth data
+          authService.logout();
+        }
       }
-      
+    };
+    
+    checkAuth();
+  }, [navigate]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email || !password) {
       toast({
-        title: "Login Successful",
-        description: `Welcome back, ${response.user.firstName}!`,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Login Failed",
-        description: error.message || "Invalid credentials. Please try again.",
+        title: "Missing Fields",
+        description: "Please fill in all required fields",
         variant: "destructive",
       });
-    },
-  });
+      return;
+    }
 
-  const onSubmit = (data: LoginForm) => {
-    loginMutation.mutate(data);
+    if (!role) {
+      toast({
+        title: "Role Required",
+        description: "Please select your role",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await authService.login(email, password, role);
+      
+      // Show success message
+      toast({
+        title: "Login Successful",
+        description: `Welcome back${response.user.firstName ? ', ' + response.user.firstName : ''}!`,
+        variant: "default",
+      });
+
+      // Small delay to ensure token is stored before navigation
+      setTimeout(() => {
+        if (response.user.role === 'doctor') {
+          navigate('/doctor', { replace: true });
+        } else if (response.user.role === 'receptionist') {
+          navigate('/receptionist', { replace: true });
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Login Failed",
+        description: error instanceof Error ? error.message : "Invalid email or password",
+        variant: "destructive",
+      });
+      // Clear password field on error
+      setPassword("");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDemoLogin = async (userType: 'doctor' | 'receptionist') => {
+    setEmail(userType === 'doctor' ? "doctor@hospital.com" : "receptionist@hospital.com");
+    setPassword(userType === 'doctor' ? "doctor123" : "receptionist123");
+    setRole(userType);
+    
+    // Submit the form after setting the values
+    const demoCredentials = {
+      email: userType === 'doctor' ? "doctor@hospital.com" : "receptionist@hospital.com",
+      password: userType === 'doctor' ? "doctor123" : "receptionist123",
+      role: userType,
+    };
+    
+    setIsLoading(true);
+    
+    try {
+      const response = await authService.login(
+        demoCredentials.email,
+        demoCredentials.password,
+        demoCredentials.role
+      );
+      
+      toast({
+        title: "Demo Login Successful",
+        description: `Welcome back${response.user.firstName ? ', ' + response.user.firstName : ''}!`,
+        variant: "default",
+      });
+
+      // Small delay to ensure token is stored before navigation
+      setTimeout(() => {
+        if (response.user.role === 'doctor') {
+          navigate('/doctor', { replace: true });
+        } else if (response.user.role === 'receptionist') {
+          navigate('/receptionist', { replace: true });
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Demo login error:', error);
+      toast({
+        title: "Demo Login Failed",
+        description: "Failed to log in with demo credentials. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-medical-blue-50 to-blue-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl">
-        <CardHeader className="text-center pb-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-medical-blue-500 rounded-full mb-4 mx-auto">
-            <Heart className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-lg shadow-lg p-8">
+          <div className="flex items-center justify-center mb-8">
+            <div className="w-12 h-12 bg-medical-blue-500 rounded-xl flex items-center justify-center">
+              <Heart className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="ml-4 text-2xl font-bold text-gray-900">HealthCare</h1>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">HealthCare Portal</h1>
-          <p className="text-gray-600 mt-2">Patient Data Management System</p>
-        </CardHeader>
 
-        <CardContent>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                Email Address
-              </Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="doctor@hospital.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="mt-2"
-                {...form.register("email")}
+                required
+                disabled={isLoading}
               />
-              {form.formState.errors.email && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.email.message}
-                </p>
-              )}
             </div>
 
             <div>
-              <Label htmlFor="password" className="text-sm font-medium text-gray-700">
-                Password
-              </Label>
-              <div className="relative mt-2">
+              <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  {...form.register("password")}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <Eye className="w-4 h-4 text-gray-400" />
-                  )}
-                </Button>
-              </div>
-              {form.formState.errors.password && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.password.message}
-                </p>
-              )}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-2"
+                required
+                disabled={isLoading}
+              />
             </div>
 
             <div>
-              <Label htmlFor="role" className="text-sm font-medium text-gray-700">
-                Role
-              </Label>
+              <Label>Role</Label>
               <Select
-                value={form.watch("role")}
-                onValueChange={(value: "doctor" | "receptionist") => 
-                  form.setValue("role", value)
-                }
+                value={role} 
+                onValueChange={setRole}
+                disabled={isLoading}
               >
                 <SelectTrigger className="mt-2">
                   <SelectValue placeholder="Select your role" />
@@ -150,23 +192,18 @@ export default function LoginPage() {
                   <SelectItem value="receptionist">Receptionist</SelectItem>
                 </SelectContent>
               </Select>
-              {form.formState.errors.role && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.role.message}
-                </p>
-              )}
             </div>
 
             <Button
               type="submit"
-              className="w-full bg-medical-blue-500 hover:bg-medical-blue-600 text-white"
-              disabled={loginMutation.isPending}
+              className="w-full bg-medical-blue-500 hover:bg-medical-blue-600"
+              disabled={isLoading}
             >
-              {loginMutation.isPending ? "Signing In..." : "Sign In"}
+              {isLoading ? "Signing in..." : "Sign in"}
             </Button>
           </form>
 
-          {/* Demo Access Section */}
+          {/* Demo Login Section */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-center text-sm text-gray-500 mb-4">Quick Demo Access</p>
             <div className="grid grid-cols-2 gap-3">
@@ -174,11 +211,8 @@ export default function LoginPage() {
                 type="button"
                 variant="outline"
                 className="bg-medical-blue-50 text-medical-blue-700 border-medical-blue-200 hover:bg-medical-blue-100"
-                onClick={() => {
-                  form.setValue("email", "doctor@hospital.com");
-                  form.setValue("password", "doctor123");
-                  form.setValue("role", "doctor");
-                }}
+                onClick={() => handleDemoLogin('doctor')}
+                disabled={isLoading}
               >
                 Doctor Demo
               </Button>
@@ -186,18 +220,15 @@ export default function LoginPage() {
                 type="button"
                 variant="outline"
                 className="bg-medical-green-50 text-medical-green-700 border-medical-green-200 hover:bg-medical-green-100"
-                onClick={() => {
-                  form.setValue("email", "receptionist@hospital.com");
-                  form.setValue("password", "receptionist123");
-                  form.setValue("role", "receptionist");
-                }}
+                onClick={() => handleDemoLogin('receptionist')}
+                disabled={isLoading}
               >
                 Receptionist Demo
               </Button>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

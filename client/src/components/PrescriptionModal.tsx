@@ -1,99 +1,133 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useMutation, queryClient } from "@/lib/queryClient";
-import { insertPrescriptionSchema } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+import { insertPrescriptionSchema, type InsertPrescription } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X } from "lucide-react";
+import { X, Plus, Minus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { authService } from "@/lib/auth";
 
-interface PrescriptionModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+interface Patient {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  email?: string;
+  patientId?: string;
 }
 
-type PrescriptionFormData = {
-  patientId: number;
-  medication: string;
+interface Medication {
+  name: string;
   dosage: string;
   frequency: string;
   duration?: string;
   quantity?: number;
-  instructions?: string;
-  notes?: string;
-};
+}
 
-export default function PrescriptionModal({ isOpen, onClose }: PrescriptionModalProps) {
+interface PrescriptionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export default function PrescriptionModal({ isOpen, onClose, onSuccess }: PrescriptionModalProps) {
   const { toast } = useToast();
+  const [medications, setMedications] = useState<Medication[]>([{ name: "", dosage: "", frequency: "" }]);
+
+  const { data: currentUser } = useQuery({
+    queryKey: ['/api/auth/me'],
+    queryFn: () => authService.getCurrentUser().then(res => res.user),
+  });
   
-  const { data: patients } = useQuery({
+  const { data: patients } = useQuery<Patient[]>({
     queryKey: ['/api/patients'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/patients");
+      return response.json();
+    },
   });
 
-  const form = useForm<PrescriptionFormData>({
-    resolver: zodResolver(insertPrescriptionSchema.omit({ doctorId: true })),
+  const form = useForm<InsertPrescription>({
+    resolver: zodResolver(insertPrescriptionSchema),
     defaultValues: {
-      patientId: 0,
-      medication: "",
-      dosage: "",
-      frequency: "",
-      duration: "",
-      quantity: undefined,
+      patientId: "",
+      doctorId: currentUser?.id || "",
+      medications: [],
       instructions: "",
       notes: "",
     },
   });
 
-  const prescriptionMutation = useMutation({
-    mutationFn: async (data: PrescriptionFormData) => {
-      const response = await fetch('/api/prescriptions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create prescription');
-      return response.json();
-    },
-    onSuccess: (newPrescription) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/prescriptions'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      form.reset();
-      onClose();
-      toast({
-        title: "Prescription Created",
-        description: `Prescription for ${newPrescription.medication} has been successfully created.`,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Creation Failed",
-        description: error.message || "Failed to create prescription. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onSubmit = (data: PrescriptionFormData) => {
-    prescriptionMutation.mutate(data);
+  const addMedication = () => {
+    setMedications([...medications, { name: "", dosage: "", frequency: "" }]);
   };
 
-  const handleClose = () => {
-    form.reset();
-    onClose();
+  const removeMedication = (index: number) => {
+    if (medications.length > 1) {
+      setMedications(medications.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateMedication = (index: number, field: keyof Medication, value: string | number) => {
+    const updatedMedications = [...medications];
+    updatedMedications[index] = { 
+      ...updatedMedications[index], 
+      [field]: field === 'quantity' ? Number(value) : value 
+    };
+    setMedications(updatedMedications);
+  };
+
+  const onSubmit = async (data: InsertPrescription) => {
+    if (medications.length === 0 || !medications.some(med => med.name.trim() !== "")) {
+      toast({
+        title: "Error",
+        description: "At least one medication is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await apiRequest("POST", "/api/prescriptions", {
+        ...data,
+        medications: medications.filter(med => med.name.trim() !== ""),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create prescription");
+      }
+
+      toast({
+        title: "Success",
+        description: "Prescription has been created successfully",
+      });
+      form.reset();
+      setMedications([{ name: "", dosage: "", frequency: "" }]);
+      onSuccess();
+      onClose();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create prescription",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between text-xl font-semibold text-gray-900">
             Write Prescription
-            <Button variant="ghost" size="sm" onClick={handleClose}>
+            <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="w-5 h-5" />
             </Button>
           </DialogTitle>
@@ -103,111 +137,97 @@ export default function PrescriptionModal({ isOpen, onClose }: PrescriptionModal
           <div>
             <Label className="text-sm font-medium text-gray-700">Patient *</Label>
             <Select
-              value={form.watch("patientId")?.toString() || ""}
-              onValueChange={(value) => form.setValue("patientId", parseInt(value))}
+              value={form.watch("patientId")}
+              onValueChange={(value) => form.setValue("patientId", value)}
             >
               <SelectTrigger className="mt-2">
                 <SelectValue placeholder="Select patient" />
               </SelectTrigger>
               <SelectContent>
-                {patients?.map((patient: any) => (
-                  <SelectItem key={patient.id} value={patient.id.toString()}>
-                    {patient.firstName} {patient.lastName}
+                {patients?.map((patient) => (
+                  <SelectItem key={patient._id} value={patient._id}>
+                    {patient.firstName} {patient.lastName} {patient.patientId ? `- ${patient.patientId}` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             {form.formState.errors.patientId && (
               <p className="text-sm text-red-600 mt-1">
-                Please select a patient
+                {form.formState.errors.patientId.message}
               </p>
             )}
           </div>
 
+          {/* Medications */}
           <div>
-            <Label htmlFor="medication" className="text-sm font-medium text-gray-700">
-              Medication Name *
-            </Label>
-            <Input
-              id="medication"
-              placeholder="e.g., Lisinopril, Metformin, Amoxicillin"
-              {...form.register("medication")}
-              className="mt-2"
-            />
-            {form.formState.errors.medication && (
-              <p className="text-sm text-red-600 mt-1">
-                {form.formState.errors.medication.message}
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="dosage" className="text-sm font-medium text-gray-700">
-                Dosage *
-              </Label>
-              <Input
-                id="dosage"
-                placeholder="e.g., 10mg, 500mg"
-                {...form.register("dosage")}
-                className="mt-2"
-              />
-              {form.formState.errors.dosage && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.dosage.message}
-                </p>
-              )}
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-md font-medium text-gray-900">Medications *</h4>
+              <Button type="button" variant="outline" size="sm" onClick={addMedication}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Medication
+              </Button>
             </div>
             
+            <div className="space-y-4">
+              {medications.map((medication, index) => (
+                <div key={index} className="grid grid-cols-2 gap-2 p-2 border rounded">
             <div>
-              <Label className="text-sm font-medium text-gray-700">Frequency *</Label>
-              <Select
-                value={form.watch("frequency")}
-                onValueChange={(value) => form.setValue("frequency", value)}
-              >
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Select frequency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="once_daily">Once daily</SelectItem>
-                  <SelectItem value="twice_daily">Twice daily</SelectItem>
-                  <SelectItem value="three_times_daily">Three times daily</SelectItem>
-                  <SelectItem value="four_times_daily">Four times daily</SelectItem>
-                  <SelectItem value="as_needed">As needed</SelectItem>
-                </SelectContent>
-              </Select>
-              {form.formState.errors.frequency && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.frequency.message}
-                </p>
-              )}
+                    <Label>Name *</Label>
+                    <Input
+                      value={medication.name}
+                      onChange={(e) => updateMedication(index, "name", e.target.value)}
+                      placeholder="Medication name"
+                      required
+                    />
             </div>
+                  <div>
+                    <Label>Dosage *</Label>
+                    <Input
+                      value={medication.dosage}
+                      onChange={(e) => updateMedication(index, "dosage", e.target.value)}
+                      placeholder="Dosage"
+                      required
+                    />
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="duration" className="text-sm font-medium text-gray-700">
-                Duration
-              </Label>
+                    <Label>Frequency *</Label>
               <Input
-                id="duration"
-                placeholder="e.g., 7 days, 2 weeks, 1 month"
-                {...form.register("duration")}
-                className="mt-2"
+                      value={medication.frequency}
+                      onChange={(e) => updateMedication(index, "frequency", e.target.value)}
+                      placeholder="Frequency"
+                      required
               />
             </div>
-            
             <div>
-              <Label htmlFor="quantity" className="text-sm font-medium text-gray-700">
-                Quantity
-              </Label>
+                    <Label>Duration</Label>
+                    <Input
+                      value={medication.duration || ""}
+                      onChange={(e) => updateMedication(index, "duration", e.target.value)}
+                      placeholder="Duration (optional)"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Quantity</Label>
               <Input
-                id="quantity"
                 type="number"
-                placeholder="e.g., 30, 60, 90"
-                {...form.register("quantity", { valueAsNumber: true })}
-                className="mt-2"
-              />
+                      value={medication.quantity || ""}
+                      onChange={(e) => updateMedication(index, "quantity", e.target.value)}
+                      placeholder="Quantity (optional)"
+                    />
+                  </div>
+                  {medications.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={() => removeMedication(index)}
+                      className="col-span-2"
+                    >
+                      <Minus className="mr-2 h-4 w-4" />
+                      Remove Medication
+                    </Button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
 
@@ -237,16 +257,19 @@ export default function PrescriptionModal({ isOpen, onClose }: PrescriptionModal
             />
           </div>
 
-          <div className="flex items-center justify-end space-x-4 pt-6 border-t border-gray-200">
-            <Button type="button" variant="outline" onClick={handleClose}>
+          <div className="flex justify-end space-x-3">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+            >
               Cancel
             </Button>
             <Button 
               type="submit" 
-              className="bg-medical-blue-500 hover:bg-medical-blue-600 text-white"
-              disabled={prescriptionMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
-              {prescriptionMutation.isPending ? "Creating..." : "Create Prescription"}
+              Save Prescription
             </Button>
           </div>
         </form>

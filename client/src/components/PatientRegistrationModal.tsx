@@ -1,3 +1,6 @@
+// Description: A modal component for registering new patients with a form that includes validation and submission handling.
+//file nme: PatientRegistrationModal.tsx
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, queryClient } from "@/lib/queryClient";
@@ -14,13 +17,14 @@ import { useToast } from "@/hooks/use-toast";
 interface PatientRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onSuccess?: () => void;
 }
 
 type PatientFormData = {
   firstName: string;
   lastName: string;
-  dateOfBirth: string;
-  gender: string;
+  dateOfBirth: string | Date;
+  gender: 'male' | 'female' | 'other';
   phone: string;
   email?: string;
   address?: string;
@@ -29,7 +33,7 @@ type PatientFormData = {
   medicalHistory?: string;
 };
 
-export default function PatientRegistrationModal({ isOpen, onClose }: PatientRegistrationModalProps) {
+export default function PatientRegistrationModal({ isOpen, onClose, onSuccess }: PatientRegistrationModalProps) {
   const { toast } = useToast();
   
   const form = useForm<PatientFormData>({
@@ -38,7 +42,7 @@ export default function PatientRegistrationModal({ isOpen, onClose }: PatientReg
       firstName: "",
       lastName: "",
       dateOfBirth: "",
-      gender: "",
+      gender: "" as 'male' | 'female' | 'other',
       phone: "",
       email: "",
       address: "",
@@ -50,12 +54,19 @@ export default function PatientRegistrationModal({ isOpen, onClose }: PatientReg
 
   const patientMutation = useMutation({
     mutationFn: async (data: PatientFormData) => {
-      const response = await fetch('/api/patients', {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:3000/api/patients', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error('Failed to register patient');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to register patient');
+      }
       return response.json();
     },
     onSuccess: (newPatient) => {
@@ -63,6 +74,7 @@ export default function PatientRegistrationModal({ isOpen, onClose }: PatientReg
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       form.reset();
       onClose();
+      onSuccess?.();
       toast({
         title: "Patient Registered",
         description: `${newPatient.firstName} ${newPatient.lastName} has been successfully registered.`,
@@ -77,8 +89,21 @@ export default function PatientRegistrationModal({ isOpen, onClose }: PatientReg
     },
   });
 
-  const onSubmit = (data: PatientFormData) => {
-    patientMutation.mutate(data);
+  const onSubmit = async (data: PatientFormData) => {
+    try {
+      // Validate the data against the schema
+      const validatedData = insertPatientSchema.parse(data);
+      await patientMutation.mutateAsync(validatedData);
+    } catch (error) {
+      console.error('Form submission error:', error);
+      if (error instanceof Error) {
+        toast({
+          title: "Validation Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   const handleClose = () => {
@@ -155,7 +180,7 @@ export default function PatientRegistrationModal({ isOpen, onClose }: PatientReg
               <Label className="text-sm font-medium text-gray-700">Gender *</Label>
               <Select
                 value={form.watch("gender")}
-                onValueChange={(value) => form.setValue("gender", value)}
+                onValueChange={(value: 'male' | 'female' | 'other') => form.setValue("gender", value)}
               >
                 <SelectTrigger className="mt-2">
                   <SelectValue placeholder="Select gender" />

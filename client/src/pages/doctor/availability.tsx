@@ -1,435 +1,570 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import React, { useState, useEffect } from 'react';
+import { Trash2, Clock, Plus, Calendar, Users, Edit2, MoreVertical } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { apiRequest } from "@/lib/queryClient";
-import { getCurrentUser } from "@/lib/auth";
-import { DAYS_OF_WEEK, TIME_SLOTS } from "@/lib/constants";
-import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, Plus, X } from "lucide-react";
+} from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormDescription,
+} from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
+import { Header } from '@/components/layout/header';
+import { authService } from '@/lib/auth';
+import { Badge } from '@/components/ui/badge';
 
-const availabilitySchema = z.object({
-  dayOfWeek: z.number().min(0).max(6),
-  startTime: z.string().min(1, "Start time is required"),
-  endTime: z.string().min(1, "End time is required"),
-  isAvailable: z.boolean().default(true),
-});
+interface TimeSlot {
+  startTime: string;
+  endTime: string;
+  hoursAvailable: number;
+  tokenCount: number;
+}
 
-const leaveSchema = z.object({
-  leaveDate: z.string().min(1, "Leave date is required"),
-  reason: z.string().optional(),
-});
+interface Availability {
+  _id: string;
+  doctorId: string;
+  dayOfWeek: number;
+  slots: TimeSlot[];
+}
 
-type AvailabilityForm = z.infer<typeof availabilitySchema>;
-type LeaveForm = z.infer<typeof leaveSchema>;
+const DAYS = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+];
 
-export default function DoctorAvailability() {
-  const [showAvailabilityForm, setShowAvailabilityForm] = useState(false);
-  const [showLeaveForm, setShowLeaveForm] = useState(false);
-  const user = getCurrentUser();
+const DEFAULT_SLOT: TimeSlot = {
+  startTime: '09:00',
+  endTime: '10:00',
+  hoursAvailable: 1,
+  tokenCount: 10,
+};
+
+export default function AvailabilityPage() {
+  const [availabilities, setAvailabilities] = useState<Availability[]>([]);
+  const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [newSlot, setNewSlot] = useState<TimeSlot>(DEFAULT_SLOT);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  const { data: availability = [], isLoading: availabilityLoading } = useQuery({
-    queryKey: ["/api/doctors", user?.id, "availability"],
-  });
-
-  const { data: leaves = [], isLoading: leavesLoading } = useQuery({
-    queryKey: ["/api/doctors", user?.id, "leaves"],
-  });
-
-  const availabilityForm = useForm<AvailabilityForm>({
-    resolver: zodResolver(availabilitySchema),
+  const user = authService.getStoredUser();
+  const form = useForm({
     defaultValues: {
-      dayOfWeek: 1,
-      startTime: "09:00",
-      endTime: "17:00",
-      isAvailable: true,
+      dayOfWeek: '1',
+      startTime: '09:00',
+      endTime: '10:00',
+      hoursAvailable: 1,
+      tokenCount: 10,
     },
   });
 
-  const leaveForm = useForm<LeaveForm>({
-    resolver: zodResolver(leaveSchema),
-    defaultValues: {
-      leaveDate: "",
-      reason: "",
-    },
-  });
+  useEffect(() => {
+    fetchAvailabilities();
+  }, []);
 
-  const addAvailabilityMutation = useMutation({
-    mutationFn: async (data: AvailabilityForm) => {
-      const response = await apiRequest("POST", `/api/doctors/${user?.id}/availability`, data);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Availability updated successfully",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/doctors", user?.id, "availability"] });
-      availabilityForm.reset();
-      setShowAvailabilityForm(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update availability",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const addLeaveMutation = useMutation({
-    mutationFn: async (data: LeaveForm) => {
-      const response = await apiRequest("POST", `/api/doctors/${user?.id}/leaves`, data);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Leave day added successfully",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/doctors", user?.id, "leaves"] });
-      leaveForm.reset();
-      setShowLeaveForm(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add leave day",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onAvailabilitySubmit = (data: AvailabilityForm) => {
-    addAvailabilityMutation.mutate(data);
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
   };
 
-  const onLeaveSubmit = (data: LeaveForm) => {
-    addLeaveMutation.mutate(data);
-  };
+  const fetchAvailabilities = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        toast({
+          title: 'Error',
+          description: 'Please log in to view availability',
+          variant: 'destructive',
+        });
+        return;
+      }
 
-  const getDayName = (dayOfWeek: number) => {
-    return DAYS_OF_WEEK.find(day => day.value === dayOfWeek)?.label || "Unknown";
-  };
+      const response = await fetch('/api/doctor/availability', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-  const groupedAvailability = availability.reduce((acc: any, item: any) => {
-    if (!acc[item.dayOfWeek]) {
-      acc[item.dayOfWeek] = [];
+      if (!response.ok) {
+        if (response.status === 403) {
+          toast({
+            title: 'Access Denied',
+            description: 'You do not have permission to view availability',
+            variant: 'destructive',
+          });
+          return;
+        }
+        throw new Error('Failed to fetch availabilities');
+      }
+
+      const data = await response.json();
+      setAvailabilities(data);
+    } catch (error) {
+      toast({
+        title: 'Error fetching availabilities',
+        description: 'Failed to load availability data',
+        variant: 'destructive',
+      });
     }
-    acc[item.dayOfWeek].push(item);
-    return acc;
-  }, {});
+  };
+
+  const handleAddTimeSlot = async (formData: any) => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        toast({
+          title: 'Error',
+          description: 'Please log in to add availability',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Convert form data to the correct format
+      const dayOfWeek = parseInt(formData.dayOfWeek);
+      const newSlot = {
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        hoursAvailable: parseInt(formData.hoursAvailable),
+        tokenCount: parseInt(formData.tokenCount),
+      };
+
+      // Find existing availability for the selected day
+      const existingAvailability = availabilities.find(a => a.dayOfWeek === dayOfWeek);
+      const slots = existingAvailability ? [...existingAvailability.slots, newSlot] : [newSlot];
+
+      const response = await fetch('/api/doctor/availability', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dayOfWeek,
+          slots,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          toast({
+            title: 'Access Denied',
+            description: 'You do not have permission to add availability',
+            variant: 'destructive',
+          });
+          return;
+        }
+        throw new Error('Failed to add time slot');
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Time slot added successfully',
+      });
+
+      fetchAvailabilities();
+      form.reset();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to add time slot',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeleteAvailability = async (dayOfWeek: number) => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        toast({
+          title: 'Error',
+          description: 'Please log in to delete availability',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const response = await fetch(`/api/doctor/availability/${dayOfWeek}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 403) {
+          toast({
+            title: 'Access Denied',
+            description: 'You do not have permission to delete availability',
+            variant: 'destructive',
+          });
+          return;
+        }
+        throw new Error('Failed to delete availability');
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Availability deleted successfully',
+      });
+
+      fetchAvailabilities();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete availability',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleEditAvailability = (dayOfWeek: number) => {
+    // TODO: Implement edit functionality
+    toast({
+      title: "Edit Availability",
+      description: "Edit functionality coming soon!",
+    });
+  };
+
+  if (!user) return null;
+
+  // Calculate some stats for the overview cards
+  const totalSlots = availabilities.reduce((acc, curr) => acc + curr.slots.length, 0);
+  const totalHours = availabilities.reduce((acc, curr) => 
+    acc + curr.slots.reduce((sum, slot) => sum + slot.hoursAvailable, 0), 0
+  );
+  const totalTokens = availabilities.reduce((acc, curr) => 
+    acc + curr.slots.reduce((sum, slot) => sum + slot.tokenCount, 0), 0
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      
-      <div className="ml-64 flex-1">
-        <Header title="Availability Management" />
-        
-        <main className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Weekly Schedule */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Weekly Schedule
-                  </CardTitle>
-                  <Button
-                    onClick={() => setShowAvailabilityForm(!showAvailabilityForm)}
-                    className="bg-medical-blue hover:bg-blue-600"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Hours
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {showAvailabilityForm && (
-                  <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-                    <h4 className="font-medium mb-4">Add Available Hours</h4>
-                    <Form {...availabilityForm}>
-                      <form onSubmit={availabilityForm.handleSubmit(onAvailabilitySubmit)} className="space-y-4">
-                        <FormField
-                          control={availabilityForm.control}
-                          name="dayOfWeek"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Day of Week</FormLabel>
-                              <Select onValueChange={(value) => field.onChange(parseInt(value))} defaultValue={field.value?.toString()}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  {DAYS_OF_WEEK.map((day) => (
-                                    <SelectItem key={day.value} value={day.value.toString()}>
-                                      {day.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={availabilityForm.control}
-                            name="startTime"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Start Time</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {TIME_SLOTS.map((time) => (
-                                      <SelectItem key={time} value={time}>
-                                        {time}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={availabilityForm.control}
-                            name="endTime"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>End Time</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {TIME_SLOTS.map((time) => (
-                                      <SelectItem key={time} value={time}>
-                                        {time}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
+      <div className="p-6 space-y-6">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-none shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-3xl font-bold text-blue-600">
+                {totalSlots}
+              </CardTitle>
+              <CardDescription className="text-blue-600/80 flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4" />
+                Total Time Slots
+              </CardDescription>
+            </CardHeader>
+          </Card>
 
-                        <FormField
-                          control={availabilityForm.control}
-                          name="isAvailable"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                              <div className="space-y-0.5">
-                                <FormLabel>Available</FormLabel>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
+          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-none shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-3xl font-bold text-purple-600">
+                {totalHours}h
+              </CardTitle>
+              <CardDescription className="text-purple-600/80 flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4" />
+                Total Hours Available
+              </CardDescription>
+            </CardHeader>
+          </Card>
 
-                        <div className="flex gap-2">
-                          <Button
-                            type="submit"
-                            className="bg-medical-blue hover:bg-blue-600"
-                            disabled={addAvailabilityMutation.isPending}
-                          >
-                            {addAvailabilityMutation.isPending ? "Adding..." : "Add"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowAvailabilityForm(false)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    </Form>
+          <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-none shadow-md hover:shadow-lg transition-shadow">
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-3xl font-bold text-emerald-600">
+                {totalTokens}
+              </CardTitle>
+              <CardDescription className="text-emerald-600/80 flex items-center gap-2 text-sm">
+                <Users className="h-4 w-4" />
+                Total Patient Tokens
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Add Time Slot Form */}
+          <Card className="lg:col-span-1 border-none shadow-lg bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-gray-800">
+                <Plus className="h-5 w-5 text-blue-500" />
+                Add Time Slot
+              </CardTitle>
+              <CardDescription>
+                Configure your availability for specific days
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleAddTimeSlot)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="dayOfWeek"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-gray-700 font-medium">Day of Week</FormLabel>
+                        <Select
+                          value={field.value}
+                          onValueChange={field.onChange}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a day" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DAYS.map((day) => (
+                              <SelectItem
+                                key={day.value}
+                                value={day.value.toString()}
+                                disabled={day.value === 0}
+                                className="cursor-pointer"
+                              >
+                                {day.label} {day.value === 0 ? '(Holiday)' : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="startTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700 font-medium">Start Time</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="time"
+                              {...field}
+                              className="focus:ring-2 focus:ring-blue-500"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="endTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700 font-medium">End Time</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="time"
+                              {...field}
+                              className="focus:ring-2 focus:ring-blue-500"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                   </div>
-                )}
 
-                <div className="space-y-4">
-                  {availabilityLoading ? (
-                    <div className="text-center py-4">Loading schedule...</div>
-                  ) : Object.keys(groupedAvailability).length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      No availability set. Add your working hours above.
-                    </div>
-                  ) : (
-                    DAYS_OF_WEEK.map((day) => (
-                      <div key={day.value} className="border rounded-lg p-4">
-                        <h4 className="font-medium text-gray-900 mb-2">{day.label}</h4>
-                        <div className="space-y-2">
-                          {groupedAvailability[day.value] ? (
-                            groupedAvailability[day.value].map((slot: any) => (
-                              <div key={slot.id} className="flex items-center justify-between bg-green-50 p-2 rounded">
-                                <span className="text-sm">
-                                  {slot.startTime} - {slot.endTime}
-                                </span>
-                                <Badge variant={slot.isAvailable ? "default" : "secondary"}>
-                                  {slot.isAvailable ? "Available" : "Unavailable"}
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="hoursAvailable"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700 font-medium">Hours Available</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={1}
+                              {...field}
+                              className="focus:ring-2 focus:ring-blue-500"
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="tokenCount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-gray-700 font-medium">Tokens per Hour</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={1}
+                              {...field}
+                              className="focus:ring-2 focus:ring-blue-500"
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs text-gray-500">
+                            Maximum patients per hour
+                          </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-6"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Time Slot
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+
+          {/* Current Availability Table */}
+          <Card className="lg:col-span-2 border-none shadow-lg bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-gray-800">
+                <Calendar className="h-5 w-5 text-blue-500" />
+                Current Availability
+              </CardTitle>
+              <CardDescription>
+                Overview of your weekly availability schedule
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-lg border border-gray-100 overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold w-1/4">Day</TableHead>
+                      <TableHead className="font-semibold w-1/2">Time Slots</TableHead>
+                      <TableHead className="font-semibold text-right w-1/4">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {DAYS.map((day) => {
+                      const availability = availabilities.find(
+                        (a) => a.dayOfWeek === day.value
+                      );
+                      return (
+                        <TableRow key={day.value} className="hover:bg-gray-50/50">
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {day.label}
+                              {day.value === 0 && (
+                                <Badge variant="secondary" className="bg-gray-100 text-gray-600">
+                                  Holiday
                                 </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1.5">
+                              {availability?.slots.map((slot, index) => (
+                                <div key={index} className="flex items-center gap-2 text-sm">
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                    {slot.startTime} - {slot.endTime}
+                                  </Badge>
+                                  <span className="text-gray-600">
+                                    ({slot.hoursAvailable}h, {slot.tokenCount} tokens)
+                                  </span>
+                                </div>
+                              )) || (
+                                <span className="text-gray-500 text-sm italic">
+                                  No slots available
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {day.value !== 0 && (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                                  onClick={() => handleEditAvailability(day.value)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleDeleteAvailability(day.value)}
+                                  className="bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-gray-500 hover:text-gray-700"
+                                    >
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuLabel>More Actions</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="cursor-pointer">
+                                      Copy Schedule
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="cursor-pointer">
+                                      Set as Default
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="cursor-pointer">
+                                      Export Schedule
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      className="cursor-pointer text-red-600 focus:text-red-600"
+                                      onClick={() => handleDeleteAvailability(day.value)}
+                                    >
+                                      Delete Schedule
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
-                            ))
-                          ) : (
-                            <p className="text-sm text-gray-500">Not available</p>
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Leave Days */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Leave Days
-                  </CardTitle>
-                  <Button
-                    onClick={() => setShowLeaveForm(!showLeaveForm)}
-                    className="bg-medical-green hover:bg-green-600"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Leave
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {showLeaveForm && (
-                  <div className="mb-6 p-4 bg-green-50 rounded-lg">
-                    <h4 className="font-medium mb-4">Add Leave Day</h4>
-                    <Form {...leaveForm}>
-                      <form onSubmit={leaveForm.handleSubmit(onLeaveSubmit)} className="space-y-4">
-                        <FormField
-                          control={leaveForm.control}
-                          name="leaveDate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Leave Date</FormLabel>
-                              <FormControl>
-                                <Input type="date" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={leaveForm.control}
-                          name="reason"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Reason (Optional)</FormLabel>
-                              <FormControl>
-                                <Textarea {...field} rows={2} placeholder="Vacation, sick leave, etc." />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <div className="flex gap-2">
-                          <Button
-                            type="submit"
-                            className="bg-medical-green hover:bg-green-600"
-                            disabled={addLeaveMutation.isPending}
-                          >
-                            {addLeaveMutation.isPending ? "Adding..." : "Add Leave"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setShowLeaveForm(false)}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </form>
-                    </Form>
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  {leavesLoading ? (
-                    <div className="text-center py-4">Loading leave days...</div>
-                  ) : leaves.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      No leave days scheduled.
-                    </div>
-                  ) : (
-                    leaves.map((leave: any) => (
-                      <div key={leave.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                        <div>
-                          <p className="font-medium text-gray-900">
-                            {new Date(leave.leaveDate).toLocaleDateString()}
-                          </p>
-                          {leave.reason && (
-                            <p className="text-sm text-gray-600">{leave.reason}</p>
-                          )}
-                        </div>
-                        <Badge variant="destructive">
-                          Leave
-                        </Badge>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </main>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
   );
-}
+} 

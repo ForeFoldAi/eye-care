@@ -1,14 +1,14 @@
 import { defineConfig } from "drizzle-kit";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL, ensure the database is provisioned");
+if (!process.env.MONGODB_URI) {
+  throw new Error("MONGODB_URI is required. Please ensure the MongoDB connection string is set in your environment variables.");
 }
 
 export default defineConfig({
   out: "./migrations",
   schema: "./shared/schema.ts",
-  dialect: "postgresql",
+  dialect: "mongodb",
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    uri: process.env.MONGODB_URI,
   },
 });
