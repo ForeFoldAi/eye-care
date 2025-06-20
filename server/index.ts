@@ -6,7 +6,7 @@ import apiRoutes from './routes/index';
 import { type Request, Response, NextFunction } from "express";
 import dotenv from 'dotenv';
 import { connectDB } from './db/connect';
-import { setupVite } from './vite';
+import path from 'path';
 
 dotenv.config();
 
@@ -45,9 +45,30 @@ async function initializeServer() {
     // Mount API routes
     app.use('/api', apiRoutes);
 
-    // Setup Vite for development
-    if (process.env.NODE_ENV !== 'production') {
-      await setupVite(app, httpServer);
+    // In development, proxy to Vite dev server
+    if (process.env.NODE_ENV === 'development') {
+      app.get('/', (req, res) => {
+        res.redirect('http://localhost:5173');
+      });
+      
+      app.get('*', (req, res) => {
+        // Skip API routes
+        if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+          return res.status(404).json({ message: 'API endpoint not found' });
+        }
+        // Redirect all other routes to Vite dev server
+        res.redirect(`http://localhost:5173${req.path}`);
+      });
+    } else {
+      // Serve static files in production
+      app.use(express.static(path.join(__dirname, '../client/dist')));
+      
+      app.get('*', (req, res) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+          return res.status(404).json({ message: 'API endpoint not found' });
+        }
+        res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+      });
     }
 
     // Error handling middleware - after routes
