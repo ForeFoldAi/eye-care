@@ -58,6 +58,60 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
+// Dashboard stats route (for /dashboard/stats)
+router.get('/dashboard/stats', authenticateToken, async (req, res) => {
+  try {
+    // Get today's date range
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+    // Get this week's date range
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    // Count new patients this week
+    const newPatients = await User.countDocuments({
+      createdAt: { $gte: startOfWeek },
+      role: 'patient',
+      isActive: true
+    });
+
+    // Count total active patients
+    const totalPatients = await User.countDocuments({ role: 'patient', isActive: true });
+
+    // Count patients registered today
+    const patientsToday = await User.countDocuments({
+      createdAt: { $gte: startOfDay, $lt: endOfDay },
+      role: 'patient',
+      isActive: true
+    });
+
+    // TODO: Add appointments, payments, cancellations if needed
+    const stats = {
+      todayAppointments: 0,
+      newPatients,
+      paymentsToday: 0,
+      cancellations: 0,
+      totalPatients,
+      patientsToday
+    };
+
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching dashboard stats',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Mount routes
 router.use('/auth', authRoutes);
 router.use('/patients', patientRoutes);

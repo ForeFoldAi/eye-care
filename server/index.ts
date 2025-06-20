@@ -1,68 +1,73 @@
-import express from 'express';
+import express, { type Request, Response, NextFunction } from 'express';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
-import apiRoutes from './routes/index';
-import { type Request, Response, NextFunction } from "express";
 import dotenv from 'dotenv';
-import { connectDB } from './db/connect';
+import helmet from 'helmet';
 import path from 'path';
+import apiRoutes from './routes/index';
+import { connectDB } from './db/connect';
+import { registerRoutes } from './routes';
 
 dotenv.config();
 
 const app = express();
 const httpServer = createServer(app);
+
+// Parse CORS origins from .env
+const allowedOrigins =
+  process.env.NODE_ENV === 'production'
+    ? false
+    : process.env.DEV_ORIGINS?.split(',') || [];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? false : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5000', 'http://127.0.0.1:5000', 'http://0.0.0.0:5000'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    credentials: true
-  }
+    credentials: true,
+  },
 });
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? false : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5000', 'http://127.0.0.1:5000', 'http://0.0.0.0:5000'],
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Health check endpoint
+// Health check
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Initialize server with database connection
+// Server init
 async function initializeServer() {
   try {
-    // Connect to MongoDB
     await connectDB();
     console.log('MongoDB Atlas connected successfully to healthcare database');
 
-    // Mount API routes
-    app.use('/api', apiRoutes);
+    await registerRoutes(app);
 
-    // In development, proxy to Vite dev server
+    // Dev: redirect to Vite
     if (process.env.NODE_ENV === 'development') {
-      app.get('/', (req, res) => {
+      app.get('/', (_req, res) => {
         res.redirect('http://localhost:5173');
       });
-      
+
       app.get('*', (req, res) => {
-        // Skip API routes
         if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
           return res.status(404).json({ message: 'API endpoint not found' });
         }
-        // Redirect all other routes to Vite dev server
         res.redirect(`http://localhost:5173${req.path}`);
       });
     } else {
-      // Serve static files in production
+      // Prod: serve built frontend
       app.use(express.static(path.join(__dirname, '../client/dist')));
-      
+
       app.get('*', (req, res) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
           return res.status(404).json({ message: 'API endpoint not found' });
@@ -71,7 +76,7 @@ async function initializeServer() {
       });
     }
 
-    // Error handling middleware - after routes
+    // Error handler
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       console.error('Error:', err);
       const status = err.status || err.statusCode || 500;
@@ -79,18 +84,17 @@ async function initializeServer() {
       res.status(status).json({ message });
     });
 
-    // Socket.IO connection handling
+    // Socket.IO
     io.on('connection', (socket: Socket) => {
-      console.log('Client connected');
+      console.log(`Client connected: ${socket.id}`);
 
       socket.on('disconnect', () => {
-        console.log('Client disconnected');
+        console.log(`Client disconnected: ${socket.id}`);
       });
     });
 
-    // Start server
-    const PORT = parseInt(process.env.PORT || '5000', 10);
-    
+    const PORT = parseInt(process.env.PORT || '3000', 10);
+
     return new Promise<void>((resolve) => {
       httpServer.listen(PORT, '0.0.0.0', () => {
         console.log(`Server running at http://0.0.0.0:${PORT}`);
@@ -103,7 +107,15 @@ async function initializeServer() {
   }
 }
 
-// Start the server
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('Shutting down server...');
+  httpServer.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
 initializeServer().catch((error) => {
   console.error('Unhandled server initialization error:', error);
   process.exit(1);

@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_ENV=development tsx watch index.ts",
-    "start": "NODE_ENV=production tsx index.ts",
+    "dev": "cross-env NODE_ENV=development tsx watch index.ts",
+    "start": "cross-env NODE_ENV=production tsx index.ts",
     "build": "tsc",
     "check": "tsc --noEmit"
   },
@@ -21,6 +21,7 @@
     "express": "^4.21.2",
     "express-session": "^1.18.1",
     "express-validator": "^7.2.1",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "memorystore": "^1.6.7",
     "mongodb": "^6.17.0",
@@ -50,6 +51,7 @@
     "@types/react-router-dom": "^5.3.3",
     "@types/socket.io": "^3.0.1",
     "@types/ws": "^8.5.13",
+    "cross-env": "^7.0.3",
     "esbuild": "^0.25.0",
     "tsx": "^4.19.1",
     "typescript": "5.6.3"

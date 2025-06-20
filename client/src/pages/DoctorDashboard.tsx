@@ -5,38 +5,28 @@ import {
   Calendar, 
   Users, 
   FileText, 
-  DollarSign,
   Search,
   CalendarPlus,
-  BarChart3,
-  TrendingUp,
   Clock,
   CheckCircle2,
-  AlertCircle,
-  CalendarCheck,
-  CalendarClock,
-  UserRound,
   Phone,
-  Stethoscope,
   ClipboardList,
-  ArrowRight,
   Save,
-  Check,
-  Bell
+  Check
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
-import Layout from "@/components/Layout";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import PrescriptionModal from "@/components/PrescriptionModal";
 import { useToast } from "@/hooks/use-toast";
 import { type User as AuthUser } from "@/lib/auth";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import PrescriptionModal from "@/components/PrescriptionModal";
+import { authService } from "@/lib/auth";
 
 interface DashboardStats {
   todayAppointments: number;
@@ -55,13 +45,6 @@ interface Patient {
   phone: string;
   email: string;
   lastVisit?: string;
-}
-
-interface Doctor {
-  id: string;
-  firstName: string;
-  lastName: string;
-  specialization: string;
 }
 
 type AppointmentStatus = 'pending' | 'completed' | 'follow-up-required' | 'cancelled';
@@ -125,14 +108,13 @@ interface AppointmentState extends Omit<Appointment, 'status'> {
 }
 
 export default function DoctorDashboard() {
-  return (
-    <ProtectedRoute requiredRole="doctor">
-      {(currentUser: AuthUser) => {
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const navigate = useNavigate();
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // All hooks must be called here, unconditionally!
   const { data: stats = {
     todayAppointments: 0,
     totalPatients: 0,
@@ -159,10 +141,19 @@ export default function DoctorDashboard() {
     },
   });
 
+  const user = authService.getStoredUser();
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+
   const { data: appointments = [] } = useQuery<Appointment[]>({
-    queryKey: ['/api/appointments'],
+    queryKey: ['/api/appointments', user?.id, todayStr],
     queryFn: async () => {
-      const response = await fetch('/api/appointments', {
+      if (!user) return [];
+      const params = new URLSearchParams({ doctorId: user.id, date: todayStr });
+      const response = await fetch(`/api/appointments?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -313,19 +304,6 @@ export default function DoctorDashboard() {
     }
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return 'bg-medical-green-100 text-medical-green-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const getPatientInitials = (firstName: string, lastName: string) => {
     return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
   };
@@ -472,6 +450,18 @@ export default function DoctorDashboard() {
       modifications
     });
   };
+
+  // Render a loading state if user is not set yet
+  if (!currentUser) {
+    return (
+      <ProtectedRoute requiredRole="doctor">
+        {(user: AuthUser) => {
+          setCurrentUser(user);
+          return null;
+        }}
+      </ProtectedRoute>
+    );
+  }
 
   return (
           <>
@@ -890,7 +880,4 @@ export default function DoctorDashboard() {
           )}
           </>
         );
-      }}
-    </ProtectedRoute>
-  );
 }
