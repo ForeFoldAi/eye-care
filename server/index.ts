@@ -2,10 +2,11 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
-import { registerRoutes } from './routes';
+import apiRoutes from './routes/index';
 import { type Request, Response, NextFunction } from "express";
 import dotenv from 'dotenv';
 import { connectDB } from './db/connect';
+import { setupVite } from './vite';
 
 dotenv.config();
 
@@ -13,7 +14,7 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' ? false : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: process.env.NODE_ENV === 'production' ? false : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5000', 'http://127.0.0.1:5000', 'http://0.0.0.0:5000'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     credentials: true
   }
@@ -21,7 +22,7 @@ const io = new Server(httpServer, {
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? false : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: process.env.NODE_ENV === 'production' ? false : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5000', 'http://127.0.0.1:5000', 'http://0.0.0.0:5000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -41,8 +42,13 @@ async function initializeServer() {
     await connectDB();
     console.log('MongoDB Atlas connected successfully to healthcare database');
 
-    // Mount routes
-    await registerRoutes(app);
+    // Mount API routes
+    app.use('/api', apiRoutes);
+
+    // Setup Vite for development
+    if (process.env.NODE_ENV !== 'production') {
+      await setupVite(app, httpServer);
+    }
 
     // Error handling middleware - after routes
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -62,11 +68,11 @@ async function initializeServer() {
     });
 
     // Start server
-    const PORT = parseInt(process.env.PORT || '3000', 10);
+    const PORT = parseInt(process.env.PORT || '5000', 10);
     
     return new Promise<void>((resolve) => {
-      httpServer.listen(PORT, () => {
-        console.log(`Server running at http://127.0.0.1:${PORT}`);
+      httpServer.listen(PORT, '0.0.0.0', () => {
+        console.log(`Server running at http://0.0.0.0:${PORT}`);
         resolve();
       });
     });
