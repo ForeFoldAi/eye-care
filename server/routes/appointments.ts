@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Appointment, DoctorAvailability } from '../models';
-import { insertAppointmentSchema } from '../../shared/schema';
+import { insertAppointmentSchema } from '../shared/schema';
 import { authenticateToken, authorizeRole, AuthRequest } from '../middleware/auth';
 import mongoose from 'mongoose';
 

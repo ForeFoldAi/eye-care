@@ -6,8 +6,11 @@ A comprehensive healthcare management system with separate client and server app
 
 ```
 ├── client/          # React frontend application
+│   ├── shared/      # Client copy of shared schemas
+│   └── src/         # React components and pages
 ├── server/          # Express.js backend API
-├── shared/          # Shared TypeScript schemas and types
+│   ├── shared/      # Server copy of shared schemas
+│   └── routes/      # API endpoints
 └── package.json     # Root package.json for coordinated development
 ```
 

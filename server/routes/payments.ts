@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Payment, Patient, Appointment, User, Receipt } from '../models';
-import { insertPaymentSchema } from '../../shared/schema';
+import { insertPaymentSchema } from '../shared/schema';
 import { authenticateToken, authorizeRole } from '../middleware/auth';
 import { AuthRequest } from '../middleware/auth';
 import { generateReceipt } from '../utils/receipt';

@@ -1,6 +1,5 @@
 import PDFDocument from 'pdfkit';
 import { Document } from 'mongoose';
-import { Payment, User, Patient, Appointment } from '@shared/schema';
 
 type PaymentDoc = {
   receiptNumber: string;

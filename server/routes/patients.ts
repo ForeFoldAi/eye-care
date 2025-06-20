@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Patient } from '../models';
-import { insertPatientSchema } from '../../shared/schema';
+import { insertPatientSchema } from '../shared/schema';
 import { authenticateToken, authorizeRole, AuthRequest } from '../middleware/auth';
 
 const router = Router();

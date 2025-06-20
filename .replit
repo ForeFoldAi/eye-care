@@ -21,7 +21,6 @@ externalPort = 80
 [[ports]]
 localPort = 5173
 externalPort = 5173
-exposeLocalhost = true
 
 [workflows]
 runButton = "Project"
@@ -41,5 +40,5 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "concurrently \"NODE_ENV=development tsx watch server/index.ts\" \"cd client && vite\""
 waitForPort = 5000
