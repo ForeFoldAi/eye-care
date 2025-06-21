@@ -9,9 +9,12 @@
   "dev:server": "NODE_ENV=development tsx watch server/index.ts",
   "dev:client": "vite",
   "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-  "build": "cd client && npm install && npm run build",
+  "build": "npm run build:client && npm run build:server",
+  "build:client": "cd client && npm install && npm run build",
+  "build:server": "tsc",
   "start": "NODE_ENV=production tsx server/index.ts",
   "check": "tsc"
+
 
   },
   "dependencies": {
