@@ -1,4 +1,4 @@
-import express, { type Request, Response, NextFunction } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
@@ -13,18 +13,15 @@ import { registerRoutes } from './routes';
 
 dotenv.config();
 
-// ESM-compatible __dirname polyfill
+// Polyfill for __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
 
-// Parse CORS origins from .env
-const allowedOrigins =
-  process.env.NODE_ENV === 'production'
-    ? false
-    : process.env.DEV_ORIGINS?.split(',') || [];
+// Load allowed CORS origins from env
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
 
 const io = new Server(httpServer, {
   cors: {
@@ -34,23 +31,29 @@ const io = new Server(httpServer, {
   },
 });
 
-// Middleware
+// CORS middleware with dynamic origin validation
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
 app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Health check route
+// Health check
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Server initialization
 async function initializeServer() {
   try {
     await connectDB();
@@ -59,7 +62,7 @@ async function initializeServer() {
     await registerRoutes(app);
 
     if (process.env.NODE_ENV === 'development') {
-      // In dev, redirect root to Vite dev server
+      // Dev: redirect to Vite dev server
       app.get('/', (_req, res) => {
         res.redirect('http://localhost:5173');
       });
@@ -71,14 +74,12 @@ async function initializeServer() {
         res.redirect(`http://localhost:5173${req.path}`);
       });
     } else {
-      // In production, serve built frontend
-      app.use(express.static(path.join(__dirname, '../client/dist')));
-
+      // Production: Do NOT serve static frontend — it's hosted separately
       app.get('*', (req, res) => {
         if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
           return res.status(404).json({ message: 'API endpoint not found' });
         }
-        res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+        res.status(404).json({ message: 'Frontend is hosted separately.' });
       });
     }
 
@@ -90,7 +91,7 @@ async function initializeServer() {
       res.status(status).json({ message });
     });
 
-    // Socket.IO connections
+    // Socket.IO
     io.on('connection', (socket: Socket) => {
       console.log(`Client connected: ${socket.id}`);
 
@@ -122,7 +123,6 @@ process.on('SIGINT', () => {
   });
 });
 
-// Start the server
 initializeServer().catch((error) => {
   console.error('Unhandled server initialization error:', error);
   process.exit(1);
