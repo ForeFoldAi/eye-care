@@ -3,6 +3,15 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 // Re-export useMutation for convenience
 export { useMutation } from "@tanstack/react-query";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+function withBaseUrl(url: string) {
+  if (url.startsWith('/api')) {
+    return `${API_BASE_URL}${url}`;
+  }
+  return url;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -16,7 +25,7 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const token = localStorage.getItem('token');
-  const res = await fetch(url, {
+  const res = await fetch(withBaseUrl(url), {
     method,
     headers: { 
       ...(data ? { "Content-Type": "application/json" } : {}),
@@ -36,7 +45,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    const res = await fetch(withBaseUrl(queryKey[0] as string), {
       credentials: "include",
     });
 
