@@ -4,24 +4,24 @@ import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
+import path, { dirname } from 'path';
+
+import { fileURLToPath } from 'url';
 import apiRoutes from './routes/index';
 import { connectDB } from './db/connect';
 import { registerRoutes } from './routes';
-import path, { dirname } from 'path';
-import { fileURLToPath } from 'url';
 
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
 const app = express();
 const httpServer = createServer(app);
 
 // Parse CORS origins from .env
-const allowedOrigins = [
-  'http://localhost:5173', // local dev
-  'https://eye-care-kskv.onrender.com' // <-- replace with your actual Render frontend URL if you have one
-];
+const allowedOrigins =
+  process.env.NODE_ENV === 'production'
+    ? false
+    : process.env.DEV_ORIGINS?.split(',') || [];
 
 const io = new Server(httpServer, {
   cors: {
