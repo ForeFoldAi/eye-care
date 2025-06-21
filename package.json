@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "scripts": {
-    "dev:server": "NODE_ENV=development tsx watch server/index.ts",
-    "dev:client": "vite",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "build": "vite build",
-    "start": "NODE_ENV=production tsx server/index.ts",
-    "check": "tsc"
+  
+   "scripts": {
+  "dev:server": "NODE_ENV=development tsx watch server/index.ts",
+  "dev:client": "vite",
+  "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+  "build": "cd client && npm install && npm run build",
+  "start": "NODE_ENV=production tsx server/index.ts",
+  "check": "tsc"
+
   },
   "dependencies": {
     "@chakra-ui/form-control": "^2.2.0",
