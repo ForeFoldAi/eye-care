@@ -20,7 +20,7 @@ const httpServer = createServer(app);
 // Parse CORS origins from .env
 const allowedOrigins = [
   'http://localhost:5173', // local dev
-  'https://your-frontend-on-render.com' // <-- replace with your actual Render frontend URL if you have one
+  'https://eye-care-kskv.onrender.com' // <-- replace with your actual Render frontend URL if you have one
 ];
 
 const io = new Server(httpServer, {
