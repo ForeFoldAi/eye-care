@@ -4,12 +4,18 @@ import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
-import path from 'path';
+import path, { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
 import apiRoutes from './routes/index';
 import { connectDB } from './db/connect';
 import { registerRoutes } from './routes';
 
 dotenv.config();
+
+// ESM-compatible __dirname polyfill
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
@@ -39,12 +45,12 @@ app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Health check
+// Health check route
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Server init
+// Server initialization
 async function initializeServer() {
   try {
     await connectDB();
@@ -52,8 +58,8 @@ async function initializeServer() {
 
     await registerRoutes(app);
 
-    // Dev: redirect to Vite
     if (process.env.NODE_ENV === 'development') {
+      // In dev, redirect root to Vite dev server
       app.get('/', (_req, res) => {
         res.redirect('http://localhost:5173');
       });
@@ -65,7 +71,7 @@ async function initializeServer() {
         res.redirect(`http://localhost:5173${req.path}`);
       });
     } else {
-      // Prod: serve built frontend
+      // In production, serve built frontend
       app.use(express.static(path.join(__dirname, '../client/dist')));
 
       app.get('*', (req, res) => {
@@ -84,7 +90,7 @@ async function initializeServer() {
       res.status(status).json({ message });
     });
 
-    // Socket.IO
+    // Socket.IO connections
     io.on('connection', (socket: Socket) => {
       console.log(`Client connected: ${socket.id}`);
 
@@ -116,6 +122,7 @@ process.on('SIGINT', () => {
   });
 });
 
+// Start the server
 initializeServer().catch((error) => {
   console.error('Unhandled server initialization error:', error);
   process.exit(1);
