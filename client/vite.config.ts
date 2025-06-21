@@ -27,6 +27,7 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    allowedHosts: ["eye-care-kskv.onrender.com"],
     proxy: {
       '/health': {
         target: 'http://127.0.0.1:3000',
