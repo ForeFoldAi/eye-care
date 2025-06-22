@@ -135,13 +135,13 @@ export default function ReceptionistAppointmentsPage() {
     retry: 1,
     retryDelay: 1000
   });
-
+  const API_URL = import.meta.env.VITE_API_URL;
   // Fetch patients for booking
   const { data: patientsData = [] } = useQuery<Patient[]>({
     queryKey: ['/api/patients'],
     queryFn: async () => {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/patients', {
+      const response = await fetch(`${API_URL}/api/patients`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -158,7 +158,7 @@ export default function ReceptionistAppointmentsPage() {
     queryKey: ['/api/doctors'],
     queryFn: async () => {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/doctors', {
+      const response = await fetch(`${API_URL}/api/doctors`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -174,7 +174,7 @@ export default function ReceptionistAppointmentsPage() {
   const updateAppointmentMutation = useMutation({
     mutationFn: async ({ id, status, notes }: { id: string; status: string; notes?: string }) => {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/appointments/${id}/status`, {
+      const response = await fetch(`${API_URL}/api/appointments/${id}/status`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -208,7 +208,7 @@ export default function ReceptionistAppointmentsPage() {
   const bookAppointmentMutation = useMutation({
     mutationFn: async (appointmentData: typeof newAppointment) => {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/appointments', {
+      const response = await fetch(`${API_URL}/api/appointments`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -244,7 +244,7 @@ export default function ReceptionistAppointmentsPage() {
   const rescheduleAppointmentMutation = useMutation({
     mutationFn: async ({ id, datetime }: { id: string; datetime: string }) => {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/appointments/${id}/reschedule`, {
+      const response = await fetch(`${API_URL}/api/appointments/${id}/reschedule`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,

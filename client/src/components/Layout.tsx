@@ -47,7 +47,7 @@ export default function Layout({ children, user }: LayoutProps) {
 
   const navItems = isDoctorRoute ? doctorNavItems : receptionistNavItems;
 
-  const getCurrentDateTime = () => {
+  const CurrentDateTime = () => {
     const now = new Date();
     const dateOptions: Intl.DateTimeFormatOptions = { 
       weekday: 'long', 
@@ -67,7 +67,7 @@ export default function Layout({ children, user }: LayoutProps) {
     };
   };
 
-  const { date, time } = getCurrentDateTime();
+  const { date, time } = CurrentDateTime();
 
   return (
     <div className="min-h-screen bg-slate-50">

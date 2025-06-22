@@ -22,10 +22,10 @@ export default function ReceiptModal({ isOpen, onClose, payment, patient }: Rece
   const handlePrint = () => {
     window.print();
   };
-
+  const API_URL = import.meta.env.VITE_API_URL;
   const handleDownload = async () => {
     try {
-      const response = await fetch(`/api/payments/${payment.id}/receipt`, {
+      const response = await fetch(`${API_URL}/api/payments/${payment.id}/receipt`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },

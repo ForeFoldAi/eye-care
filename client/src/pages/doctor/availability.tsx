@@ -76,6 +76,7 @@ const DEFAULT_SLOT: TimeSlot = {
   hoursAvailable: 1,
   tokenCount: 10,
 };
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function AvailabilityPage() {
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
@@ -113,7 +114,7 @@ export default function AvailabilityPage() {
         return;
       }
 
-      const response = await fetch('/api/doctor/availability', {
+      const response = await fetch(`${API_URL}/api/doctor/availability`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -167,7 +168,7 @@ export default function AvailabilityPage() {
       const existingAvailability = availabilities.find(a => a.dayOfWeek === dayOfWeek);
       const slots = existingAvailability ? [...existingAvailability.slots, newSlot] : [newSlot];
 
-      const response = await fetch('/api/doctor/availability', {
+      const response = await fetch(`${API_URL}/api/doctor/availability`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -219,7 +220,7 @@ export default function AvailabilityPage() {
         return;
       }
 
-      const response = await fetch(`/api/doctor/availability/${dayOfWeek}`, {
+      const response = await fetch(`${API_URL}/api/doctor/availability/${dayOfWeek}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { X, Clock, Stethoscope, Activity, Calendar, Loader2 } from "lucide-react";
+import {  Clock, Stethoscope, Activity, Calendar, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -63,246 +62,249 @@ export default function AppointmentBookingModal({
   const [selectedType, setSelectedType] = useState<'consultation' | 'checkup' | 'follow-up'>('consultation');
   const [localSelectedPatient, setLocalSelectedPatient] = useState<Patient | null>(selectedPatient || null);
   
-  const { data: patients } = useQuery<Patient[]>({
-    queryKey: ['/api/patients'],
-    queryFn: async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
+  const API_URL = import.meta.env.VITE_API_URL;
 
-        const response = await fetch('/api/patients', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response.status === 401) {
-          localStorage.removeItem('token');
-          navigate('/login');
-          throw new Error('Session expired. Please login again.');
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch patients');
-        }
-
-        const data = await response.json();
-        return data.data.patients.map((p: any) => ({ ...p, id: p._id?.toString() || p.patientId || '' }));
-      } catch (error) {
-        console.error('Error fetching patients:', error);
-        if (error instanceof Error && error.message.includes('Session expired')) {
-          toast({
-            title: "Session Expired",
-            description: "Your session has expired. Please login again.",
-            variant: "destructive",
-          });
-          navigate('/login');
-        }
-        throw error;
+const { data: patients } = useQuery<Patient[]>({
+  queryKey: ['/api/patients'],
+  queryFn: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
       }
-    },
-    enabled: !selectedPatient,
-    retry: false
-  });
 
-  const { data: doctors = [] } = useQuery<Doctor[]>({
-    queryKey: ['/api/doctors'],
-    queryFn: async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
+      const response = await fetch(`${API_URL}/api/patients`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-        const response = await fetch('/api/doctors', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (response.status === 401) {
-          localStorage.removeItem('token');
-          navigate('/login');
-          throw new Error('Session expired. Please login again.');
-        }
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch doctors');
-        }
-
-        const data = await response.json();
-        return data.map((doctor: any) => ({
-          id: doctor._id?.toString() || doctor.id || '',
-          firstName: doctor.firstName,
-          lastName: doctor.lastName,
-          specialization: doctor.specialization
-        }));
-      } catch (error) {
-        console.error('Error fetching doctors:', error);
-        if (error instanceof Error && error.message.includes('Session expired')) {
-          toast({
-            title: "Session Expired",
-            description: "Your session has expired. Please login again.",
-            variant: "destructive",
-          });
-          navigate('/login');
-        }
-        throw error;
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+        throw new Error('Session expired. Please login again.');
       }
-    },
-    retry: false
-  });
 
-  const { data: doctorAvailabilityData, isLoading: isLoadingAvailability } = useQuery<DoctorAvailability | null, Error>({
-    queryKey: ['doctorAvailability', selectedDoctor, selectedDate],
-    queryFn: async () => {
-      try {
-        if (!selectedDoctor || !selectedDate) return null;
+      if (!response.ok) {
+        throw new Error('Failed to fetch patients');
+      }
 
-        const token = localStorage.getItem('token');
-        if (!token) {
-          toast({
-            title: "Authentication Error",
-            description: "Please login again",
-            variant: "destructive",
-          });
-          navigate('/login');
-          return null;
-        }
-
-        // Get the day of week from the selected date
-        const dayOfWeek = new Date(selectedDate).getDay();
-
-        console.log(`[Frontend] Fetching availability for doctorId: ${selectedDoctor}, dayOfWeek: ${dayOfWeek}`);
-
-        const response = await fetch(
-          `/api/doctors/${selectedDoctor}/availability?dayOfWeek=${dayOfWeek}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (response.status === 401) {
-          localStorage.removeItem('token');
-          toast({
-            title: "Session Expired",
-            description: "Your session has expired. Please login again.",
-            variant: "destructive",
-          });
-          navigate('/login');
-          return null;
-        }
-
-        if (!response.ok) {
-          // If response status is 200 but slots are empty, backend sends { slots: [] }
-          // If response is not ok, it's an error
-          if (response.status === 200) {
-            const data = await response.json();
-            return data;
-          }
-          throw new Error('Failed to fetch doctor availability');
-        }
-
-        const data = await response.json();
-        return data;
-      } catch (error) {
-        console.error('Error fetching availability:', error);
+      const data = await response.json();
+      return data.data.patients.map((p: any) => ({
+        ...p,
+        id: p._id?.toString() || p.patientId || ''
+      }));
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+      if (error instanceof Error && error.message.includes('Session expired')) {
         toast({
-          title: "Error",
-          description: error instanceof Error ? error.message : "Failed to fetch doctor availability",
+          title: "Session Expired",
+          description: "Your session has expired. Please login again.",
           variant: "destructive",
         });
+        navigate('/login');
+      }
+      throw error;
+    }
+  },
+  enabled: !selectedPatient,
+  retry: false
+});
+
+
+const { data: doctors = [] } = useQuery<Doctor[]>({
+  queryKey: ['/api/doctors'],
+  queryFn: async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${API_URL}/api/doctors`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch doctors');
+      }
+
+      const data = await response.json();
+      return data.map((doctor: any) => ({
+        id: doctor._id?.toString() || doctor.id || '',
+        firstName: doctor.firstName,
+        lastName: doctor.lastName,
+        specialization: doctor.specialization
+      }));
+    } catch (error) {
+      console.error('Error fetching doctors:', error);
+      if (error instanceof Error && error.message.includes('Session expired')) {
+        toast({
+          title: "Session Expired",
+          description: "Your session has expired. Please login again.",
+          variant: "destructive",
+        });
+        navigate('/login');
+      }
+      throw error;
+    }
+  },
+  retry: false
+});
+
+const { data: doctorAvailabilityData, isLoading: isLoadingAvailability } = useQuery<DoctorAvailability | null, Error>({
+  queryKey: ['doctorAvailability', selectedDoctor, selectedDate],
+  queryFn: async () => {
+    try {
+      if (!selectedDoctor || !selectedDate) return null;
+
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast({
+          title: "Authentication Error",
+          description: "Please login again",
+          variant: "destructive",
+        });
+        navigate('/login');
         return null;
       }
-    },
-    enabled: !!selectedDoctor && !!selectedDate,
-    retry: false,
-    staleTime: 30000 // Cache for 30 seconds
-  });
 
-  const bookAppointmentMutation = useMutation({
-    mutationFn: async (data: { 
-      patientId: string; 
-      doctorId: string; 
-      datetime: string; 
-      tokenNumber: number;
-      type: 'consultation' | 'checkup' | 'follow-up';
-    }) => {
-      try {
-        console.log("Attempting to book appointment with data:", data);
-        const token = localStorage.getItem('token');
-        if (!token) {
-          throw new Error('No authentication token found');
-        }
+      const dayOfWeek = new Date(selectedDate).getDay();
 
-        const response = await fetch('/api/appointments', {
-          method: 'POST',
+      console.log(`[Frontend] Fetching availability for doctorId: ${selectedDoctor}, dayOfWeek: ${dayOfWeek}`);
+
+      const response = await fetch(
+        `${API_URL}/api/doctors/${selectedDoctor}/availability?dayOfWeek=${dayOfWeek}`,
+        {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(data),
-        });
-
-        console.log("Appointment booking API response status:", response.status);
-
-        if (response.status === 401) {
-          localStorage.removeItem('token');
-          navigate('/login');
-          throw new Error('Session expired. Please login again.');
         }
+      );
 
-        if (!response.ok) {
-          const error = await response.json();
-          console.error("Appointment booking failed with error:", error);
-          throw new Error(error.message || 'Failed to book appointment');
-        }
-
-        const result = await response.json();
-        console.log("Appointment booked successfully:", result);
-        return result;
-      } catch (error) {
-        console.error('Error booking appointment:', error);
-        if (error instanceof Error && error.message.includes('Session expired')) {
-          toast({
-            title: "Session Expired",
-            description: "Your session has expired. Please login again.",
-            variant: "destructive",
-          });
-          navigate('/login');
-        }
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      queryClient.invalidateQueries({ queryKey: ['doctorAvailability', selectedDoctor, selectedDate] }); // Invalidate availability to show updated tokens
-      onClose();
-      onSuccess();
-      toast({
-        title: "Success",
-        description: "Appointment booked successfully",
-      });
-    },
-    onError: (error: Error) => {
-      console.error("Appointment booking mutation error:", error);
-      if (!error.message.includes('Session expired')) {
+      if (response.status === 401) {
+        localStorage.removeItem('token');
         toast({
-          title: "Error",
-          description: error.message || "Failed to book appointment",
+          title: "Session Expired",
+          description: "Your session has expired. Please login again.",
           variant: "destructive",
         });
+        navigate('/login');
+        return null;
       }
-    },
-  });
+
+      if (!response.ok) {
+        if (response.status === 200) {
+          const data = await response.json();
+          return data;
+        }
+        throw new Error('Failed to fetch doctor availability');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching availability:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to fetch doctor availability",
+        variant: "destructive",
+      });
+      return null;
+    }
+  },
+  enabled: !!selectedDoctor && !!selectedDate,
+  retry: false,
+  staleTime: 30000 // Cache for 30 seconds
+});
+
+const bookAppointmentMutation = useMutation({
+  mutationFn: async (data: { 
+    patientId: string; 
+    doctorId: string; 
+    datetime: string; 
+    tokenNumber: number;
+    type: 'consultation' | 'checkup' | 'follow-up';
+  }) => {
+    try {
+      console.log("Attempting to book appointment with data:", data);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${API_URL}/api/appointments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      console.log("Appointment booking API response status:", response.status);
+
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error("Appointment booking failed with error:", error);
+        throw new Error(error.message || 'Failed to book appointment');
+      }
+
+      const result = await response.json();
+      console.log("Appointment booked successfully:", result);
+      return result;
+    } catch (error) {
+      console.error('Error booking appointment:', error);
+      if (error instanceof Error && error.message.includes('Session expired')) {
+        toast({
+          title: "Session Expired",
+          description: "Your session has expired. Please login again.",
+          variant: "destructive",
+        });
+        navigate('/login');
+      }
+      throw error;
+    }
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+    queryClient.invalidateQueries({ queryKey: ['doctorAvailability', selectedDoctor, selectedDate] }); // Invalidate availability to show updated tokens
+    onClose();
+    onSuccess();
+    toast({
+      title: "Success",
+      description: "Appointment booked successfully",
+    });
+  },
+  onError: (error: Error) => {
+    console.error("Appointment booking mutation error:", error);
+    if (!error.message.includes('Session expired')) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to book appointment",
+        variant: "destructive",
+      });
+    }
+  },
+});
 
   const getAvailableTokens = (slot: TimeSlot) => {
     const durationHours = (new Date(`2000-01-01T${slot.endTime}`).getTime() - new Date(`2000-01-01T${slot.startTime}`).getTime()) / (1000 * 60 * 60);

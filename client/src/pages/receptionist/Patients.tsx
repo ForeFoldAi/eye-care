@@ -37,9 +37,9 @@ interface Patient {
   appointmentsCount?: number;
   paymentsTotal?: number;
 }
-
+const API_URL = import.meta.env.VITE_API_URL;
 async function fetchPatients(): Promise<Patient[]> {
-  const response = await fetch('/api/patients');
+  const response = await fetch(`${API_URL}/api/patients`);
   if (!response.ok) {
     throw new Error('Failed to fetch patients');
   }
@@ -62,7 +62,7 @@ async function fetchPatients(): Promise<Patient[]> {
 }
 
 async function searchPatients(query: string): Promise<Patient[]> {
-  const response = await fetch(`/api/patients/search?q=${encodeURIComponent(query)}`);
+  const response = await fetch(`${API_URL}/api/patients/search?q=${encodeURIComponent(query)}`);
   if (!response.ok) {
     throw new Error('Failed to search patients');
   }

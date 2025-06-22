@@ -54,9 +54,9 @@ interface Payment {
   patient: Patient;
   appointment?: Appointment;
 }
-
+const API_URL = import.meta.env.VITE_API_URL;
 async function fetchPayments(patientId?: string, appointmentId?: string): Promise<Payment[]> {
-  let url = '/api/payments';
+  let url = `${API_URL}/api/payments`;
   const params = new URLSearchParams();
   if (patientId) params.append('patientId', patientId);
   if (appointmentId) params.append('appointmentId', appointmentId);
@@ -85,7 +85,7 @@ async function fetchPayments(patientId?: string, appointmentId?: string): Promis
     // If no linked patient data but we have patientId, fetch it
     if (!patientData && payment.patientId) {
       try {
-        const patientResponse = await fetch(`/api/patients/${payment.patientId}`, {
+        const patientResponse = await fetch(`${API_URL}/api/patients/${payment.patientId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
@@ -102,7 +102,7 @@ async function fetchPayments(patientId?: string, appointmentId?: string): Promis
     let appointmentData = payment.appointment;
     if (!appointmentData && payment.appointmentId) {
       try {
-        const appointmentResponse = await fetch(`/api/appointments/${payment.appointmentId}?include=doctor`, {
+        const appointmentResponse = await fetch(`${API_URL}/api/appointments/${payment.appointmentId}?include=doctor`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
@@ -195,7 +195,7 @@ async function searchPayments(query: string, patientId?: string, appointmentId?:
     // If no linked patient data but we have patientId, fetch it
     if (!patientData && payment.patientId) {
       try {
-        const patientResponse = await fetch(`/api/patients/${payment.patientId}`, {
+        const patientResponse = await fetch(`${API_URL}/api/patients/${payment.patientId}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
@@ -212,7 +212,7 @@ async function searchPayments(query: string, patientId?: string, appointmentId?:
     let appointmentData = payment.appointment;
     if (!appointmentData && payment.appointmentId) {
       try {
-        const appointmentResponse = await fetch(`/api/appointments/${payment.appointmentId}?include=doctor`, {
+        const appointmentResponse = await fetch(`${API_URL}/api/appointments/${payment.appointmentId}?include=doctor`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
@@ -343,7 +343,7 @@ export default function PaymentsPage() {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch(`/api/payments/${payment.id}/receipt`, {
+      const response = await fetch(`${API_URL}/api/payments/${payment.id}/receipt`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

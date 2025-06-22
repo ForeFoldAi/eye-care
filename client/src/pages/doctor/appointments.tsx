@@ -67,7 +67,7 @@ export default function DoctorAppointmentsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-
+  const API_URL = import.meta.env.VITE_API_URL;
   // Fetch doctor's appointments
   const { data: appointmentsData = [], isError, error, isLoading } = useQuery({
     queryKey: ['/api/appointments', 'doctor', selectedDate, statusFilter],
@@ -82,7 +82,7 @@ export default function DoctorAppointmentsPage() {
         const endpoints = [
           // First try: doctor-specific endpoint
           (() => {
-            let url = '/api/doctor/appointments?';
+            let url = `${API_URL}/api/doctor/appointments?`;
             const params = new URLSearchParams();
             if (selectedDate) params.append('date', selectedDate);
             if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
@@ -90,7 +90,7 @@ export default function DoctorAppointmentsPage() {
           })(),
           // Second try: general appointments with doctor filter
           (() => {
-            let url = '/api/appointments?';
+            let url = `${API_URL}/api/appointments?`;
             const params = new URLSearchParams();
             params.append('doctorOnly', 'true');
             if (selectedDate) params.append('date', selectedDate);
@@ -99,7 +99,7 @@ export default function DoctorAppointmentsPage() {
           })(),
           // Third try: just general appointments (backend should filter by token)
           (() => {
-            let url = '/api/appointments?';
+            let url = `${API_URL}/api/appointments?`;
             const params = new URLSearchParams();
             if (selectedDate) params.append('date', selectedDate);
             if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
@@ -176,7 +176,7 @@ export default function DoctorAppointmentsPage() {
           throw new Error('No authentication token found');
         }
 
-        const response = await fetch(`/api/appointments/${id}/status`, {
+        const response = await fetch(`${API_URL}/api/appointments/${id}/status`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${token}`,

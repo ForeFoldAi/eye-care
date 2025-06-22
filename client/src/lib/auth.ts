@@ -15,7 +15,8 @@ export interface AuthResponse {
   user: User;
 }
 
-const API_BASE_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL + '/api';
+
 
 // Initialize auth interceptor
 let isInterceptorInitialized = false;
@@ -24,7 +25,7 @@ let isInterceptorInitialized = false;
 const waitForServer = async (retries = 10, delay = 1000): Promise<void> => {
   for (let i = 0; i < retries; i++) {
     try {
-      const response = await fetch('/health');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/health`);
       if (response.ok) {
         console.log('Server is ready');
         return;

@@ -115,6 +115,7 @@ export default function DoctorDashboard() {
   const { toast } = useToast();
 
   // All hooks must be called here, unconditionally!
+  const API_URL = import.meta.env.VITE_API_URL;
   const { data: stats = {
     todayAppointments: 0,
     totalPatients: 0,
@@ -124,7 +125,7 @@ export default function DoctorDashboard() {
   } } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
     queryFn: async () => {
-      const response = await fetch('/api/dashboard/stats', {
+      const response = await fetch(`${API_URL}/api/dashboard/stats`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -153,7 +154,7 @@ export default function DoctorDashboard() {
     queryFn: async () => {
       if (!user) return [];
       const params = new URLSearchParams({ doctorId: user.id, date: todayStr });
-      const response = await fetch(`/api/appointments?${params.toString()}`, {
+      const response = await fetch(`${API_URL}/api/appointments?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -194,7 +195,7 @@ export default function DoctorDashboard() {
   const { data: prescriptions = [] } = useQuery<Prescription[]>({
     queryKey: ['/api/prescriptions'],
     queryFn: async () => {
-      const response = await fetch('/api/prescriptions');
+      const response = await fetch(`${API_URL}/api/prescriptions`);
       if (!response.ok) throw new Error('Failed to fetch prescriptions');
       const data = await response.json();
       return data.map((pres: any) => ({
@@ -217,7 +218,7 @@ export default function DoctorDashboard() {
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ['/api/patients'],
     queryFn: async () => {
-      const response = await fetch('/api/patients', {
+      const response = await fetch(`${API_URL}/api/patients`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -357,7 +358,7 @@ export default function DoctorDashboard() {
       appointmentId: string; 
       modifications: AppointmentModification;
     }) => {
-      const response = await fetch(`/api/appointments/${appointmentId}`, {
+      const response = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

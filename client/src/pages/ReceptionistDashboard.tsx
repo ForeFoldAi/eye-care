@@ -105,15 +105,16 @@ export default function ReceptionistDashboard() {
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
   });
-
+  const API_URL = import.meta.env.VITE_API_URL;
   const { data: patients, isLoading: isLoadingPatients, error } = useQuery<Patient[], Error>({
     queryKey: ['/api/patients'],
     queryFn: async () => {
-      const response = await fetch('/api/patients', {
+      const response = await fetch(`${API_URL}/api/patients`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
       });
+      
       if (!response.ok) {
         console.error('Failed to fetch patients:', response.status);
         throw new Error('Failed to fetch patients');
@@ -137,7 +138,7 @@ export default function ReceptionistDashboard() {
   const { data: searchResults, isLoading: isLoadingSearch, error: searchError } = useQuery<Patient[], Error>({
     queryKey: ['/api/patients/search', searchQuery],
     queryFn: async () => {
-      const response = await fetch(`/api/patients/search?q=${encodeURIComponent(searchQuery)}`, {
+      const response = await fetch(`${API_URL}/api/patients/search?q=${encodeURIComponent(searchQuery)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -168,7 +169,7 @@ export default function ReceptionistDashboard() {
   const { data: doctors = [] } = useQuery<Doctor[]>({
     queryKey: ['/api/doctors'],
     queryFn: async () => {
-      const response = await fetch('/api/doctors');
+      const response = await fetch('${API_URL}/api/doctors');
       if (!response.ok) throw new Error('Failed to fetch doctors');
       const data = await response.json();
       return data.map((doctor: any) => ({
@@ -183,7 +184,7 @@ export default function ReceptionistDashboard() {
   const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery<Appointment[]>({
     queryKey: ['/api/appointments'],
     queryFn: async () => {
-      const response = await fetch('/api/appointments', {
+      const response = await fetch('${API_URL}/api/appointments', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -233,7 +234,7 @@ export default function ReceptionistDashboard() {
       const token = localStorage.getItem('token');
       console.log('Using token:', token ? 'Token exists' : 'No token found');
 
-      const response = await fetch('/api/payments', {
+      const response = await fetch('${API_URL}/api/payments', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -264,7 +265,7 @@ export default function ReceptionistDashboard() {
       // Download PDF receipt
       try {
         console.log('Attempting to generate receipt for payment:', payment.id);
-        const response = await fetch(`/api/payments/${payment.id}/receipt`, {
+        const response = await fetch(`${API_URL}/api/payments/${payment.id}/receipt`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
@@ -412,7 +413,7 @@ export default function ReceptionistDashboard() {
 
     try {
       // First process the payment
-      const paymentResponse = await fetch('/api/payments', {
+      const paymentResponse = await fetch('${API_URL}/api/payments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -436,7 +437,7 @@ export default function ReceptionistDashboard() {
       const payment = await paymentResponse.json();
 
       // Then generate and download receipt
-      const receiptResponse = await fetch(`/api/payments/${payment.id}/receipt`, {
+      const receiptResponse = await fetch(`${API_URL}/api/payments/${payment.id}/receipt`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
