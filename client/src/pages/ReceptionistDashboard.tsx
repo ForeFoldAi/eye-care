@@ -169,7 +169,8 @@ export default function ReceptionistDashboard() {
   const { data: doctors = [] } = useQuery<Doctor[]>({
     queryKey: ['/api/doctors'],
     queryFn: async () => {
-      const response = await fetch('${API_URL}/api/doctors');
+   
+      const response = await fetch(`${API_URL}/api/doctors`);
       if (!response.ok) throw new Error('Failed to fetch doctors');
       const data = await response.json();
       return data.map((doctor: any) => ({
@@ -184,7 +185,7 @@ export default function ReceptionistDashboard() {
   const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery<Appointment[]>({
     queryKey: ['/api/appointments'],
     queryFn: async () => {
-      const response = await fetch('${API_URL}/api/appointments', {
+      const response = await fetch(`${API_URL}/api/appointments`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
@@ -234,7 +235,7 @@ export default function ReceptionistDashboard() {
       const token = localStorage.getItem('token');
       console.log('Using token:', token ? 'Token exists' : 'No token found');
 
-      const response = await fetch('${API_URL}/api/payments', {
+      const response = await fetch(`${API_URL}/api/payments`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -413,7 +414,7 @@ export default function ReceptionistDashboard() {
 
     try {
       // First process the payment
-      const paymentResponse = await fetch('${API_URL}/api/payments', {
+      const paymentResponse = await fetch(`${API_URL}/api/payments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

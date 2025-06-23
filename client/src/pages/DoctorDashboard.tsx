@@ -195,8 +195,17 @@ export default function DoctorDashboard() {
   const { data: prescriptions = [] } = useQuery<Prescription[]>({
     queryKey: ['/api/prescriptions'],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/prescriptions`);
+      const token = authService.getToken(); // Make sure this method exists and works
+    
+      const response = await fetch(`${API_URL}/api/prescriptions`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    
       if (!response.ok) throw new Error('Failed to fetch prescriptions');
+    
       const data = await response.json();
       return data.map((pres: any) => ({
         id: pres._id?.toString() || pres.id || '',
@@ -212,31 +221,40 @@ export default function DoctorDashboard() {
         isActive: pres.isActive,
         createdAt: pres.createdAt,
       }));
-    },
-  });
+    }
+    });
 
   const { data: patients = [] } = useQuery<Patient[]>({
     queryKey: ['/api/patients'],
     queryFn: async () => {
+      const token = authService.getToken(); // Or use your helper for token retrieval
+    
       const response = await fetch(`${API_URL}/api/patients`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
+    
       if (!response.ok) throw new Error('Failed to fetch patients');
+    
       const data = await response.json();
       const patientsArray = data.data?.patients || data.patients || data;
-      return Array.isArray(patientsArray) ? patientsArray.map((p: any) => ({
-        id: p._id?.toString() || p.id || '',
-        firstName: p.firstName || '',
-        lastName: p.lastName || '',
-        age: parseInt(p.age) || 0,
-        gender: p.gender || '',
-        phone: p.phone || '',
-        email: p.email || '',
-        lastVisit: p.lastVisit,
-      })) : [];
-    },
+    
+      return Array.isArray(patientsArray)
+        ? patientsArray.map((p: any) => ({
+            id: p._id?.toString() || p.id || '',
+            firstName: p.firstName || '',
+            lastName: p.lastName || '',
+            age: parseInt(p.age) || 0,
+            gender: p.gender || '',
+            phone: p.phone || '',
+            email: p.email || '',
+            lastVisit: p.lastVisit,
+          }))
+        : [];
+    }
+    
   });
 
   const statsCards = [
