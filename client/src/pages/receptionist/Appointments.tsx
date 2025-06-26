@@ -94,7 +94,7 @@ export default function ReceptionistAppointmentsPage() {
           throw new Error('No authentication token found');
         }
 
-        let url = '/api/appointments?';
+        let url = `${API_URL}/api/appointments?`;
         const params = new URLSearchParams();
         if (selectedDate) params.append('date', selectedDate);
         if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);

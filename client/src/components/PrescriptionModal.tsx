@@ -88,7 +88,7 @@ export default function PrescriptionModal({ isOpen, onClose, onSuccess }: Prescr
     if (medications.length === 0 || !medications.some(med => med.name.trim() !== "")) {
       toast({
         title: "Error",
-        description: "At least one medication is required",
+        description: "At least one medication is required. Please add at least one valid medication before submitting.",
         variant: "destructive",
       });
       return;
@@ -101,12 +101,17 @@ export default function PrescriptionModal({ isOpen, onClose, onSuccess }: Prescr
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create prescription");
+        const errorData = await response.json();
+        let errorMsg = errorData.message || "Failed to create prescription.";
+        if (errorMsg.toLowerCase().includes('duplicate')) {
+          errorMsg = 'A prescription for this patient and date already exists.';
+        }
+        throw new Error(errorMsg);
       }
 
       toast({
         title: "Success",
-        description: "Prescription has been created successfully",
+        description: "Prescription has been created successfully.",
       });
       form.reset();
       setMedications([{ name: "", dosage: "", frequency: "" }]);
@@ -115,7 +120,7 @@ export default function PrescriptionModal({ isOpen, onClose, onSuccess }: Prescr
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create prescription",
+        description: error instanceof Error ? error.message : "Failed to create prescription. Please check all fields and try again.",
         variant: "destructive",
       });
     }

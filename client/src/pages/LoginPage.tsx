@@ -23,7 +23,7 @@ export default function LoginPage() {
     if (!email || !password) {
       toast({
         title: "Missing Fields",
-        description: "Please fill in all required fields",
+        description: "Please enter both your email and password to log in.",
         variant: "destructive",
       });
       return;
@@ -32,7 +32,7 @@ export default function LoginPage() {
     if (!role) {
       toast({
         title: "Role Required",
-        description: "Please select your role",
+        description: "Please select your role (Doctor or Receptionist) to continue.",
         variant: "destructive",
       });
       return;
@@ -59,13 +59,15 @@ export default function LoginPage() {
         }
       }, 100);
     } catch (error) {
-      console.error('Login error:', error);
+      let errorMsg = error instanceof Error ? error.message : "Invalid email or password. Please check your credentials and try again.";
+      if (errorMsg.toLowerCase().includes('network')) {
+        errorMsg = 'Network error. Please check your internet connection and try again.';
+      }
       toast({
         title: "Login Failed",
-        description: error instanceof Error ? error.message : "Invalid email or password",
+        description: errorMsg,
         variant: "destructive",
       });
-      // Clear password field on error
       setPassword("");
     } finally {
       setIsLoading(false);
