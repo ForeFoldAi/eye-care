@@ -27,7 +27,7 @@ import {
   SortAsc,
   ChevronDown
 } from "lucide-react";
-import { type User } from "@/lib/auth";
+import { type User as AuthUser, authService } from "@/lib/auth";
 
 interface Patient {
   id: string;

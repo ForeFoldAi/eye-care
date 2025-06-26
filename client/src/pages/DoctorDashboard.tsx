@@ -27,7 +27,7 @@ import { type User as AuthUser } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PrescriptionModal from "@/components/PrescriptionModal";
 import { authService } from "@/lib/auth";
-
+import Layout from "@/components/Layout";
 interface DashboardStats {
   todayAppointments: number;
   totalPatients: number;
@@ -298,29 +298,37 @@ export default function DoctorDashboard() {
 
   const quickActions = [
     {
-      title: "Search Patient",
-      description: "Find patient records quickly",
-      icon: Search,
+      title: "Appointments",
+      description: "View and manage appointments",
+      icon: Calendar,
       color: "bg-medical-blue-50 hover:bg-medical-blue-100",
       iconColor: "bg-medical-blue-500",
-            action: () => navigate('/doctor/patients'),
+      action: () => navigate('/doctor/appointments'),
     },
     {
-      title: "Write Prescription",
-      description: "Create new prescription",
-      icon: FileText,
+      title: "Patients",
+      description: "View and manage patients",
+      icon: Users,
       color: "bg-medical-green-50 hover:bg-medical-green-100",
       iconColor: "bg-medical-green-500",
-      action: () => setShowPrescriptionModal(true),
+      action: () => navigate('/doctor/patients'),
     },
     {
-      title: "Set Availability",
-      description: "Update your schedule",
-      icon: CalendarPlus,
+      title: "Prescriptions",
+      description: "View and manage prescriptions",
+      icon: FileText,
       color: "bg-blue-50 hover:bg-blue-100",
       iconColor: "bg-blue-500",
+      action: () => navigate('/doctor/prescriptions'),
+    },
+    {
+      title: "Availability",
+      description: "Set your availability",
+      icon: Clock,
+      color: "bg-purple-50 hover:bg-purple-100",
+      iconColor: "bg-purple-500",
       action: () => navigate('/doctor/availability'),
-    }
+    },
   ];
 
   const getPatientInitials = (firstName: string, lastName: string) => {
@@ -483,7 +491,9 @@ export default function DoctorDashboard() {
   }
 
   return (
-          <>
+    <ProtectedRoute requiredRole="doctor">
+    {(currentUser: AuthUser) => (
+      <Layout user={currentUser}>
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {statsCards.map((stat, index) => {
@@ -897,6 +907,8 @@ export default function DoctorDashboard() {
               }}
             />
           )}
-          </>
+           </Layout>
+        )}
+      </ProtectedRoute>
         );
 }

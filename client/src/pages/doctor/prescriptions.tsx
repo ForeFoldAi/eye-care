@@ -19,6 +19,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 import { authService } from "@/lib/auth";
+import { type User as AuthUser } from "@/lib/auth";
+
 
 interface Patient {
   _id: string;
@@ -77,7 +79,11 @@ export default function DoctorPrescriptionsPage() {
     queryKey: ['/api/patients'],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/patients");
-      return response.json();
+      const data = await response.json();
+      if (Array.isArray(data)) return data;
+      if (Array.isArray(data.patients)) return data.patients;
+      if (data.data && Array.isArray(data.data.patients)) return data.data.patients;
+      return [];
     },
   });
 

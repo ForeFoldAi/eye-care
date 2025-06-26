@@ -35,6 +35,7 @@ import {
 import { useMutation, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { type User as AuthUser } from "@/lib/auth";
+import { authService } from '@/lib/auth';
 
 interface DashboardStats {
   todayAppointments: number;
@@ -106,6 +107,7 @@ export default function ReceptionistDashboard() {
     queryKey: ['/api/dashboard/stats'],
   });
   const API_URL = import.meta.env.VITE_API_URL;
+  const user = authService.getStoredUser();
   const { data: patients, isLoading: isLoadingPatients, error } = useQuery<Patient[], Error>({
     queryKey: ['/api/patients'],
     queryFn: async () => {
@@ -169,7 +171,6 @@ export default function ReceptionistDashboard() {
   const { data: doctors = [] } = useQuery<Doctor[]>({
     queryKey: ['/api/doctors'],
     queryFn: async () => {
-   
       const response = await fetch(`${API_URL}/api/doctors`);
       if (!response.ok) throw new Error('Failed to fetch doctors');
       const data = await response.json();
@@ -180,6 +181,7 @@ export default function ReceptionistDashboard() {
         specialization: doctor.specialization
       }));
     },
+    enabled: user?.role === 'doctor',
   });
 
   const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery<Appointment[]>({

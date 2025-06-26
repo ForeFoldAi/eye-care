@@ -23,7 +23,7 @@ import {
   Mail,
   Edit
 } from "lucide-react";
-import { type User as AuthUser } from "@/lib/auth";
+import { type User as AuthUser, authService } from "@/lib/auth";
 
 interface Patient {
   _id: string;

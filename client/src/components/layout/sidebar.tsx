@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { authService } from "@/lib/auth";
@@ -33,7 +33,7 @@ const receptionistMenuItems = [
 ];
 
 export function Sidebar() {
-  const location = useLocation();
+  const [location] = useLocation();
   const user = authService.getStoredUser();
 
   if (!user) return null;
@@ -72,14 +72,10 @@ export function Sidebar() {
         <nav className="flex-1 px-4 py-6 space-y-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.href;
+            const isActive = location === item.href;
             
             return (
-              <Link 
-                key={item.href} 
-                to={item.href} 
-                className="block"
-              >
+              <Link key={item.href} href={item.href}>
                 <Button
                   variant={isActive ? "default" : "ghost"}
                   className={cn(

@@ -1,7 +1,7 @@
-import { Outlet } from 'react-router-dom';
-import Layout from './Layout';
-import ProtectedRoute from './ProtectedRoute';
-import { type User as AuthUser } from '@/lib/auth';
+import { Outlet } from "react-router-dom";
+import { authService, User as AuthUser } from "@/lib/auth";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import Layout from "@/components/Layout";
 
 export default function DoctorLayout() {
   return (

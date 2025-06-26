@@ -28,7 +28,6 @@ export default function Layout({ children, user }: LayoutProps) {
   };
 
   const isDoctorRoute = location.pathname.startsWith('/doctor');
-  const isReceptionistRoute = location.pathname.startsWith('/receptionist');
 
   const doctorNavItems = [
     { href: '/doctor', icon: BarChart3, label: 'Dashboard' },
@@ -47,7 +46,7 @@ export default function Layout({ children, user }: LayoutProps) {
 
   const navItems = isDoctorRoute ? doctorNavItems : receptionistNavItems;
 
-  const CurrentDateTime = () => {
+  const getCurrentDateTime = () => {
     const now = new Date();
     const dateOptions: Intl.DateTimeFormatOptions = { 
       weekday: 'long', 
@@ -67,7 +66,7 @@ export default function Layout({ children, user }: LayoutProps) {
     };
   };
 
-  const { date, time } = CurrentDateTime();
+  const { date, time } = getCurrentDateTime();
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -139,7 +138,7 @@ export default function Layout({ children, user }: LayoutProps) {
       </div>
 
       {/* Main Content */}
-      <div className="ml-60">
+      <div className="ml-64">
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="px-6 py-4">

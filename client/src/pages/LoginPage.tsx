@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authService } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -15,27 +15,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-
-  // Check if user is already logged in
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (authService.isAuthenticated()) {
-        try {
-          const { user } = await authService.getCurrentUser();
-          if (user.role === 'doctor') {
-            navigate('/doctor', { replace: true });
-          } else if (user.role === 'receptionist') {
-            navigate('/receptionist', { replace: true });
-          }
-        } catch (error) {
-          // If getCurrentUser fails, clear auth data
-          authService.logout();
-        }
-      }
-    };
-    
-    checkAuth();
-  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
