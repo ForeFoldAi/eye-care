@@ -77,7 +77,7 @@ export default function Layout({ children, user }: LayoutProps) {
             <div className="w-8 h-8 bg-medical-blue-500 rounded-lg flex items-center justify-center">
               <Heart className="w-4 h-4 text-white" />
             </div>
-            <span className="ml-3 text-lg font-semibold text-gray-900">HealthCare</span>
+            <span className="ml-3 text-lg font-semibold text-gray-900">EyeCare</span>
           </div>
         </div>
 

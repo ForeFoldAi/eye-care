@@ -126,7 +126,7 @@ export default function LoginPage() {
             <div className="w-12 h-12 bg-medical-blue-500 rounded-xl flex items-center justify-center">
               <Heart className="w-6 h-6 text-white" />
             </div>
-            <h1 className="ml-4 text-2xl font-bold text-gray-900">HealthCare</h1>
+            <h1 className="ml-4 text-2xl font-bold text-gray-900">EyeCare</h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">

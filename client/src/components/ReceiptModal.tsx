@@ -98,7 +98,7 @@ export default function ReceiptModal({ isOpen, onClose, payment, patient }: Rece
           <CardContent className="p-6 space-y-4">
             {/* Header */}
             <div className="text-center border-b border-gray-200 pb-4">
-              <h3 className="text-2xl font-bold text-medical-blue-600">HealthCare Management System</h3>
+              <h3 className="text-2xl font-bold text-medical-blue-600">EyeCare Management System</h3>
               <p className="text-sm text-gray-600 mt-1">Official Payment Receipt</p>
             </div>
 
