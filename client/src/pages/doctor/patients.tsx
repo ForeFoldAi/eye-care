@@ -28,6 +28,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { type User as AuthUser, authService } from "@/lib/auth";
+import LoadingEye from '@/components/ui/LoadingEye';
 
 interface Patient {
   id: string;
@@ -47,7 +48,13 @@ interface Patient {
 }
 const API_URL = import.meta.env.VITE_API_URL;
 async function fetchPatients(): Promise<Patient[]> {
-  const response = await fetch(`${API_URL}/api/patients`);
+  const token = authService.getToken();
+  const response = await fetch(`${API_URL}/api/patients`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
   if (!response.ok) {
     throw new Error('Failed to fetch patients');
   }
@@ -74,7 +81,13 @@ async function fetchPatients(): Promise<Patient[]> {
 }
 
 async function searchPatients(query: string): Promise<Patient[]> {
-  const response = await fetch(`${API_URL}/api/patients/search?q=${encodeURIComponent(query)}`);
+  const token = authService.getToken();
+  const response = await fetch(`${API_URL}/api/patients/search?q=${encodeURIComponent(query)}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
   if (!response.ok) {
     throw new Error('Failed to search patients');
   }
@@ -516,10 +529,7 @@ export default function DoctorPatientsPage() {
         <CardContent className="p-6">
           {isLoading ? (
             <div className="text-center py-12">
-              <div className="flex items-center justify-center">
-                <Stethoscope className="w-6 h-6 text-blue-500 mr-2 animate-pulse" />
-                <p className="text-gray-500">Loading patients...</p>
-              </div>
+              <LoadingEye size={32} />
             </div>
           ) : isError ? (
             <div className="text-center py-12">

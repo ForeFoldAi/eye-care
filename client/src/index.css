@@ -100,3 +100,11 @@
 
 .hover\:bg-medical-blue-600:hover { background-color: hsl(var(--medical-blue-600)); }
 .hover\:bg-medical-green-600:hover { background-color: hsl(var(--medical-green-600)); }
+
+@keyframes spin-slow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
+}

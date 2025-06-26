@@ -29,6 +29,7 @@ import {
   Users,
   CalendarPlus
 } from "lucide-react";
+import LoadingEye from '@/components/ui/LoadingEye';
 
 interface Patient {
   _id: string;
@@ -692,14 +693,18 @@ export default function ReceptionistAppointmentsPage() {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-12">
-                    <div className="animate-spin w-8 h-8 border-4 border-medical-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <LoadingEye size={48} className="mx-auto mb-4" />
               <p className="text-gray-500">Loading appointments...</p>
             </div>
           ) : isError ? (
             <div className="text-center py-12 bg-red-50 rounded-lg">
               <X className="w-8 h-8 text-red-500 mx-auto mb-2" />
               <p className="text-red-600 font-medium">
-                {error instanceof Error ? error.message : 'Failed to load appointments'}
+                {error instanceof Error && error.message.includes('HTTP 404')
+                  ? 'No appointments found for the selected date.'
+                  : error instanceof Error
+                  ? error.message
+                  : 'Failed to load appointments'}
               </p>
               <Button
                 variant="outline"
@@ -715,14 +720,16 @@ export default function ReceptionistAppointmentsPage() {
                 filteredAppointments.map(renderAppointmentCard)
               ) : (
                 <div className="text-center py-12 bg-gray-50 rounded-lg">
-                        <div className="w-12 h-12 bg-medical-blue-100 rounded-full flex items-center justify-center text-medical-blue-600 mx-auto mb-4">
-                          <Calendar className="w-6 h-6" />
-                        </div>
+                  <div className="w-12 h-12 bg-medical-blue-100 rounded-full flex items-center justify-center text-medical-blue-600 mx-auto mb-4">
+                    <Calendar className="w-6 h-6" />
+                  </div>
                   <p className="text-gray-500 font-medium text-lg mb-2">
-                    No appointments found
+                    No appointments found for the selected date.
                   </p>
                   <p className="text-gray-400">
-                    {searchQuery ? 'Try adjusting your search criteria' : 'No appointments scheduled for this date'}
+                    {searchQuery
+                      ? 'Try adjusting your search criteria or filters.'
+                      : 'There are no appointments scheduled for this date. You can book a new appointment using the button above.'}
                   </p>
                 </div>
               )}

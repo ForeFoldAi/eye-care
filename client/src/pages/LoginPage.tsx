@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Heart } from "lucide-react";
+import LoadingEye from '@/components/ui/LoadingEye';
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -119,7 +120,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center relative">
+      {isLoading && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-white bg-opacity-80">
+          <LoadingEye size={64} />
+        </div>
+      )}
       <div className="w-full max-w-md">
         <div className="bg-white rounded-lg shadow-lg p-8">
           <div className="flex items-center justify-center mb-8">

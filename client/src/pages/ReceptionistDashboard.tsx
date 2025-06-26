@@ -36,6 +36,7 @@ import { useMutation, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { type User as AuthUser } from "@/lib/auth";
 import { authService } from '@/lib/auth';
+import LoadingEye from '@/components/ui/LoadingEye';
 
 interface DashboardStats {
   todayAppointments: number;
@@ -553,8 +554,8 @@ export default function ReceptionistDashboard() {
                   <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                     {isLoading ? (
                       <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-medical-blue-500 mr-2" />
-                        <p className="text-gray-500">Loading patients...</p>
+                        <LoadingEye size={32} />
+                        <p className="text-gray-500 ml-2">Loading patients...</p>
                       </div>
                     ) : currentError ? (
                       <div className="text-center py-8">
@@ -630,7 +631,7 @@ export default function ReceptionistDashboard() {
                     >
                       {paymentMutation.isPending ? (
                         <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          <LoadingEye size={32} />
                           Processing...
                         </>
                       ) : (
@@ -750,8 +751,8 @@ export default function ReceptionistDashboard() {
                 <CardContent className="pt-6">
                   {isLoadingAppointments ? (
                     <div className="flex items-center justify-center py-8">
-                      <Loader2 className="w-6 h-6 animate-spin text-blue-500 mr-2" />
-                      <p className="text-gray-500">Loading appointments...</p>
+                      <LoadingEye size={32} />
+                      <p className="text-gray-500 ml-2">Loading appointments...</p>
                     </div>
                   ) : appointments.length === 0 ? (
                     <div className="text-center py-8">

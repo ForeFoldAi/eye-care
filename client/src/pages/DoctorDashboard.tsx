@@ -28,6 +28,8 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import PrescriptionModal from "@/components/PrescriptionModal";
 import { authService } from "@/lib/auth";
 import Layout from "@/components/Layout";
+import LoadingEye from '@/components/ui/LoadingEye';
+
 interface DashboardStats {
   todayAppointments: number;
   totalPatients: number;
@@ -491,9 +493,7 @@ export default function DoctorDashboard() {
   }
 
   return (
-    <ProtectedRoute requiredRole="doctor">
-    {(currentUser: AuthUser) => (
-      <Layout user={currentUser}>
+    <>
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {statsCards.map((stat, index) => {
@@ -907,8 +907,6 @@ export default function DoctorDashboard() {
               }}
             />
           )}
-           </Layout>
-        )}
-      </ProtectedRoute>
+         </>
         );
 }
