@@ -10,6 +10,7 @@ import {  Clock, Stethoscope, Activity, Calendar, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import LoadingEye from '@/components/ui/LoadingEye';
 
 interface Patient {
   id: string;
@@ -469,7 +470,7 @@ const bookAppointmentMutation = useMutation({
                 {isLoadingAvailability ? (
                   <div className="col-span-full flex items-center justify-center py-8">
                     <div className="flex items-center space-x-2">
-                      <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                      <LoadingEye size={24} />
                       <span className="text-gray-500">Loading available slots...</span>
                     </div>
                   </div>
@@ -594,7 +595,7 @@ const bookAppointmentMutation = useMutation({
             >
               {bookAppointmentMutation.isPending ? (
                 <div className="flex items-center space-x-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <LoadingEye size={20} />
                   <span>Booking...</span>
                 </div>
               ) : (

@@ -78,9 +78,13 @@ export function PatientRegistrationModal({ trigger }: PatientRegistrationModalPr
       setOpen(false);
     },
     onError: (error: any) => {
+      let description = error.message || "Failed to register patient";
+      if (description && description.toLowerCase().includes('phone number already registered')) {
+        description = 'This phone number is already registered. Please use a different phone number or search for the existing patient.';
+      }
       toast({
         title: "Error",
-        description: error.message || "Failed to register patient",
+        description,
         variant: "destructive",
       });
     },

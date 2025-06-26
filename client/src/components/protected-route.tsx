@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { authService, type User } from "@/lib/auth";
 import { Loader2 } from "lucide-react";
 import { Navigate } from "react-router-dom";
+import LoadingEye from '@/components/ui/LoadingEye';
 
 interface ProtectedRouteProps {
   children: (user: User) => ReactNode;
@@ -27,7 +28,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-medical-blue-500" />
+          <LoadingEye size={32} className="mx-auto mb-4" />
           <p className="text-gray-600">Loading...</p>
         </div>
       </div>
@@ -46,7 +47,7 @@ export function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) 
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied or Please Login Again</h1>
           <p className="text-gray-600">You don't have permission to access this page.</p>
         </div>
       </div>
