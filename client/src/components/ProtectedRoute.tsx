@@ -1,8 +1,8 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authService, User } from "@/lib/auth";
 import LoadingEye from '@/components/ui/LoadingEye';
-import { Navigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 
 interface ProtectedRouteProps {
   children: (user: User) => ReactNode;
@@ -10,6 +10,8 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
+  const navigate = useNavigate();
+  
   const { data, isLoading, error } = useQuery({
     queryKey: ['/api/auth/me'],
     queryFn: () => authService.getCurrentUser(),
@@ -20,7 +22,10 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   // If not authenticated, redirect to login
   if (!authService.isAuthenticated()) {
-    return <Navigate to="/login" replace />;
+    useEffect(() => {
+      navigate({ to: '/login', replace: true });
+    }, [navigate]);
+    return null;
   }
 
   if (isLoading) {
@@ -36,7 +41,10 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
 
   if (error || !data?.user) {
     authService.logout();
-    return <Navigate to="/login" replace />;
+    useEffect(() => {
+      navigate({ to: '/login', replace: true });
+    }, [navigate]);
+    return null;
   }
 
   const user = data.user;

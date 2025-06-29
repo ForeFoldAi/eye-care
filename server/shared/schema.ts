@@ -37,8 +37,7 @@ export const insertPrescriptionSchema = z.object({
     name: z.string().min(1, "Medication name is required"),
     dosage: z.string().min(1, "Dosage is required"),
     frequency: z.string().min(1, "Frequency is required"),
-    duration: z.string().optional(),
-    quantity: z.number().optional()
+    duration: z.string().optional()
   })).min(1, "At least one medication is required"),
   instructions: z.string().optional(),
   notes: z.string().optional()

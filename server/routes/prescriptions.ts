@@ -2,12 +2,14 @@ import { Router } from 'express';
 import { Prescription } from '../models';
 import { insertPrescriptionSchema } from '../shared/schema';
 import { authenticateToken, authorizeRole, AuthRequest } from '../middleware/auth';
+import connectDB from '../config/database';
 
 const router = Router();
 
 // Get all prescriptions
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    await connectDB();
     const prescriptions = await Prescription.find()
       .populate('patientId', 'firstName lastName phone')
       .populate('doctorId', 'firstName lastName specialization')
@@ -22,6 +24,7 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
 // Get prescription by ID
 router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    await connectDB();
     const prescription = await Prescription.findById(req.params.id)
       .populate('patientId', 'firstName lastName phone')
       .populate('doctorId', 'firstName lastName specialization')
@@ -38,19 +41,20 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
 
 // Create new prescription
 router.post('/', authenticateToken, authorizeRole(['doctor']), async (req: AuthRequest, res) => {
+  console.log('POST /api/prescriptions body:', req.body);
+  await connectDB();
   try {
     const prescriptionData = insertPrescriptionSchema.parse(req.body);
     const prescription = new Prescription(prescriptionData);
     await prescription.save();
-    
     const populatedPrescription = await Prescription.findById(prescription._id)
       .populate('patientId', 'firstName lastName phone')
       .populate('doctorId', 'firstName lastName specialization')
       .populate('appointmentId');
-    
     res.status(201).json(populatedPrescription);
-  } catch (error) {
-    res.status(400).json({ message: 'Invalid request data' });
+  } catch (validationError) {
+    console.error('Prescription validation error:', validationError);
+    res.status(400).json({ message: 'Invalid request data', error: validationError });
   }
 });
 

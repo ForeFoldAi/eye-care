@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useRouter } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -122,7 +122,7 @@ export default function DoctorAppointmentsPage() {
             
             if (response.status === 401) {
               localStorage.removeItem('token');
-              navigate('/login');
+              navigate({ to: '/login' });
               throw new Error('Session expired. Please login again.');
             }
 
@@ -158,7 +158,7 @@ export default function DoctorAppointmentsPage() {
             description: "Your session has expired. Please login again.",
             variant: "destructive",
           });
-          navigate('/login');
+          navigate({ to: '/login' });
         }
         throw error;
       }
@@ -289,7 +289,7 @@ export default function DoctorAppointmentsPage() {
   };
 
   const viewPatientHistory = (patientId: string) => {
-    navigate(`/patients/${patientId}/history`);
+    navigate({ to: `/patients/${patientId}/history` });
   };
 
   // Filter appointments based on search query

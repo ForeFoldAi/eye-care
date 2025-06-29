@@ -3,11 +3,13 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IPrescription extends Document {
   patientId: mongoose.Types.ObjectId;
   doctorId: mongoose.Types.ObjectId;
-  medication: string;
-  dosage: string;
-  frequency: string;
-  duration?: string;
-  quantity?: number;
+  medications: {
+    name: string;
+    dosage: string;
+    frequency: string;
+    duration?: string;
+    quantity?: number;
+  }[];
   instructions?: string;
   notes?: string;
   isActive: boolean;
@@ -26,28 +28,15 @@ const prescriptionSchema = new Schema<IPrescription>({
     ref: 'User',
     required: [true, 'Doctor ID is required']
   },
-  medication: {
-    type: String,
-    required: [true, 'Medication name is required'],
-    trim: true
-  },
-  dosage: {
-    type: String,
-    required: [true, 'Dosage is required'],
-    trim: true
-  },
-  frequency: {
-    type: String,
-    required: [true, 'Frequency is required'],
-    trim: true
-  },
-  duration: {
-    type: String,
-    trim: true
-  },
-  quantity: {
-    type: Number
-  },
+  medications: [
+    {
+      name: { type: String, required: true, trim: true },
+      dosage: { type: String, required: true, trim: true },
+      frequency: { type: String, required: true, trim: true },
+      duration: { type: String, trim: true },
+      quantity: { type: Number }
+    }
+  ],
   instructions: {
     type: String,
     trim: true

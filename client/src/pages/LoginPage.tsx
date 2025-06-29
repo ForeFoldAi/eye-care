@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import { authService } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,9 +53,9 @@ export default function LoginPage() {
       // Small delay to ensure token is stored before navigation
       setTimeout(() => {
         if (response.user.role === 'doctor') {
-          navigate('/doctor', { replace: true });
+          navigate({ to: '/doctor/dashboard', replace: true });
         } else if (response.user.role === 'receptionist') {
-          navigate('/receptionist', { replace: true });
+          navigate({ to: '/receptionist/dashboard', replace: true });
         }
       }, 100);
     } catch (error) {
@@ -104,9 +104,9 @@ export default function LoginPage() {
       // Small delay to ensure token is stored before navigation
       setTimeout(() => {
         if (response.user.role === 'doctor') {
-          navigate('/doctor', { replace: true });
+          navigate({ to: '/doctor/dashboard', replace: true });
         } else if (response.user.role === 'receptionist') {
-          navigate('/receptionist', { replace: true });
+          navigate({ to: '/receptionist/dashboard', replace: true });
         }
       }, 100);
     } catch (error) {

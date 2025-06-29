@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useRouter } from "@tanstack/react-router";
 import { authService, User } from "@/lib/auth";
 import { 
   Heart, 
@@ -20,7 +20,8 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, user }: LayoutProps) {
-  const location = useLocation();
+  const router = useRouter();
+  const location = router.state.location;
 
   const handleLogout = () => {
     authService.logout();
@@ -30,7 +31,7 @@ export default function Layout({ children, user }: LayoutProps) {
   const isDoctorRoute = location.pathname.startsWith('/doctor');
 
   const doctorNavItems = [
-    { href: '/doctor', icon: BarChart3, label: 'Dashboard' },
+    { href: '/doctor/dashboard', icon: BarChart3, label: 'Dashboard' },
     { href: '/doctor/appointments', icon: Calendar, label: 'Appointments' },
     { href: '/doctor/patients', icon: Users, label: 'Patients' },
     { href: '/doctor/prescriptions', icon: FileText, label: 'Prescriptions' },
@@ -38,7 +39,7 @@ export default function Layout({ children, user }: LayoutProps) {
   ];
 
   const receptionistNavItems = [
-    { href: '/receptionist', icon: BarChart3, label: 'Dashboard' },
+    { href: '/receptionist/dashboard', icon: BarChart3, label: 'Dashboard' },
     { href: '/receptionist/patients', icon: Users, label: 'Patients' },
     { href: '/receptionist/appointments', icon: Calendar, label: 'Appointments' },
     { href: '/receptionist/payments', icon: Receipt, label: 'Payments' },

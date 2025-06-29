@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -109,7 +109,7 @@ export default function ReceptionistAppointmentsPage() {
         
         if (response.status === 401) {
           localStorage.removeItem('token');
-          navigate('/login');
+          navigate({ to: '/login' });
           throw new Error('Session expired. Please login again.');
         }
 
@@ -128,7 +128,7 @@ export default function ReceptionistAppointmentsPage() {
             description: "Your session has expired. Please login again.",
             variant: "destructive",
           });
-          navigate('/login');
+          navigate({ to: '/login' });
         }
         throw error;
       }
@@ -372,7 +372,7 @@ export default function ReceptionistAppointmentsPage() {
   };
 
   const viewPatientHistory = (patientId: string) => {
-    navigate(`/patients/${patientId}/history`);
+    navigate({ to: `/patients/${patientId}/history` });
   };
 
   // Filter appointments based on search query

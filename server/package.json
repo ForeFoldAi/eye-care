@@ -9,7 +9,6 @@
     "build": "tsc",
     "check": "tsc --noEmit",
     "postinstall": "npm install --save-dev @types/express @types/bcrypt @types/jsonwebtoken @types/pdfkit"
-  
   },
   "dependencies": {
     "@chakra-ui/form-control": "^2.2.0",

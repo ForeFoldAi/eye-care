@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -196,23 +196,32 @@ export default function DoctorPatientsPage() {
   };
 
   const viewPatientDetails = (patientId: string) => {
-    navigate(`/patient/${patientId}`);
+    // TODO: Navigate to patient details page when route is added
+    console.log('View patient details:', patientId);
+    // navigate({ to: `/patient/${patientId}` });
   };
 
   const viewPatientHistory = (patientId: string) => {
-    navigate(`/patient/${patientId}/history`);
+    // TODO: Navigate to patient history page when route is added
+    console.log('View patient history:', patientId);
+    // navigate({ to: `/patient/${patientId}/history` });
   };
 
   const viewPatientAppointments = (patientId: string) => {
-    navigate(`/appointments?patientId=${patientId}`);
+    // Navigate to appointments page with patient filter
+    navigate({ to: '/doctor/appointments', search: { patientId } });
   };
 
   const scheduleAppointment = (patientId: string) => {
-    navigate(`/appointments/new?patientId=${patientId}`);
+    // TODO: Open appointment booking modal instead of navigation
+    console.log('Schedule appointment for patient:', patientId);
+    // navigate({ to: `/appointments/new?patientId=${patientId}` });
   };
 
   const addNewPatient = () => {
-    navigate('/patients/new');
+    // TODO: Open patient registration modal instead of navigation
+    // For now, we'll just log the action
+    console.log('Add new patient - should open modal');
   };
 
   const exportPatients = () => {

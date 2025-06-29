@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import PrescriptionModal from "@/components/PrescriptionModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -129,7 +129,7 @@ export default function DoctorPrescriptionsPage() {
   };
 
   const handleView = (prescriptionId: string) => {
-    navigate(`/doctor/prescriptions/${prescriptionId}`);
+    navigate({ to: `/doctor/prescriptions/${prescriptionId}` });
   };
 
   return (

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {  Clock, Stethoscope, Activity, Calendar, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import { Badge } from "@/components/ui/badge";
 import LoadingEye from '@/components/ui/LoadingEye';
 
@@ -83,7 +83,7 @@ const { data: patients } = useQuery<Patient[]>({
 
       if (response.status === 401) {
         localStorage.removeItem('token');
-        navigate('/login');
+        navigate({ to: '/login' });
         throw new Error('Session expired. Please login again.');
       }
 
@@ -104,7 +104,7 @@ const { data: patients } = useQuery<Patient[]>({
           description: "Your session has expired. Please login again.",
           variant: "destructive",
         });
-        navigate('/login');
+        navigate({ to: '/login' });
       }
       throw error;
     }
@@ -132,7 +132,7 @@ const { data: doctors = [] } = useQuery<Doctor[]>({
 
       if (response.status === 401) {
         localStorage.removeItem('token');
-        navigate('/login');
+        navigate({ to: '/login' });
         throw new Error('Session expired. Please login again.');
       }
 
@@ -155,7 +155,7 @@ const { data: doctors = [] } = useQuery<Doctor[]>({
           description: "Your session has expired. Please login again.",
           variant: "destructive",
         });
-        navigate('/login');
+        navigate({ to: '/login' });
       }
       throw error;
     }
@@ -176,7 +176,7 @@ const { data: doctorAvailabilityData, isLoading: isLoadingAvailability } = useQu
           description: "Please login again",
           variant: "destructive",
         });
-        navigate('/login');
+        navigate({ to: '/login' });
         return null;
       }
 
@@ -201,7 +201,7 @@ const { data: doctorAvailabilityData, isLoading: isLoadingAvailability } = useQu
           description: "Your session has expired. Please login again.",
           variant: "destructive",
         });
-        navigate('/login');
+        navigate({ to: '/login' });
         return null;
       }
 
@@ -258,7 +258,7 @@ const bookAppointmentMutation = useMutation({
 
       if (response.status === 401) {
         localStorage.removeItem('token');
-        navigate('/login');
+        navigate({ to: '/login' });
         throw new Error('Session expired. Please login again.');
       }
 
@@ -279,7 +279,7 @@ const bookAppointmentMutation = useMutation({
           description: "Your session has expired. Please login again.",
           variant: "destructive",
         });
-        navigate('/login');
+        navigate({ to: '/login' });
       }
       throw error;
     }

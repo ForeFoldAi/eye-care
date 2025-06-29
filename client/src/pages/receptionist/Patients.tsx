@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PatientRegistrationModal from "@/components/PatientRegistrationModal";
@@ -125,11 +125,11 @@ export default function PatientsPage() {
   };
 
   const viewPatientAppointments = (patientId: string) => {
-    navigate(`/appointments?patientId=${patientId}`);
+    navigate({ to: `/appointments?patientId=${patientId}` });
   };
 
   const viewPatientPayments = (patientId: string) => {
-    navigate(`/payments?patientId=${patientId}`);
+    navigate({ to: `/payments?patientId=${patientId}` });
   };
 
   const handleViewDetails = (patient: Patient) => {

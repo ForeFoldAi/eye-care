@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   Calendar, 
@@ -305,7 +305,7 @@ export default function DoctorDashboard() {
       icon: Calendar,
       color: "bg-medical-blue-50 hover:bg-medical-blue-100",
       iconColor: "bg-medical-blue-500",
-      action: () => navigate('/doctor/appointments'),
+      action: () => navigate({ to: '/doctor/appointments' }),
     },
     {
       title: "Patients",
@@ -313,7 +313,7 @@ export default function DoctorDashboard() {
       icon: Users,
       color: "bg-medical-green-50 hover:bg-medical-green-100",
       iconColor: "bg-medical-green-500",
-      action: () => navigate('/doctor/patients'),
+      action: () => navigate({ to: '/doctor/patients' }),
     },
     {
       title: "Prescriptions",
@@ -321,7 +321,7 @@ export default function DoctorDashboard() {
       icon: FileText,
       color: "bg-blue-50 hover:bg-blue-100",
       iconColor: "bg-blue-500",
-      action: () => navigate('/doctor/prescriptions'),
+      action: () => navigate({ to: '/doctor/prescriptions' }),
     },
     {
       title: "Availability",
@@ -329,7 +329,7 @@ export default function DoctorDashboard() {
       icon: Clock,
       color: "bg-purple-50 hover:bg-purple-100",
       iconColor: "bg-purple-500",
-      action: () => navigate('/doctor/availability'),
+      action: () => navigate({ to: '/doctor/availability' }),
     },
   ];
 

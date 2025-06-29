@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "@tanstack/react-router";
 import Layout from "@/components/Layout";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import ReceiptModal from "@/components/ReceiptModal";
@@ -20,7 +21,6 @@ import {
   Eye
 } from "lucide-react";
 import { type User as AuthUser } from "@/lib/auth";
-import { useLocation, useNavigate } from "react-router-dom";
 
 interface Patient {
   id: string;
@@ -283,11 +283,10 @@ export default function PaymentsPage() {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const { toast } = useToast();
-  const location = useLocation();
-  const navigate = useNavigate();
+  const router = useRouter();
   const queryClient = useQueryClient();
 
-  const urlParams = new URLSearchParams(location.search);
+  const urlParams = new URLSearchParams(router.state.location.search);
   const patientIdParam = urlParams.get('patientId');
   const appointmentIdParam = urlParams.get('appointmentId');
 

@@ -1,4 +1,4 @@
-import { Outlet } from "react-router-dom";
+import { Outlet } from "@tanstack/react-router";
 import { authService, User as AuthUser } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Layout from "@/components/Layout";
