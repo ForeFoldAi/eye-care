@@ -15,7 +15,7 @@ localPort = 3000
 externalPort = 3000
 
 [[ports]]
-localPort = 3000
+localPort = 5000
 externalPort = 80
 
 [[ports]]
@@ -40,5 +40,8 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "concurrently \"NODE_ENV=development tsx watch server/index.ts\" \"cd client && vite\""
+args = "concurrently \"NODE_ENV=development tsx watch server/index.ts\" \"cd client && vite --host 0.0.0.0 --port 3000\""
 waitForPort = 5000
+
+[agent]
+expertMode = true

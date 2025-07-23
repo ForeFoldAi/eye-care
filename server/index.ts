@@ -20,7 +20,7 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 // ✅ Load environment variables
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
@@ -65,9 +65,12 @@ async function initializeServer() {
     await connectDB();
     console.log('MongoDB Atlas connected successfully to healthcare database');
 
-    // Initialize database indexes for multi-tenant performance
-    await initializeIndexes();
-    console.log('Database indexes initialized for multi-tenant queries');
+    // Initialize database indexes for multi-tenant performance (non-blocking)
+    initializeIndexes().then(() => {
+      console.log('Database indexes initialized for multi-tenant queries');
+    }).catch((error) => {
+      console.error('Index initialization failed (non-critical):', error);
+    });
 
     await registerRoutes(app);
 
@@ -104,10 +107,10 @@ async function initializeServer() {
     // WebSocket server is already initialized
     console.log('WebSocket server initialized');
 
-    const PORT = parseInt(process.env.PORT || '3000', 10);
+    const serverPort = parseInt(process.env.PORT || '5000', 10);
     return new Promise<void>((resolve) => {
-      httpServer.listen(PORT, '0.0.0.0', () => {
-        console.log(`Server running at http://localhost:${PORT}`);
+      httpServer.listen(serverPort, '0.0.0.0', () => {
+        console.log(`Server running at http://localhost:${serverPort}`);
         resolve();
       });
     });
