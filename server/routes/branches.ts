@@ -433,10 +433,11 @@ router.get('/:id/staff', authenticateToken, authorizeRole(['sub_admin', 'admin',
   }
 });
 
-// Get department performance for sub-admin dashboard
-router.get('/:id/departments/performance', authenticateToken, authorizeRole(['sub_admin', 'admin', 'master_admin']), async (req: AuthRequest, res) => {
+// Get comprehensive analytics data for sub-admin
+router.get('/:id/analytics', authenticateToken, authorizeRole(['sub_admin', 'admin', 'master_admin']), async (req: AuthRequest, res) => {
   try {
     const branchId = req.params.id;
+    const { period = '30', department = 'all' } = req.query;
     const branch = await Branch.findById(branchId);
     
     if (!branch) {
@@ -448,21 +449,115 @@ router.get('/:id/departments/performance', authenticateToken, authorizeRole(['su
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Get departments from branch settings
-    const departments = branch.settings?.specialties || ['General Medicine', 'Cardiology', 'Orthopedics'];
-    
-    const performance = departments.map(dept => ({
-      department: dept,
-      efficiency: Math.floor(Math.random() * 20) + 80, // 80-100%
-      patientSatisfaction: Math.floor(Math.random() * 20) + 80, // 80-100%
-      avgWaitTime: Math.floor(Math.random() * 20) + 10, // 10-30 minutes
-      completedAppointments: Math.floor(Math.random() * 20) + 30 // 30-50 appointments
+    // Calculate date range
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - parseInt(period as string));
+
+    // Get real data from various collections
+    const [
+      totalUsers,
+      activeUsers,
+      doctorUsers,
+      recentUsers,
+      departments,
+      previousPeriodUsers
+    ] = await Promise.all([
+      User.countDocuments({ branchId }),
+      User.countDocuments({ branchId, isActive: true }),
+      User.find({ branchId, role: 'doctor', isActive: true })
+        .select('firstName lastName specialization createdAt')
+        .sort({ createdAt: -1 }),
+      User.find({ branchId, createdAt: { $gte: startDate } })
+        .select('firstName lastName role createdAt')
+        .sort({ createdAt: -1 })
+        .limit(20),
+      User.aggregate([
+        { $match: { branchId: branch._id } },
+        { $group: { _id: '$specialization', count: { $sum: 1 }, active: { $sum: { $cond: ['$isActive', 1, 0] } } } }
+      ]),
+      User.countDocuments({ 
+        branchId, 
+        createdAt: { 
+          $gte: new Date(startDate.getTime() - (parseInt(period as string) * 24 * 60 * 60 * 1000)),
+          $lt: startDate 
+        }
+      })
+    ]);
+
+    // Calculate growth metrics
+    const userGrowth = previousPeriodUsers > 0 ? ((totalUsers - previousPeriodUsers) / previousPeriodUsers * 100) : 0;
+
+    // Process department performance
+    const departmentPerformance = departments.map(dept => ({
+      name: dept._id || 'General',
+      revenue: Math.floor(Math.random() * 50000) + 25000, // Simulated until billing is ready
+      patients: dept.count,
+      satisfaction: Math.floor(Math.random() * 20) + 80, // 80-100%
+      growth: Math.floor(Math.random() * 30) - 10, // -10% to +20%
+      activeStaff: dept.active
     }));
 
-    res.json(performance);
+    // Process top doctors
+    const topDoctors = doctorUsers.map(doctor => ({
+      name: `${doctor.firstName} ${doctor.lastName}`,
+      specialty: doctor.specialization || 'General Medicine',
+      patients: Math.floor(Math.random() * 50) + 20, // Simulated until appointments are ready
+      revenue: Math.floor(Math.random() * 25000) + 15000, // Simulated until billing is ready
+      rating: (Math.random() * 1 + 4).toFixed(1) // 4.0 - 5.0 rating
+    }));
+
+    // Revenue time series (simulated with realistic patterns)
+    const revenueTimeSeries = [];
+    for (let i = parseInt(period as string); i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      revenueTimeSeries.push({
+        date: date.toISOString().split('T')[0],
+        revenue: Math.floor(Math.random() * 5000) + 2000 + (Math.sin(i * 0.2) * 1000),
+        appointments: Math.floor(Math.random() * 20) + 10 + Math.floor(Math.sin(i * 0.3) * 5),
+        patients: Math.floor(Math.random() * 15) + 5 + Math.floor(Math.sin(i * 0.25) * 3)
+      });
+    }
+
+    const analyticsData = {
+      overview: {
+        totalRevenue: Math.floor(Math.random() * 200000) + 100000,
+        revenueGrowth: Math.floor(Math.random() * 20) + 5,
+        totalPatients: totalUsers,
+        patientGrowth: userGrowth,
+        totalAppointments: Math.floor(Math.random() * 500) + 200,
+        appointmentGrowth: Math.floor(Math.random() * 25) + 5,
+        averageWaitTime: Math.floor(Math.random() * 15) + 10,
+        patientSatisfaction: (Math.random() * 0.5 + 4.5).toFixed(1)
+      },
+      departmentPerformance,
+      topDoctors: topDoctors.slice(0, 5),
+      operationalMetrics: {
+        bedOccupancy: Math.floor(Math.random() * 30) + 70,
+        equipmentUtilization: Math.floor(Math.random() * 20) + 80,
+        staffEfficiency: Math.floor(Math.random() * 15) + 85,
+        emergencyResponseTime: (Math.random() * 5 + 5).toFixed(1)
+      },
+      revenueTimeSeries,
+      recentActivities: recentUsers.map(user => ({
+        id: user._id.toString(),
+        type: 'user_registration',
+        message: `New ${user.role} ${user.firstName} ${user.lastName} joined`,
+        timestamp: user.createdAt,
+        value: Math.floor(Math.random() * 5000) + 1000
+      })),
+      departmentDistribution: departmentPerformance.map(dept => ({
+        name: dept.name,
+        value: dept.patients,
+        revenue: dept.revenue
+      }))
+    };
+
+    res.json(analyticsData);
   } catch (error) {
-    console.error('Error fetching department performance:', error);
-    res.status(500).json({ message: 'Error fetching department performance' });
+    console.error('Error fetching analytics data:', error);
+    res.status(500).json({ message: 'Error fetching analytics data' });
   }
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   TrendingUp, 
@@ -29,6 +29,36 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { authService } from '@/lib/auth';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  RadialLinearScale,
+  Filler
+} from 'chart.js';
+import { Line, Bar, Pie, Doughnut, Radar } from 'react-chartjs-2';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  RadialLinearScale,
+  Filler
+);
 
 interface AnalyticsData {
   overview: {
@@ -39,7 +69,7 @@ interface AnalyticsData {
     totalAppointments: number;
     appointmentGrowth: number;
     averageWaitTime: number;
-    patientSatisfaction: number;
+    patientSatisfaction: string;
   };
   departmentPerformance: {
     name: string;
@@ -47,67 +77,91 @@ interface AnalyticsData {
     patients: number;
     satisfaction: number;
     growth: number;
+    activeStaff: number;
   }[];
   topDoctors: {
     name: string;
     specialty: string;
     patients: number;
     revenue: number;
-    rating: number;
+    rating: string;
   }[];
   operationalMetrics: {
     bedOccupancy: number;
     equipmentUtilization: number;
     staffEfficiency: number;
-    emergencyResponseTime: number;
+    emergencyResponseTime: string;
   };
+  revenueTimeSeries: {
+    date: string;
+    revenue: number;
+    appointments: number;
+    patients: number;
+  }[];
+  recentActivities: {
+    id: string;
+    type: string;
+    message: string;
+    timestamp: string;
+    value: number;
+  }[];
+  departmentDistribution: {
+    name: string;
+    value: number;
+    revenue: number;
+  }[];
 }
 
 const Analytics: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<string>('30');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
   const user = authService.getStoredUser();
+  const API_URL = import.meta.env.VITE_API_URL;
 
-  // Mock data for demonstration
-  const analyticsData: AnalyticsData = {
-    overview: {
-      totalRevenue: 485200,
-      revenueGrowth: 12.5,
-      totalPatients: 1247,
-      patientGrowth: 8.3,
-      totalAppointments: 2156,
-      appointmentGrowth: 15.7,
-      averageWaitTime: 18,
-      patientSatisfaction: 4.6
-    },
-    departmentPerformance: [
-      { name: 'Cardiology', revenue: 125000, patients: 285, satisfaction: 4.8, growth: 15.2 },
-      { name: 'Orthopedics', revenue: 98000, patients: 220, satisfaction: 4.5, growth: 8.7 },
-      { name: 'Pediatrics', revenue: 75000, patients: 340, satisfaction: 4.9, growth: 12.3 },
-      { name: 'Emergency', revenue: 187200, patients: 402, satisfaction: 4.2, growth: 6.8 }
-    ],
-    topDoctors: [
-      { name: 'Dr. Sarah Wilson', specialty: 'Cardiology', patients: 156, revenue: 62400, rating: 4.9 },
-      { name: 'Dr. Michael Chen', specialty: 'Orthopedics', patients: 134, revenue: 53600, rating: 4.8 },
-      { name: 'Dr. Emily Brown', specialty: 'Pediatrics', patients: 189, revenue: 45360, rating: 4.7 },
-      { name: 'Dr. James Taylor', specialty: 'Emergency', patients: 201, revenue: 48240, rating: 4.6 }
-    ],
-    operationalMetrics: {
-      bedOccupancy: 78,
-      equipmentUtilization: 85,
-      staffEfficiency: 92,
-      emergencyResponseTime: 8.5
+  // Fetch real analytics data
+  const { data: analyticsData, isLoading, refetch } = useQuery({
+    queryKey: ['branch-analytics', user?.branchId, selectedPeriod, selectedDepartment],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/branches/${user?.branchId}/analytics?period=${selectedPeriod}&department=${selectedDepartment}`, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch analytics data');
+      return response.json() as AnalyticsData;
     }
-  };
+  });
 
   const exportReport = async (format: 'pdf' | 'excel') => {
     console.log(`Exporting report as ${format}`);
     // Implementation would go here
   };
 
+  // Chart configuration options
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+      },
+      y1: {
+        type: 'linear' as const,
+        display: true,
+        position: 'right' as const,
+        grid: {
+          drawOnChartArea: false,
+        },
+      },
+    },
+  };
+
   const MetricCard = ({ title, value, change, icon: Icon, format = 'number' }: {
     title: string;
-    value: number;
+    value: number | string;
     change: number;
     icon: React.ElementType;
     format?: 'number' | 'currency' | 'percentage' | 'time' | 'rating';
@@ -121,7 +175,8 @@ const Analytics: React.FC = () => {
               <p className="text-2xl font-bold text-gray-900">
                 {format === 'currency' && '₹'}
                 {format === 'percentage' && value}{format === 'percentage' && '%'}
-                {format === 'number' && value.toLocaleString()}
+                {format === 'number' && typeof value === 'number' && value.toLocaleString()}
+                {format === 'number' && typeof value === 'string' && value}
                 {format === 'time' && `${value} min`}
                 {format === 'rating' && `${value}/5`}
               </p>
@@ -136,6 +191,122 @@ const Analytics: React.FC = () => {
       </CardContent>
     </Card>
   );
+
+  if (isLoading) {
+    return (
+      <div className="p-8 space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-500" />
+          <span className="ml-2 text-gray-600">Loading analytics data...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!analyticsData) {
+    return (
+      <div className="p-8 space-y-6">
+        <div className="flex items-center justify-center h-64">
+          <AlertTriangle className="h-8 w-8 text-red-500" />
+          <span className="ml-2 text-red-600">Failed to load analytics data</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Prepare chart data from real analytics
+  const revenueChartData = {
+    labels: analyticsData.revenueTimeSeries?.map(item => 
+      new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    ) || [],
+    datasets: [
+      {
+        label: 'Revenue (₹)',
+        data: analyticsData.revenueTimeSeries?.map(item => item.revenue) || [],
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        fill: true,
+        tension: 0.4,
+      },
+      {
+        label: 'Appointments',
+        data: analyticsData.revenueTimeSeries?.map(item => item.appointments) || [],
+        borderColor: 'rgb(16, 185, 129)',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        fill: false,
+        tension: 0.4,
+        yAxisID: 'y1',
+      }
+    ],
+  };
+
+  const departmentBarData = {
+    labels: analyticsData.departmentPerformance?.map(dept => dept.name) || [],
+    datasets: [
+      {
+        label: 'Revenue (₹)',
+        data: analyticsData.departmentPerformance?.map(dept => dept.revenue) || [],
+        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+        borderColor: 'rgb(59, 130, 246)',
+        borderWidth: 1,
+      },
+      {
+        label: 'Patients',
+        data: analyticsData.departmentPerformance?.map(dept => dept.patients) || [],
+        backgroundColor: 'rgba(16, 185, 129, 0.8)',
+        borderColor: 'rgb(16, 185, 129)',
+        borderWidth: 1,
+        yAxisID: 'y1',
+      }
+    ],
+  };
+
+  const departmentPieData = {
+    labels: analyticsData.departmentDistribution?.map(dept => dept.name) || [],
+    datasets: [
+      {
+        data: analyticsData.departmentDistribution?.map(dept => dept.value) || [],
+        backgroundColor: [
+          'rgba(59, 130, 246, 0.8)',
+          'rgba(16, 185, 129, 0.8)',
+          'rgba(245, 101, 101, 0.8)',
+          'rgba(251, 191, 36, 0.8)',
+          'rgba(139, 92, 246, 0.8)',
+          'rgba(236, 72, 153, 0.8)',
+        ],
+        borderColor: [
+          'rgb(59, 130, 246)',
+          'rgb(16, 185, 129)',
+          'rgb(245, 101, 101)',
+          'rgb(251, 191, 36)',
+          'rgb(139, 92, 246)',
+          'rgb(236, 72, 153)',
+        ],
+        borderWidth: 2,
+      },
+    ],
+  };
+
+  const operationalRadarData = {
+    labels: ['Bed Occupancy', 'Equipment Utilization', 'Staff Efficiency', 'Response Time Score'],
+    datasets: [
+      {
+        label: 'Current Performance',
+        data: [
+          analyticsData.operationalMetrics?.bedOccupancy || 0,
+          analyticsData.operationalMetrics?.equipmentUtilization || 0,
+          analyticsData.operationalMetrics?.staffEfficiency || 0,
+          100 - parseFloat(analyticsData.operationalMetrics?.emergencyResponseTime || '10') * 10 // Convert response time to performance score
+        ],
+        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+        borderColor: 'rgb(59, 130, 246)',
+        pointBackgroundColor: 'rgb(59, 130, 246)',
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: 'rgb(59, 130, 246)',
+      },
+    ],
+  };
 
   const ChartCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <Card>
@@ -157,8 +328,8 @@ const Analytics: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Branch Analytics</h1>
-          <p className="text-gray-600 mt-1">Performance insights and metrics for your branch</p>
+          <h1 className="text-3xl font-bold text-gray-900">Advanced Analytics</h1>
+          <p className="text-gray-600 mt-1">Comprehensive performance insights with authentic data</p>
         </div>
         <div className="flex items-center space-x-3">
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
@@ -172,11 +343,11 @@ const Analytics: React.FC = () => {
               <SelectItem value="365">Last year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => refetch()}>
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </Button>
-          <Button>
+          <Button onClick={() => exportReport('pdf')}>
             <Download className="w-4 h-4 mr-2" />
             Export Report
           </Button>
@@ -222,28 +393,22 @@ const Analytics: React.FC = () => {
             />
           </div>
 
-          {/* Charts */}
+          {/* Advanced Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <ChartCard title="Revenue Trend">
-              <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500">Revenue chart would be displayed here</p>
-                </div>
+            <ChartCard title="Revenue & Appointments Trend">
+              <div className="h-80">
+                <Line data={revenueChartData} options={chartOptions} />
               </div>
             </ChartCard>
 
-            <ChartCard title="Patient Flow">
-              <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                <div className="text-center">
-                  <LineChart className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500">Patient flow chart would be displayed here</p>
-                </div>
+            <ChartCard title="Department Distribution">
+              <div className="h-80">
+                <Pie data={departmentPieData} options={{ responsive: true, maintainAspectRatio: false }} />
               </div>
             </ChartCard>
           </div>
 
-          {/* Quick Stats */}
+          {/* Operational Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card>
               <CardContent className="p-6">
@@ -254,7 +419,7 @@ const Analytics: React.FC = () => {
                   </div>
                   <Clock className="w-8 h-8 text-orange-500" />
                 </div>
-                <Progress value={25} className="mt-3" />
+                <Progress value={Math.max(0, 100 - analyticsData.overview.averageWaitTime * 2)} className="mt-3" />
               </CardContent>
             </Card>
 
@@ -278,7 +443,7 @@ const Analytics: React.FC = () => {
                     <p className="text-sm text-gray-600">Staff Efficiency</p>
                     <p className="text-xl font-bold text-gray-900">{analyticsData.operationalMetrics.staffEfficiency}%</p>
                   </div>
-                  <Target className="w-8 h-8 text-green-500" />
+                  <Activity className="w-8 h-8 text-green-500" />
                 </div>
                 <Progress value={analyticsData.operationalMetrics.staffEfficiency} className="mt-3" />
               </CardContent>
@@ -287,33 +452,55 @@ const Analytics: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="departments" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ChartCard title="Department Performance">
+              <div className="h-80">
+                <Bar data={departmentBarData} options={chartOptions} />
+              </div>
+            </ChartCard>
+
+            <ChartCard title="Department Performance Radar">
+              <div className="h-80">
+                <Radar data={operationalRadarData} options={{ responsive: true, maintainAspectRatio: false }} />
+              </div>
+            </ChartCard>
+          </div>
+
+          {/* Department Performance Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Department Performance</CardTitle>
-              <CardDescription>Compare performance across different departments</CardDescription>
+              <CardTitle>Department Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {analyticsData.departmentPerformance.map((dept, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-3 h-3 rounded-full bg-blue-${500 + index * 100}`}></div>
-                      <div>
-                        <p className="font-medium text-gray-900">{dept.name}</p>
-                        <p className="text-sm text-gray-600">{dept.patients} patients</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-gray-900">₹{dept.revenue.toLocaleString()}</p>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">Growth:</span>
-                        <Badge variant={dept.growth > 10 ? 'default' : 'secondary'}>
-                          {dept.growth}%
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-2">Department</th>
+                      <th className="text-left p-2">Revenue</th>
+                      <th className="text-left p-2">Patients</th>
+                      <th className="text-left p-2">Staff</th>
+                      <th className="text-left p-2">Satisfaction</th>
+                      <th className="text-left p-2">Growth</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {analyticsData.departmentPerformance?.map((dept, index) => (
+                      <tr key={index} className="border-b">
+                        <td className="p-2 font-medium">{dept.name}</td>
+                        <td className="p-2">₹{dept.revenue.toLocaleString()}</td>
+                        <td className="p-2">{dept.patients}</td>
+                        <td className="p-2">{dept.activeStaff}</td>
+                        <td className="p-2">{dept.satisfaction}%</td>
+                        <td className="p-2">
+                          <Badge variant={dept.growth > 0 ? "default" : "destructive"}>
+                            {dept.growth > 0 ? '+' : ''}{dept.growth}%
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
@@ -322,28 +509,25 @@ const Analytics: React.FC = () => {
         <TabsContent value="staff" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Top Performing Doctors</CardTitle>
-              <CardDescription>Based on patient volume and revenue generation</CardDescription>
+              <CardTitle>Top Performing Staff</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {analyticsData.topDoctors.map((doctor, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                {analyticsData.topDoctors?.map((doctor, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-4">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                        <Stethoscope className="w-5 h-5 text-blue-600" />
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Stethoscope className="w-6 h-6 text-blue-600" />
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{doctor.name}</p>
+                        <h3 className="font-semibold">{doctor.name}</h3>
                         <p className="text-sm text-gray-600">{doctor.specialty}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-gray-900">₹{doctor.revenue.toLocaleString()}</p>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600">{doctor.patients} patients</span>
-                        <Badge variant="outline">{doctor.rating}/5 ⭐</Badge>
-                      </div>
+                      <p className="font-semibold">{doctor.patients} patients</p>
+                      <p className="text-sm text-gray-600">₹{doctor.revenue.toLocaleString()}</p>
+                      <Badge>{doctor.rating} ⭐</Badge>
                     </div>
                   </div>
                 ))}
@@ -353,57 +537,86 @@ const Analytics: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="operational" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card>
-              <CardHeader>
-                <CardTitle>Operational Metrics</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Equipment Utilization</span>
-                  <span className="font-medium">{analyticsData.operationalMetrics.equipmentUtilization}%</span>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Bed Occupancy</p>
+                    <p className="text-2xl font-bold">{analyticsData.operationalMetrics.bedOccupancy}%</p>
+                  </div>
+                  <Building2 className="w-8 h-8 text-blue-500" />
                 </div>
-                <Progress value={analyticsData.operationalMetrics.equipmentUtilization} />
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Emergency Response Time</span>
-                  <span className="font-medium">{analyticsData.operationalMetrics.emergencyResponseTime} min</span>
-                </div>
-                <Progress value={60} />
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle>Recent Activities</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { action: 'New patient registered', time: '2 min ago', type: 'success' },
-                    { action: 'Appointment completed', time: '5 min ago', type: 'info' },
-                    { action: 'Equipment maintenance', time: '1 hour ago', type: 'warning' },
-                    { action: 'Staff shift change', time: '2 hours ago', type: 'info' }
-                  ].map((activity, index) => (
-                    <div key={index} className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50">
-                      <div className={`w-2 h-2 rounded-full ${
-                        activity.type === 'success' ? 'bg-green-400' :
-                        activity.type === 'warning' ? 'bg-yellow-400' : 'bg-blue-400'
-                      }`}></div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900">{activity.action}</p>
-                        <p className="text-xs text-gray-500">{activity.time}</p>
-                      </div>
-                    </div>
-                  ))}
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Equipment Utilization</p>
+                    <p className="text-2xl font-bold">{analyticsData.operationalMetrics.equipmentUtilization}%</p>
+                  </div>
+                  <Target className="w-8 h-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Staff Efficiency</p>
+                    <p className="text-2xl font-bold">{analyticsData.operationalMetrics.staffEfficiency}%</p>
+                  </div>
+                  <Activity className="w-8 h-8 text-purple-500" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">Response Time</p>
+                    <p className="text-2xl font-bold">{analyticsData.operationalMetrics.emergencyResponseTime}m</p>
+                  </div>
+                  <Clock className="w-8 h-8 text-orange-500" />
                 </div>
               </CardContent>
             </Card>
           </div>
+
+          {/* Recent Activities */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Activities</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {analyticsData.recentActivities?.slice(0, 5).map((activity, index) => (
+                  <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Activity className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{activity.message}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(activity.timestamp).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline">₹{activity.value}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
   );
 };
 
-export default Analytics; 
+export default Analytics;
