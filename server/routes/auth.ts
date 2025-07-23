@@ -206,4 +206,54 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+// Create test receptionist endpoint
+router.post('/create-test-receptionist', async (req, res) => {
+  try {
+    // Check if test receptionist already exists
+    const existingUser = await User.findOne({ email: 'receptionist@test.com' });
+    if (existingUser) {
+      return res.json({ message: 'Test receptionist already exists', user: existingUser.email });
+    }
+
+    // Get sample data for references
+    const sampleSubAdmin = await User.findOne({ role: 'sub_admin' }).select('hospitalId branchId _id');
+    if (!sampleSubAdmin) {
+      return res.status(400).json({ message: 'No sample sub-admin found for references' });
+    }
+
+    // Create test receptionist
+    const hashedPassword = await bcrypt.hash('password123', 10);
+    const testReceptionist = new User({
+      email: 'receptionist@test.com',
+      username: 'test_receptionist',
+      password: hashedPassword,
+      role: 'receptionist',
+      firstName: 'Test',
+      lastName: 'Receptionist',
+      isActive: true,
+      phoneNumber: '+1234567897',
+      address: 'Test Receptionist Address',
+      hospitalId: sampleSubAdmin.hospitalId,
+      branchId: sampleSubAdmin.branchId,
+      createdBy: sampleSubAdmin._id
+    });
+
+    await testReceptionist.save();
+    console.log('✅ Test receptionist created successfully');
+
+    res.json({ 
+      message: 'Test receptionist created successfully',
+      credentials: {
+        email: 'receptionist@test.com',
+        password: 'password123',
+        role: 'receptionist'
+      }
+    });
+
+  } catch (error :any) {
+    console.error('Error creating test receptionist:', error);
+    res.status(500).json({ message: 'Error creating test receptionist', error: error.message });
+  }
+});
+
 export default router; 

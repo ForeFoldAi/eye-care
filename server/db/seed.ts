@@ -143,6 +143,7 @@ export async function seedDatabase() {
     const receptionistPassword = await bcrypt.hash('receptionist123', 10);
     const receptionist = new User({
       email: 'receptionist@hospital.com',
+      username: 'receptionist',
       password: receptionistPassword,
       role: 'receptionist',
       firstName: 'Jane',
@@ -157,6 +158,26 @@ export async function seedDatabase() {
 
     await receptionist.save();
     console.log('✅ Sample receptionist created successfully');
+
+    // Create additional test receptionist with test.com email
+    const testReceptionistPassword = await bcrypt.hash('password123', 10);
+    const testReceptionist = new User({
+      email: 'receptionist@test.com',
+      username: 'test_receptionist',
+      password: testReceptionistPassword,
+      role: 'receptionist',
+      firstName: 'Test',
+      lastName: 'Receptionist',
+      isActive: true,
+      phoneNumber: '+1234567897',
+      address: 'Test Address',
+      hospitalId: hospital._id,
+      branchId: branch._id,
+      createdBy: subAdmin._id
+    });
+
+    await testReceptionist.save();
+    console.log('✅ Test receptionist created successfully');
 
     // Create sample subscription plans
     const basicPlan = new SubscriptionPlan({

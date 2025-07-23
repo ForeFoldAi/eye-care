@@ -30,6 +30,7 @@ This is a comprehensive Hospital Management System (Multi-Tenant, Full-Stack) de
 - **2025-01-23**: Implemented advanced analytics with Chart.js for sub-admin dashboard
 - **2025-01-23**: Added comprehensive API endpoints for real-time analytics data
 - **2025-01-23**: Replaced all mock data with authentic MongoDB queries and aggregations
+- **2025-01-23**: Fixed receptionist login authentication issues - created test user and verified JWT authentication
 
 ## User Preferences
 
