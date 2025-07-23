@@ -27,14 +27,17 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
+    host: '0.0.0.0',
+    port: 3000,
+    allowedHosts: ['all'],
     proxy: {
       '/health': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
       },
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
         ws: true,
@@ -61,7 +64,7 @@ export default defineConfig({
         },
       },
       '/socket.io': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
         secure: false,
         ws: true,
@@ -75,8 +78,6 @@ export default defineConfig({
         },
       },
     },
-    host: true,
-    port: 5173,
     strictPort: false,
     cors: true,
     watch: {
