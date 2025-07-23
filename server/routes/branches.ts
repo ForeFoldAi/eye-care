@@ -340,10 +340,18 @@ router.get('/:id/stats', authenticateToken, authorizeRole(['sub_admin', 'admin',
   }
 });
 
+// Helper to safely convert to ISO string
+function safeToISOString(date: any) {
+  if (!date) return new Date().toISOString();
+  const d = date instanceof Date ? date : new Date(date);
+  return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
 // Get branch activities for sub-admin dashboard
 router.get('/:id/activities', authenticateToken, authorizeRole(['sub_admin', 'admin', 'master_admin']), async (req: AuthRequest, res) => {
   try {
     const branchId = req.params.id;
+    console.log('Fetching activities for branchId:', branchId);
     const branch = await Branch.findById(branchId);
     
     if (!branch) {
@@ -360,16 +368,21 @@ router.get('/:id/activities', authenticateToken, authorizeRole(['sub_admin', 'ad
       .sort({ createdAt: -1 })
       .limit(10)
       .select('firstName lastName role createdAt updatedAt');
+    console.log('Recent users for activities:', recentUsers);
 
-    const activities = recentUsers.map((user, index) => ({
-      id: user._id.toString(),
-      type: user.createdAt.getTime() === user.updatedAt.getTime() ? 'staff' : 'staff',
-      message: user.createdAt.getTime() === user.updatedAt.getTime() 
-        ? `New ${user.role} ${user.firstName} ${user.lastName} joined the branch`
-        : `${user.role} ${user.firstName} ${user.lastName} profile updated`,
-      timestamp: user.updatedAt.toISOString(),
-      status: 'success'
-    }));
+    const activities = recentUsers.map((user, index) => {
+      const createdAt = safeToISOString(user.createdAt);
+      const updatedAt = safeToISOString(user.updatedAt);
+      return {
+        id: user._id.toString(),
+        type: createdAt === updatedAt ? 'staff' : 'staff',
+        message: createdAt === updatedAt
+          ? `New ${user.role} ${user.firstName} ${user.lastName} joined the branch`
+          : `${user.role} ${user.firstName} ${user.lastName} profile updated`,
+        timestamp: updatedAt,
+        status: 'success'
+      };
+    });
 
     // Add some mock appointment activities until appointment system is ready
     const mockActivities = [
@@ -392,7 +405,7 @@ router.get('/:id/activities', authenticateToken, authorizeRole(['sub_admin', 'ad
     res.json([...activities, ...mockActivities]);
   } catch (error) {
     console.error('Error fetching branch activities:', error);
-    res.status(500).json({ message: 'Error fetching branch activities' });
+    res.status(500).json({ message: 'Error fetching branch activities', error: error instanceof Error ? error.message : error });
   }
 });
 

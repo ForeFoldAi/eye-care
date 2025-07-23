@@ -28,7 +28,7 @@ export default defineConfig(async ({ command }) => ({
   },
   server: {
     host: true,
-    port: 3000,
+    port: 5173,
     fs: {
       allow: ['..']
     },
@@ -83,8 +83,8 @@ export default defineConfig(async ({ command }) => ({
     strictPort: false,
     cors: true,
     hmr: {
-      host: '0.0.0.0',
-      clientPort: 443
+      host: 'localhost',
+      port: 5173
     },
     watch: {
       usePolling: true,

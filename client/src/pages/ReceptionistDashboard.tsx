@@ -107,49 +107,49 @@ export default function ReceptionistDashboard() {
   });
   const { toast } = useToast();
 
-  const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ['/api/dashboard/stats'],
-    queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/dashboard/stats`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard stats');
-      }
-      return response.json();
-    },
-  });
   const API_URL = import.meta.env.VITE_API_URL;
   const user = authService.getStoredUser();
-  const { data: patients, isLoading: isLoadingPatients, error } = useQuery<Patient[], Error>({
-    queryKey: ['/api/patients'],
-    queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/patients`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to fetch patients:', response.status);
-        throw new Error('Failed to fetch patients');
+
+  // Helper function to fetch with token validation
+  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No token found. Please log in again.');
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
       }
-      const data = await response.json();
-      console.log('Patients data:', data); // Debug log
-      
-      // Handle both array and object response formats
-      const patientsArray = data.data?.patients || data.patients || data;
-      return Array.isArray(patientsArray) ? patientsArray.map((p: any) => ({
-        ...p,
-        id: p._id?.toString() || p.id || '',
-        firstName: p.firstName || '',
-        lastName: p.lastName || '',
-        phone: p.phone || '',
-        email: p.email || '',
-      })) : [];
-    },
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Request failed with status ${response.status}`);
+    }
+
+    return response.json();
+  };
+
+  // Updated queries using fetchWithAuth
+  const { data: stats } = useQuery<DashboardStats>({
+    queryKey: ['dashboard-stats'],
+    queryFn: () => fetchWithAuth(`${API_URL}/api/dashboard/stats`),
+    retry: 1,
+    staleTime: 30000
+  });
+
+  const { data: patients, isLoading: isLoadingPatients } = useQuery<Patient[]>({
+    queryKey: ['patients'],
+    queryFn: () => fetchWithAuth(`${API_URL}/api/patients`),
+    retry: 1
   });
 
   const { data: searchResults, isLoading: isLoadingSearch, error: searchError } = useQuery<Patient[], Error>({
@@ -200,23 +200,9 @@ export default function ReceptionistDashboard() {
   });
 
   const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery<Appointment[]>({
-    queryKey: ['/api/appointments'],
-    queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/appointments`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      if (!response.ok) {
-        // Handle 401 specifically if needed
-        if (response.status === 401) {
-          localStorage.removeItem('token');
-          // navigate('/login'); // Assuming navigate is available
-        }
-        throw new Error('Failed to fetch appointments');
-      }
-      return response.json();
-    },
+    queryKey: ['appointments'],
+    queryFn: () => fetchWithAuth(`${API_URL}/api/appointments`),
+    retry: 1
   });
 
   // Helper function to format date
@@ -504,7 +490,7 @@ export default function ReceptionistDashboard() {
     : (isLoadingPatients ? [] : patients);
 
   const isLoading = searchQuery.length > 2 ? isLoadingSearch : isLoadingPatients;
-  const currentError = searchQuery.length > 2 ? searchError : error;
+  const currentError = searchQuery.length > 2 ? searchError : null; // No error state for patients
 
   const handlePatientSelect = (patient: Patient) => {
     setSelectedPatient(patient);
