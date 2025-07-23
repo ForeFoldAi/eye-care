@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import express from "express";
+import cors from "cors";
 import { createServer, type Server } from "http";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcrypt";
+
 import { storage } from "./storage";
 import { generateReceipt } from "./utils/receipt";
 import path from "path";
@@ -12,11 +12,10 @@ import Patient from './models/patient';
 import { z } from 'zod';
 import { Request, Response, NextFunction } from 'express';
 import { 
-  loginSchema, insertPatientSchema, insertAppointmentSchema, 
-  insertPrescriptionSchema, insertPaymentSchema, insertUserSchema 
+  insertAppointmentSchema
 } from "./schemas";
 import mongoose from 'mongoose';
-import { User, Appointment, Prescription, Payment } from './models'; 
+import { User, Appointment } from './models'; 
 import { authenticateToken, authorizeRole } from './middleware/auth';
 import { Router } from 'express';
 import authRoutes from './routes/auth';
@@ -24,9 +23,23 @@ import patientRoutes from './routes/patients';
 import appointmentRoutes from './routes/appointments';
 import prescriptionRoutes from './routes/prescriptions';
 import paymentRoutes from './routes/payments';
+import hospitalRoutes from './routes/hospitals';
+import branchRoutes from './routes/branches';
+import userRoutes from './routes/users';
+import ehrRoutes from './routes/ehr';
+import departmentRoutes from './routes/departments';
+import supportRoutes from './routes/support';
+import chatRoutes from './routes/chat';
+import notificationRoutes from './routes/notifications';
+import subscriptionPlanRoutes from './routes/subscription-plans';
+import knowledgeBaseRoutes from './routes/knowledge-base';
 import { connectDB } from './db/connect';
+import { seedDatabase } from './db/seed';
+import masterAdminRoutes from './routes/master-admin';
+import billingRoutes from './routes/billing';
+import analyticsRoutes from './routes/analytics';
 
-const JWT_SECRET = process.env.JWT_SECRET || "c55671afa6ad446ab8a9cf14fac5fa3464e29e4ddbea8af48cf0a4f9c45f2db1645d3158218aed7ee6d8878e3f0637dfba1fb87e4fa0ba739bdd97021d3edc01";
+
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 // Middleware to check role
@@ -162,214 +175,49 @@ interface IPatient {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialize default users
-  await storage.initializeDefaultUsers();
+  // Configure CORS
+  app.use(cors({
+    origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
+
+  // Initialize default users and database structure
+  await seedDatabase();
   
+  // Health check endpoint
+  app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'OK', message: 'Server is running' });
+  });
+
   // Connect routes
   app.use('/api/auth', authRoutes);
   app.use('/api/patients', patientRoutes);
   app.use('/api/appointments', appointmentRoutes);
   app.use('/api/prescriptions', prescriptionRoutes);
   app.use('/api/payments', paymentRoutes);
+  app.use('/api/hospitals', hospitalRoutes);
+  app.use('/api/branches', branchRoutes);
+  app.use('/api/users', userRoutes);
+  app.use('/api/ehr', ehrRoutes);
+  app.use('/api/departments', departmentRoutes);
+  app.use('/api/support', supportRoutes);
+  app.use('/api/chat', chatRoutes);
+  app.use('/api/notifications', notificationRoutes);
+  app.use('/api/knowledge-base', knowledgeBaseRoutes);
+  app.use('/api/master-admin', masterAdminRoutes);
+  app.use('/api/master-admin/subscription-plans', subscriptionPlanRoutes);
+  app.use('/api/billing', billingRoutes);
+  app.use('/api/analytics', analyticsRoutes);
 
-  // Auth routes
-  app.post("/api/auth/login", async (req, res) => {
-    try {
-      const loginData = loginSchema.parse(req.body);
-      const user = await storage.getUserByEmail(loginData.email);
-      
-      if (!user || user.role !== loginData.role) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
 
-      const isPasswordValid = await bcrypt.compare(loginData.password, user.password);
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: "Invalid credentials" });
-      }
 
-      const token = jwt.sign(
-        { id: user._id, email: user.email, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
 
-      const { password, ...userWithoutPassword } = user;
-      res.json({ token, user: userWithoutPassword });
-    } catch (error) {
-      res.status(400).json({ message: "Invalid request data" });
-    }
-  });
 
-  app.post("/api/auth/register", async (req, res) => {
-    try {
-      const userData = insertUserSchema.parse(req.body);
-      
-      // Check if user already exists
-      const existingUser = await storage.getUserByEmail(userData.email);
-      if (existingUser) {
-        return res.status(409).json({ message: "User already exists" });
-      }
 
-      const user = await storage.createUser(userData);
-      const { password, ...userWithoutPassword } = user;
-      res.status(201).json({ user: userWithoutPassword });
-    } catch (error) {
-      res.status(400).json({ message: "Invalid request data" });
-    }
-  });
 
-  app.get("/api/auth/me", authenticateToken, async (req: any, res) => {
-    try {
-      const user = await storage.getUserById(req.user.id);
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      const { password, ...userWithoutPassword } = user;
-      res.json({ user: userWithoutPassword });
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
 
-  // Patient routes
-  app.post("/api/patients", authenticateToken, async (req: any, res) => {
-    try {
-      await connectDB(); // Ensure MongoDB connection is established
-      const patientData = insertPatientSchema.parse(req.body);
-      
-      // Check for existing patient with same phone
-      const existingPatient = await Patient.findOne({ phone: patientData.phone });
-      if (existingPatient) {
-        return res.status(400).json({ message: "Phone number already registered" });
-      }
-
-      // Create new patient
-      const patient = new Patient({
-        ...patientData,
-        dateOfBirth: new Date(patientData.dateOfBirth),
-        registrationDate: new Date(),
-        isActive: true
-      });
-
-      const savedPatient = await patient.save();
-      res.status(201).json(savedPatient);
-    } catch (error) {
-      console.error('Error registering patient:', error);
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ message: "Validation error", errors: error.errors });
-      } else {
-        res.status(500).json({ message: "Error registering patient", error: error instanceof Error ? error.message : 'Unknown error' });
-      }
-    }
-  });
-
-  app.get("/api/patients", authenticateToken, async (req: any, res) => {
-    try {
-      await connectDB();
-      const patients = await Patient.find().sort({ createdAt: -1 });
-      res.json({ data: { patients } });
-    } catch (error) {
-      console.error('Error fetching patients:', error);
-      res.status(500).json({ message: "Error fetching patients" });
-    }
-  });
-
-  app.get("/api/patients/search", authenticateToken, async (req: any, res) => {
-    try {
-      const query = req.query.q as string;
-      if (!query) {
-        return res.status(400).json({ message: "Search query required" });
-      }
-      
-      const patients = await storage.searchPatients(query);
-      res.json(patients);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.get("/api/patients/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const patient = await Patient.findById(req.params.id);
-      if (!patient) {
-        return res.status(404).json({ message: "Patient not found" });
-      }
-      res.json(patient);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  app.post('/api/patients/register', async (req, res) => {
-    try {
-      const patientData = insertPatientSchema.parse(req.body);
-      const newPatient = new Patient(patientData);
-      await newPatient.save();
-      res.status(201).json(newPatient);
-    } catch (error) {
-      console.error('Error registering patient:', error);
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ message: 'Validation error', errors: error.errors });
-      } else {
-        res.status(500).json({ message: 'Error registering patient', error });
-      }
-    }
-  });
-
-  // Prescription routes
-  app.post("/api/prescriptions", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const prescriptionData = insertPrescriptionSchema.parse(req.body);
-      const prescription = new Prescription(prescriptionData);
-      await prescription.save();
-      res.status(201).json(prescription);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ message: 'Validation error', errors: error.errors });
-      } else {
-        res.status(500).json({ message: 'Error creating prescription', error });
-      }
-    }
-  });
-
-  app.get("/api/prescriptions", authenticateToken, async (req: any, res) => {
-    try {
-      const { patientId } = req.query;
-      
-      let prescriptions;
-      if (patientId) {
-        prescriptions = await storage.getPrescriptionsByPatient(parseInt(patientId as string));
-      } else if (req.user.role === 'doctor') {
-        prescriptions = await storage.getPrescriptionsByDoctor(req.user.id);
-      } else {
-        return res.status(403).json({ message: "Access denied" });
-      }
-      
-      res.json(prescriptions);
-    } catch (error) {
-      res.status(500).json({ message: "Internal server error" });
-    }
-  });
-
-  // Payment routes
-  app.post("/api/payments", authenticateToken, async (req: AuthenticatedRequest, res) => {
-    try {
-      const paymentData = insertPaymentSchema.parse(req.body);
-      const payment = new Payment({
-        ...paymentData,
-        processedBy: req.user?.id
-      });
-      await payment.save();
-      res.status(201).json(payment);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ message: 'Validation error', errors: error.errors });
-      } else {
-        res.status(500).json({ message: 'Error creating payment', error });
-      }
-    }
-  });
 
   // Add new receipt download endpoint
   app.get("/api/payments/:id/receipt", authenticateToken, async (req: any, res) => {

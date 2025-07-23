@@ -8,6 +8,7 @@
     "start": "cross-env NODE_ENV=production tsx index.ts",
     "build": "tsc",
     "check": "tsc --noEmit",
+    "seed": "tsx db/seed.ts",
     "postinstall": "npm install --save-dev @types/express @types/bcrypt @types/jsonwebtoken @types/pdfkit"
   },
   "dependencies": {

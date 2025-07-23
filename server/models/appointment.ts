@@ -8,6 +8,8 @@ export interface IAppointment extends Document {
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
   tokenNumber: number;
   notes?: string;
+  approved?: boolean;
+  followUpDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +48,13 @@ const appointmentSchema = new Schema<IAppointment>({
   notes: {
     type: String,
     trim: true
+  },
+  approved: {
+    type: Boolean,
+    default: false
+  },
+  followUpDate: {
+    type: Date
   }
 }, {
   timestamps: true

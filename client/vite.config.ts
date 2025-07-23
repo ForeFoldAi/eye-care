@@ -29,12 +29,12 @@ export default defineConfig({
   server: {
     proxy: {
       '/health': {
-        target: 'https://eye-care-1-jlpm.onrender.com/',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
       '/api': {
-        target: 'https://eye-care-1-jlpm.onrender.com/',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
         ws: true,
@@ -57,6 +57,20 @@ export default defineConfig({
           });
           proxy.on('proxyRes', (proxyRes, req, _res) => {
             console.log('Received Response:', proxyRes.statusCode, req.url);
+          });
+        },
+      },
+      '/socket.io': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, req, res) => {
+            console.log('WebSocket proxy error', err);
+          });
+          proxy.on('proxyReqWs', (proxyReq, req, _res) => {
+            console.log('WebSocket Request:', req.url);
           });
         },
       },

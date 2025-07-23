@@ -3,13 +3,26 @@ import mongoose from 'mongoose';
 // User Schema
 const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
+  username: { type: String, unique: true, sparse: true }, // Optional username
   password: { type: String, required: true },
-  role: { type: String, required: true, enum: ['doctor', 'receptionist'] },
+  role: { 
+    type: String, 
+    required: true, 
+    enum: ['master_admin', 'admin', 'sub_admin', 'doctor', 'receptionist'] 
+  },
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
   specialization: { type: String }, // For doctors
   isActive: { type: Boolean, default: true },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  // New fields for role-based access
+  branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' },
+  hospitalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hospital' },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  permissions: [{ type: String }],
+  lastLogin: { type: Date },
+  phoneNumber: { type: String },
+  address: { type: String }
 });
 
 // Patient Schema
@@ -24,6 +37,8 @@ const patientSchema = new mongoose.Schema({
   emergencyContactName: { type: String },
   emergencyContactPhone: { type: String },
   medicalHistory: { type: String },
+  branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }, // New field
+  hospitalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hospital' }, // New field
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -35,6 +50,8 @@ const appointmentSchema = new mongoose.Schema({
   type: { type: String, required: true, enum: ['consultation', 'checkup', 'follow-up'] },
   status: { type: String, required: true, default: 'scheduled', enum: ['scheduled', 'confirmed', 'completed', 'cancelled'] },
   notes: { type: String },
+  branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }, // New field
+  hospitalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hospital' }, // New field
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -53,6 +70,8 @@ const prescriptionSchema = new mongoose.Schema({
   instructions: { type: String },
   notes: { type: String },
   isActive: { type: Boolean, default: true },
+  branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }, // New field
+  hospitalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hospital' }, // New field
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -65,16 +84,8 @@ const paymentSchema = new mongoose.Schema({
   status: { type: String, required: true, default: 'completed', enum: ['pending', 'completed', 'refunded'] },
   receiptNumber: { type: String, required: true },
   processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  createdAt: { type: Date, default: Date.now }
-});
-
-// Doctor Availability Schema
-const doctorAvailabilitySchema = new mongoose.Schema({
-  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  dayOfWeek: { type: Number, required: true, min: 0, max: 6 }, // 0 = Sunday, 6 = Saturday
-  startTime: { type: String, required: true }, // Format: "HH:mm"
-  endTime: { type: String, required: true }, // Format: "HH:mm"
-  isAvailable: { type: Boolean, default: true },
+  branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }, // New field
+  hospitalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hospital' }, // New field
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -84,9 +95,22 @@ export const Patient = mongoose.models.Patient || mongoose.model('Patient', pati
 export const Appointment = mongoose.models.Appointment || mongoose.model('Appointment', appointmentSchema);
 export const Prescription = mongoose.models.Prescription || mongoose.model('Prescription', prescriptionSchema);
 export const Payment = mongoose.models.Payment || mongoose.model('Payment', paymentSchema);
-export const DoctorAvailability = mongoose.models.DoctorAvailability || mongoose.model('DoctorAvailability', doctorAvailabilitySchema);
+
+// Export new models
 export * from './user';
 export * from './patient';
 export * from './appointment';
 export * from './payment';
-export * from './receipt'; 
+export * from './receipt';
+export * from './hospital';
+export * from './branch';
+export * from './ehr';
+export * from './department';
+export * from './doctorAvailability';
+export * from './subscription';
+export * from './supportTicket';
+export * from './chat';
+export * from './notification';
+export * from './billing';
+export * from './analytics';
+export * from './subscriptionPlan'; 

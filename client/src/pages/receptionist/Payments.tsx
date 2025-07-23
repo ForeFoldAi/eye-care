@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import Layout from "@/components/Layout";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import ReceiptModal from "@/components/ReceiptModal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,9 +16,22 @@ import {
   CreditCard,
   Clock,
   Plus,
-  Eye
+  Eye,
+  Grid3X3,
+  List,
+  MoreHorizontal
 } from "lucide-react";
-import { type User as AuthUser } from "@/lib/auth";
+import { EnhancedTable } from "@/components/ui/enhanced-table";
+import { type ColumnDef } from "@tanstack/react-table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+
+type ViewMode = 'table' | 'grid';
 
 interface Patient {
   id: string;
@@ -56,6 +67,11 @@ interface Payment {
 }
 const API_URL = import.meta.env.VITE_API_URL;
 async function fetchPayments(patientId?: string, appointmentId?: string): Promise<Payment[]> {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
   let url = `${API_URL}/api/payments`;
   const params = new URLSearchParams();
   if (patientId) params.append('patientId', patientId);
@@ -65,53 +81,88 @@ async function fetchPayments(patientId?: string, appointmentId?: string): Promis
 
   const response = await fetch(url, {
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
   });
 
   if (!response.ok) {
-    throw new Error('Failed to fetch payments');
+    throw new Error(`Failed to fetch payments: ${response.status}`);
   }
 
   const data = await response.json();
+  console.log('Raw payments data:', data);
   
-  // Process payments sequentially to maintain data consistency
+  // Handle different response formats
+  const paymentsArray = Array.isArray(data) ? data : (data.payments || data.data || []);
+  
+  // Process payments with proper data transformation
   const processedPayments = [];
-  for (const payment of data) {
-    // First try to get the linked patient data
-    let patientData = payment.patient;
+  for (const payment of paymentsArray) {
+    console.log('Processing payment:', payment);
     
-    // If no linked patient data but we have patientId, fetch it
-    if (!patientData && payment.patientId) {
+    // Extract patient data
+    let patientData = payment.patient || payment.patientId;
+    
+    // If patientData is just an ID string, fetch the patient details
+    if (typeof patientData === 'string' || !patientData?.firstName) {
+      const patientId = typeof patientData === 'string' ? patientData : payment.patientId;
+      if (patientId) {
       try {
-        const patientResponse = await fetch(`${API_URL}/api/patients/${payment.patientId}`, {
+          const patientResponse = await fetch(`${API_URL}/api/patients/${patientId}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Authorization': `Bearer ${token}`,
           },
         });
         if (patientResponse.ok) {
-          patientData = await patientResponse.json();
+            const fetchedPatient = await patientResponse.json();
+            patientData = fetchedPatient.data || fetchedPatient;
+            console.log('Fetched patient data:', patientData);
         }
       } catch (error) {
         console.error('Error fetching patient data:', error);
       }
     }
+    }
 
-    // Get appointment data if needed
-    let appointmentData = payment.appointment;
-    if (!appointmentData && payment.appointmentId) {
+    // Extract appointment data
+    let appointmentData = payment.appointment || payment.appointmentId;
+    
+    // If appointmentData is just an ID string, fetch the appointment details
+    if (typeof appointmentData === 'string' || (appointmentData && !appointmentData.datetime)) {
+      const appointmentId = typeof appointmentData === 'string' ? appointmentData : payment.appointmentId;
+      if (appointmentId) {
       try {
-        const appointmentResponse = await fetch(`${API_URL}/api/appointments/${payment.appointmentId}?include=doctor`, {
+          const appointmentResponse = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Authorization': `Bearer ${token}`,
           },
         });
         if (appointmentResponse.ok) {
-          appointmentData = await appointmentResponse.json();
+            const fetchedAppointment = await appointmentResponse.json();
+            appointmentData = fetchedAppointment.data || fetchedAppointment;
+            console.log('Fetched appointment data:', appointmentData);
+            
+            // If appointment has doctor ID but no doctor details, fetch doctor
+            if (appointmentData.doctorId && !appointmentData.doctor?.firstName) {
+              try {
+                const doctorResponse = await fetch(`${API_URL}/api/users/${appointmentData.doctorId}`, {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                  },
+                });
+                if (doctorResponse.ok) {
+                  const fetchedDoctor = await doctorResponse.json();
+                  appointmentData.doctor = fetchedDoctor.data || fetchedDoctor;
+                }
+              } catch (error) {
+                console.error('Error fetching doctor data:', error);
+              }
+            }
         }
       } catch (error) {
         console.error('Error fetching appointment data:', error);
+        }
       }
     }
 
@@ -122,29 +173,29 @@ async function fetchPayments(patientId?: string, appointmentId?: string): Promis
       amount: payment.amount || 0,
       method: payment.method || 'cash',
       status: payment.status || 'completed',
-      receiptNumber: payment.receiptNumber || `RCP${payment.id}`,
+      receiptNumber: payment.receiptNumber || `RCP${payment._id || payment.id}`,
       createdAt: payment.createdAt || new Date().toISOString(),
       patient: patientData ? {
         id: patientData._id?.toString() || patientData.id || '',
-        firstName: patientData.firstName,
-        lastName: patientData.lastName,
-        phone: patientData.phone
+        firstName: patientData.firstName || 'Unknown',
+        lastName: patientData.lastName || 'Patient',
+        phone: patientData.phone || 'N/A'
       } : {
         id: '',
         firstName: 'Unknown',
         lastName: 'Patient',
         phone: 'N/A'
       },
-      appointment: appointmentData ? {
+      appointment: appointmentData && appointmentData.datetime ? {
         id: appointmentData._id?.toString() || appointmentData.id || '',
         datetime: appointmentData.datetime,
-        type: appointmentData.type || 'Regular',
+        type: appointmentData.type || 'consultation',
         status: appointmentData.status || 'completed',
         patient: patientData ? {
           id: patientData._id?.toString() || patientData.id || '',
-          firstName: patientData.firstName,
-          lastName: patientData.lastName,
-          phone: patientData.phone
+          firstName: patientData.firstName || 'Unknown',
+          lastName: patientData.lastName || 'Patient',
+          phone: patientData.phone || 'N/A'
         } : {
           id: '',
           firstName: 'Unknown',
@@ -152,9 +203,9 @@ async function fetchPayments(patientId?: string, appointmentId?: string): Promis
           phone: 'N/A'
         },
         doctor: appointmentData.doctor ? {
-          firstName: appointmentData.doctor.firstName,
-          lastName: appointmentData.doctor.lastName,
-          specialization: appointmentData.doctor.specialization
+          firstName: appointmentData.doctor.firstName || 'Unknown',
+          lastName: appointmentData.doctor.lastName || 'Doctor',
+          specialization: appointmentData.doctor.specialization || 'General'
         } : {
           firstName: 'Unknown',
           lastName: 'Doctor',
@@ -164,64 +215,101 @@ async function fetchPayments(patientId?: string, appointmentId?: string): Promis
     });
   }
 
+  console.log('Processed payments:', processedPayments);
   return processedPayments;
 }
 
 async function searchPayments(query: string, patientId?: string, appointmentId?: string): Promise<Payment[]> {
-  let url = `/api/payments/search?q=${encodeURIComponent(query)}`;
+  const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+
+  let url = `${API_URL}/api/payments/search?q=${encodeURIComponent(query)}`;
   if (patientId) url += `&patientId=${patientId}`;
   if (appointmentId) url += `&appointmentId=${appointmentId}`;
   url += '&include=patient,appointment,appointment.doctor';
 
   const response = await fetch(url, {
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('token')}`,
+      'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
   });
 
   if (!response.ok) {
-    throw new Error('Failed to search payments');
+    throw new Error(`Failed to search payments: ${response.status}`);
   }
 
   const data = await response.json();
+  console.log('Search results:', data);
   
-  // Process payments sequentially to maintain data consistency
+  // Handle different response formats
+  const paymentsArray = Array.isArray(data) ? data : (data.payments || data.data || []);
+  
+  // Process payments with proper data transformation
   const processedPayments = [];
-  for (const payment of data) {
-    // First try to get the linked patient data
-    let patientData = payment.patient;
+  for (const payment of paymentsArray) {
+    // Extract patient data
+    let patientData = payment.patient || payment.patientId;
     
-    // If no linked patient data but we have patientId, fetch it
-    if (!patientData && payment.patientId) {
+    // If patientData is just an ID string, fetch the patient details
+    if (typeof patientData === 'string' || !patientData?.firstName) {
+      const patientId = typeof patientData === 'string' ? patientData : payment.patientId;
+      if (patientId) {
       try {
-        const patientResponse = await fetch(`${API_URL}/api/patients/${payment.patientId}`, {
+          const patientResponse = await fetch(`${API_URL}/api/patients/${patientId}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Authorization': `Bearer ${token}`,
           },
         });
         if (patientResponse.ok) {
-          patientData = await patientResponse.json();
+            const fetchedPatient = await patientResponse.json();
+            patientData = fetchedPatient.data || fetchedPatient;
         }
       } catch (error) {
         console.error('Error fetching patient data:', error);
       }
     }
+    }
 
-    // Get appointment data if needed
-    let appointmentData = payment.appointment;
-    if (!appointmentData && payment.appointmentId) {
+    // Extract appointment data
+    let appointmentData = payment.appointment || payment.appointmentId;
+    
+    // If appointmentData is just an ID string, fetch the appointment details
+    if (typeof appointmentData === 'string' || (appointmentData && !appointmentData.datetime)) {
+      const appointmentId = typeof appointmentData === 'string' ? appointmentData : payment.appointmentId;
+      if (appointmentId) {
       try {
-        const appointmentResponse = await fetch(`${API_URL}/api/appointments/${payment.appointmentId}?include=doctor`, {
+          const appointmentResponse = await fetch(`${API_URL}/api/appointments/${appointmentId}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+              'Authorization': `Bearer ${token}`,
           },
         });
         if (appointmentResponse.ok) {
-          appointmentData = await appointmentResponse.json();
+            const fetchedAppointment = await appointmentResponse.json();
+            appointmentData = fetchedAppointment.data || fetchedAppointment;
+            
+            // If appointment has doctor ID but no doctor details, fetch doctor
+            if (appointmentData.doctorId && !appointmentData.doctor?.firstName) {
+              try {
+                const doctorResponse = await fetch(`${API_URL}/api/users/${appointmentData.doctorId}`, {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                  },
+                });
+                if (doctorResponse.ok) {
+                  const fetchedDoctor = await doctorResponse.json();
+                  appointmentData.doctor = fetchedDoctor.data || fetchedDoctor;
+                }
+              } catch (error) {
+                console.error('Error fetching doctor data:', error);
+              }
+            }
         }
       } catch (error) {
         console.error('Error fetching appointment data:', error);
+        }
       }
     }
 
@@ -232,29 +320,29 @@ async function searchPayments(query: string, patientId?: string, appointmentId?:
       amount: payment.amount || 0,
       method: payment.method || 'cash',
       status: payment.status || 'completed',
-      receiptNumber: payment.receiptNumber || `RCP${payment.id}`,
+      receiptNumber: payment.receiptNumber || `RCP${payment._id || payment.id}`,
       createdAt: payment.createdAt || new Date().toISOString(),
       patient: patientData ? {
         id: patientData._id?.toString() || patientData.id || '',
-        firstName: patientData.firstName,
-        lastName: patientData.lastName,
-        phone: patientData.phone
+        firstName: patientData.firstName || 'Unknown',
+        lastName: patientData.lastName || 'Patient',
+        phone: patientData.phone || 'N/A'
       } : {
         id: '',
         firstName: 'Unknown',
         lastName: 'Patient',
         phone: 'N/A'
       },
-      appointment: appointmentData ? {
+      appointment: appointmentData && appointmentData.datetime ? {
         id: appointmentData._id?.toString() || appointmentData.id || '',
         datetime: appointmentData.datetime,
-        type: appointmentData.type || 'Regular',
+        type: appointmentData.type || 'consultation',
         status: appointmentData.status || 'completed',
         patient: patientData ? {
           id: patientData._id?.toString() || patientData.id || '',
-          firstName: patientData.firstName,
-          lastName: patientData.lastName,
-          phone: patientData.phone
+          firstName: patientData.firstName || 'Unknown',
+          lastName: patientData.lastName || 'Patient',
+          phone: patientData.phone || 'N/A'
         } : {
           id: '',
           firstName: 'Unknown',
@@ -262,9 +350,9 @@ async function searchPayments(query: string, patientId?: string, appointmentId?:
           phone: 'N/A'
         },
         doctor: appointmentData.doctor ? {
-          firstName: appointmentData.doctor.firstName,
-          lastName: appointmentData.doctor.lastName,
-          specialization: appointmentData.doctor.specialization
+          firstName: appointmentData.doctor.firstName || 'Unknown',
+          lastName: appointmentData.doctor.lastName || 'Doctor',
+          specialization: appointmentData.doctor.specialization || 'General'
         } : {
           firstName: 'Unknown',
           lastName: 'Doctor',
@@ -282,6 +370,7 @@ export default function PaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const { toast } = useToast();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -377,43 +466,181 @@ export default function PaymentsPage() {
     }
   };
 
+  // Table columns definition
+  const paymentColumns: ColumnDef<Payment>[] = [
+    {
+      accessorKey: 'receiptNumber',
+      header: 'Receipt #',
+      cell: ({ row }) => (
+        <div className="font-medium text-xs">
+          {row.getValue('receiptNumber')}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'patient',
+      header: 'Patient',
+      cell: ({ row }) => {
+        const patient = row.original.patient;
+        return (
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-medical-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-xs font-medium text-medical-blue-600">
+                {patient.firstName.charAt(0)}{patient.lastName.charAt(0)}
+              </span>
+            </div>
+            <div>
+              <div className="font-medium text-xs">{patient.firstName} {patient.lastName}</div>
+              <div className="text-xs text-gray-500">P-{patient.id}</div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'amount',
+      header: 'Amount',
+      cell: ({ row }) => (
+        <div className="font-semibold text-medical-green-600 text-xs">
+          {formatAmount(row.getValue('amount'))}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'method',
+      header: 'Method',
+      cell: ({ row }) => (
+        <Badge className={`capitalize text-xs px-1 py-0 ${getMethodColor(row.getValue('method'))}`}>
+          {row.getValue('method')}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: 'appointment',
+      header: 'Appointment',
+      cell: ({ row }) => {
+        const appointment = row.original.appointment;
+        return appointment ? (
+          <div>
+            <div className="text-xs">{new Date(appointment.datetime).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            })}</div>
+            <div className="text-xs text-gray-500">
+              Dr. {appointment.doctor.firstName} {appointment.doctor.lastName}
+            </div>
+          </div>
+        ) : (
+          <span className="text-gray-400 text-xs">-</span>
+        );
+      },
+    },
+    {
+      accessorKey: 'createdAt',
+      header: 'Processed',
+      cell: ({ row }) => (
+        <div>
+          <div className="text-xs">{new Date(row.getValue('createdAt')).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          })}</div>
+          <div className="text-xs text-gray-500">{formatTime(row.getValue('createdAt'))}</div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge 
+          variant="outline" 
+          className={`capitalize text-xs px-1 py-0 ${row.getValue('status') === 'completed' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}
+        >
+          {row.getValue('status')}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const payment = row.original;
+        return (
+          <div className="flex space-x-1">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={() => { setSelectedPayment(payment); setShowReceiptModal(true); }}
+              className="h-6 w-6 p-0"
+            >
+              <Eye className="w-3 h-3" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                  <MoreHorizontal className="w-3 h-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleDownloadReceipt(payment)} className="text-xs">
+                  <Download className="w-3 h-3 mr-1" />
+                  Download Receipt
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    },
+  ];
+
   const renderPaymentCard = (payment: Payment) => {
     return (
       <Card key={payment.id} className="relative overflow-hidden">
-        <CardContent className="p-6">
-          <Badge variant="secondary" className={`absolute top-0 right-0 m-3 capitalize ${getMethodColor(payment.method)}`}>
+        <CardContent className="p-3">
+          <Badge variant="secondary" className={`absolute top-0 right-0 m-2 capitalize text-xs px-1 py-0 ${getMethodColor(payment.method)}`}>
                   {payment.method}
                 </Badge>
-          <div className="space-y-3">
-            <h3 className="text-xl font-bold text-medical-blue-600">{formatAmount(payment.amount)}</h3>
-            <p className="text-sm text-gray-600">Receipt #: {payment.receiptNumber}</p>
-            <p className="text-sm text-gray-600 flex items-center">
-              <User className="w-4 h-4 mr-2 text-gray-500" />
-              Patient: {payment.patient.firstName} {payment.patient.lastName} (ID: P-{payment.patient.id})
+          <div className="space-y-2">
+            <h3 className="text-sm font-bold text-medical-blue-600">{formatAmount(payment.amount)}</h3>
+            <p className="text-xs text-gray-600">Receipt #: {payment.receiptNumber}</p>
+            <p className="text-xs text-gray-600 flex items-center">
+              <User className="w-3 h-3 mr-1 text-gray-500" />
+              {payment.patient.firstName} {payment.patient.lastName} (P-{payment.patient.id})
             </p>
                 {payment.appointment && (
-              <p className="text-sm text-gray-600 flex items-center">
-                <Calendar className="w-4 h-4 mr-2 text-gray-500" />
-                Appointment: {formatDate(payment.appointment.datetime)} at {formatTime(payment.appointment.datetime)}
+              <p className="text-xs text-gray-600 flex items-center">
+                <Calendar className="w-3 h-3 mr-1 text-gray-500" />
+                {new Date(payment.appointment.datetime).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
                 {payment.appointment.doctor && (
                   <span> (Dr. {payment.appointment.doctor.firstName} {payment.appointment.doctor.lastName})</span>
                 )}
               </p>
                 )}
-            <p className="text-sm text-gray-600 flex items-center">
-              <Clock className="w-4 h-4 mr-2 text-gray-500" />
-              Processed: {formatDate(payment.createdAt)} {formatTime(payment.createdAt)}
+            <p className="text-xs text-gray-600 flex items-center">
+              <Clock className="w-3 h-3 mr-1 text-gray-500" />
+              {new Date(payment.createdAt).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+              })}
                 </p>
-            <Badge variant="outline" className={`capitalize ${payment.status === 'completed' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            <Badge variant="outline" className={`capitalize text-xs px-1 py-0 ${payment.status === 'completed' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
               {payment.status}
             </Badge>
           </div>
-          <div className="mt-4 flex space-x-2">
-            <Button size="sm" variant="outline" onClick={() => { setSelectedPayment(payment); setShowReceiptModal(true); }}>
-              <Eye className="w-4 h-4 mr-2" /> View Receipt
+          <div className="mt-3 flex space-x-1">
+            <Button size="sm" variant="outline" onClick={() => { setSelectedPayment(payment); setShowReceiptModal(true); }} className="flex-1 text-xs h-6">
+              <Eye className="w-3 h-3 mr-1" /> View
             </Button>
-            <Button size="sm" variant="outline" onClick={() => handleDownloadReceipt(payment)}>
-              <Download className="w-4 h-4 mr-2" /> Download
+            <Button size="sm" variant="outline" onClick={() => handleDownloadReceipt(payment)} className="flex-1 text-xs h-6">
+              <Download className="w-3 h-3 mr-1" /> Download
           </Button>
         </div>
         </CardContent>
@@ -422,52 +649,127 @@ export default function PaymentsPage() {
   };
 
   return (
-    <ProtectedRoute requiredRole="receptionist">
-      {(currentUser: AuthUser) => (
-        <Layout user={currentUser}>
-          <div className="p-6 space-y-6">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-2xl font-bold">Payments</CardTitle>
+    <div className="flex-1 space-y-3 p-4 overflow-auto">
+      <div className="mb-3 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Payments</h2>
+          <p className="text-sm text-gray-600">Manage payment records and receipts</p>
+        </div>
+      </div>
+
+      {viewMode === 'table' ? (
+        <div className="space-y-3">
+          {isLoading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500 text-sm">Loading payments...</p>
+            </div>
+          ) : isError ? (
+            <div className="text-center py-8">
+              <p className="text-red-500 text-sm">
+                Error: {error?.message || 'Failed to fetch payments'}
+              </p>
+            </div>
+          ) : (
+            <EnhancedTable
+              data={displayedPayments}
+              columns={paymentColumns}
+              searchPlaceholder="Search payments..."
+              showFooter={true}
+              footerProps={{
+                showFirstLastButtons: true,
+                labelRowsPerPage: "Per page:",
+                labelDisplayedRows: ({ from, to, count }) => 
+                  `${from}-${to} of ${count}`
+              }}
+              viewToggle={{
+                mode: viewMode,
+                onToggle: (mode) => setViewMode(mode)
+              }}
+            />
+          )}
+        </div>
+      ) : (
+        <Card className="border border-gray-100">
+                      <CardHeader className="border-b border-gray-100 p-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-semibold text-gray-900">
+                  Payment Records
+                </CardTitle>
                 <div className="flex items-center space-x-2">
-                    <Input
-                      placeholder="Search payments..."
-                    className="max-w-sm"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+                  <div className="w-56">
+                    <div className="relative">
+                      <Input
+                        type="text"
+                        placeholder="Search payments..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 h-8 text-sm"
+                      />
+                      <Search className="absolute left-2 top-2 w-3 h-3 text-gray-400" />
+                    </div>
+                  </div>
                   <Input
                     type="date"
                     value={selectedDate || ''}
                     onChange={(e) => setSelectedDate(e.target.value || undefined)}
-                    className="w-[180px]"
+                    className="w-[140px] h-8 text-sm"
                   />
+                  <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
+                    <Button
+                      size="sm"
+                      variant={viewMode === ('table' as ViewMode) ? 'default' : 'ghost'}
+                      onClick={() => setViewMode('table' as ViewMode)}
+                      className="h-6 px-2"
+                    >
+                      <List className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={viewMode === ('grid' as ViewMode) ? 'default' : 'ghost'}
+                      onClick={() => setViewMode('grid' as ViewMode)}
+                      className="h-6 px-2"
+                    >
+                      <Grid3X3 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardHeader>
-              <CardContent>
-              {isLoading ? (
-                  <div className="text-center py-8">Loading payments...</div>
-              ) : isError ? (
-                  <div className="text-center py-8 text-red-600">Error: {error?.message || 'Failed to fetch payments'}</div>
-                ) : displayedPayments.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {displayedPayments.map(renderPaymentCard)}
-                </div>
-              ) : (
-                  <div className="text-center py-8 text-gray-500">No payments found.</div>
-              )}
-            </CardContent>
-          </Card>
-          </div>
-
-            <ReceiptModal
-              isOpen={showReceiptModal}
-            onClose={() => setShowReceiptModal(false)}
-              payment={selectedPayment}
-            patient={selectedPayment?.patient}
-            />
-        </Layout>
+            <CardContent className="p-4">
+            {isLoading ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 text-sm">Loading payments...</p>
+              </div>
+            ) : isError ? (
+              <div className="text-center py-8">
+                <p className="text-red-500 text-sm">
+                  Error: {error?.message || 'Failed to fetch payments'}
+                </p>
+              </div>
+            ) : displayedPayments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                {displayedPayments.map(renderPaymentCard)}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500 text-sm">
+                  {searchQuery.length > 2 
+                    ? 'No payments found matching your search' 
+                    : 'No payments found'
+                  }
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
-    </ProtectedRoute>
+
+      <ReceiptModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        payment={selectedPayment}
+        patient={selectedPayment?.patient}
+      />
+    </div>
   );
 } 

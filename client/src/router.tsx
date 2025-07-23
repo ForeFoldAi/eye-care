@@ -1,8 +1,9 @@
 import React from 'react'
 import { createRouter, createRoute, createRootRoute, Outlet, useNavigate } from '@tanstack/react-router'
-import { QueryClientProvider } from '@tanstack/react-query'
-import { queryClient } from '@/lib/queryClient'
 import { Toaster } from '@/components/ui/toaster'
+import { DepartmentProvider } from '@/contexts/DepartmentContext'
+import { StaffProvider } from '@/contexts/StaffContext'
+import { ShiftProvider } from '@/contexts/ShiftContext'
 
 // Pages
 import LoginPage from './pages/LoginPage'
@@ -20,16 +21,42 @@ import DoctorPatientsPage from '@/pages/doctor/patients'
 import DoctorPrescriptionsPage from '@/pages/doctor/prescriptions'
 import DoctorAvailabilityPage from '@/pages/doctor/availability'
 import DoctorLayout from '@/components/DoctorLayout'
+import ReceptionistLayout from '@/components/ReceptionistLayout'
+
+// Admin Pages
+import MasterAdminDashboard from '@/pages/master-admin/Dashboard'
+import AdminDashboard from '@/pages/admin/Dashboard'
+import AdminAnalytics from '@/pages/admin/Analytics'
+import AdminStaffManagement from '@/pages/admin/StaffManagement'
+import AdminFinancialManagement from '@/pages/admin/FinancialManagement'
+import AdminSystemConfiguration from '@/pages/admin/SystemConfiguration'
+import AdminAuditCompliance from '@/pages/admin/AuditCompliance'
+import AdminBranchForm from '@/pages/admin/BranchForm'
+import AdminLayout from '@/components/AdminLayout'
+import SubAdminDashboard from '@/pages/sub-admin/Dashboard'
+import SubAdminLayout from '@/components/SubAdminLayout'
+import StaffManagement from '@/pages/sub-admin/StaffManagement'
+import DepartmentManagement from '@/pages/sub-admin/DepartmentManagement'
+import Appointments from '@/pages/sub-admin/Appointments'
+import Patients from '@/pages/sub-admin/Patients'
+import TestPage from '@/pages/sub-admin/TestPage'
+import Analytics from '@/pages/sub-admin/Analytics'
+import SettingsPage from '@/pages/sub-admin/Settings'
+import KnowledgeBasePage from './pages/master-admin/KnowledgeBase';
 
 // Root Route
 const rootRoute = createRootRoute({
   component: () => (
-    <QueryClientProvider client={queryClient}>
-      <div>
-        <Outlet />
-        <Toaster />
-      </div>
-    </QueryClientProvider>
+    <DepartmentProvider>
+      <StaffProvider>
+        <ShiftProvider>
+          <div>
+            <Outlet />
+            <Toaster />
+          </div>
+        </ShiftProvider>
+      </StaffProvider>
+    </DepartmentProvider>
   ),
 })
 
@@ -95,42 +122,267 @@ const doctorIndexRoute = createRoute({
   },
 })
 
+// Receptionist Layout Route
+const receptionistLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/receptionist',
+  component: ReceptionistLayout,
+})
+
 // Receptionist Dashboard Route
 const receptionistDashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/receptionist/dashboard',
+  getParentRoute: () => receptionistLayoutRoute,
+  path: '/dashboard',
   component: ReceptionistDashboard,
 })
 
 // Receptionist Patients Route
 const receptionistPatientsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/receptionist/patients',
+  getParentRoute: () => receptionistLayoutRoute,
+  path: '/patients',
   component: PatientsPage,
 })
 
 // Receptionist Appointments Route
 const receptionistAppointmentsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/receptionist/appointments',
+  getParentRoute: () => receptionistLayoutRoute,
+  path: '/appointments',
   component: AppointmentsPage,
 })
 
 // Receptionist Payments Route
 const receptionistPaymentsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/receptionist/payments',
+  getParentRoute: () => receptionistLayoutRoute,
+  path: '/payments',
   component: PaymentsPage,
+})
+
+// Receptionist Search Route
+const receptionistSearchRoute = createRoute({
+  getParentRoute: () => receptionistLayoutRoute,
+  path: '/search',
+  component: () => {
+    const navigate = useNavigate()
+    React.useEffect(() => {
+      navigate({ to: '/receptionist/patients', replace: true })
+    }, [navigate])
+    return null
+  },
 })
 
 // Receptionist Index Route (redirect to dashboard)
 const receptionistIndexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/receptionist',
+  getParentRoute: () => receptionistLayoutRoute,
+  path: '/',
   component: () => {
     const navigate = useNavigate()
     React.useEffect(() => {
       navigate({ to: '/receptionist/dashboard', replace: true })
+    }, [navigate])
+    return null
+  },
+})
+
+// Master Admin Routes
+import HospitalsPage from '@/pages/master-admin/Hospitals'
+import UsersPage from '@/pages/master-admin/Users'
+import SystemSettingsPage from '@/pages/master-admin/SystemSettings'
+import SubscriptionsPage from '@/pages/master-admin/Subscriptions'
+import AnalyticsPage from '@/pages/master-admin/Analytics'
+import BillingPage from '@/pages/master-admin/Billing'
+import ReportsPage from '@/pages/master-admin/Reports'
+import SupportPage from '@/pages/master-admin/Support'
+import MasterAdminLayout from '@/components/MasterAdminLayout'
+
+const masterAdminLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/master-admin',
+  component: MasterAdminLayout,
+})
+
+const masterAdminDashboardRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/',
+  component: MasterAdminDashboard,
+})
+
+const masterAdminHospitalsRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/hospitals',
+  component: HospitalsPage,
+})
+
+const masterAdminUsersRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/users',
+  component: UsersPage,
+})
+
+const masterAdminSettingsRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/settings',
+  component: SystemSettingsPage,
+})
+
+const masterAdminSubscriptionsRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/subscriptions',
+  component: SubscriptionsPage,
+})
+
+const masterAdminAnalyticsRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/analytics',
+  component: AnalyticsPage,
+})
+
+const masterAdminBillingRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/billing',
+  component: BillingPage,
+})
+
+const masterAdminReportsRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/reports',
+  component: ReportsPage,
+})
+
+const masterAdminSupportRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/support',
+  component: SupportPage,
+})
+
+const masterAdminKnowledgeBaseRoute = createRoute({
+  getParentRoute: () => masterAdminLayoutRoute,
+  path: '/knowledge-base',
+  component: KnowledgeBasePage,
+})
+
+// Admin Routes
+const adminLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/admin',
+  component: AdminLayout,
+})
+
+const adminDashboardRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/dashboard',
+  component: AdminDashboard,
+})
+
+const adminAnalyticsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/analytics',
+  component: AdminAnalytics,
+})
+
+const adminStaffRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/staff',
+  component: AdminStaffManagement,
+})
+
+const adminFinancialRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/financial',
+  component: AdminFinancialManagement,
+})
+
+const adminSettingsRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/settings',
+  component: AdminSystemConfiguration,
+})
+
+const adminAuditRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/audit',
+  component: AdminAuditCompliance,
+})
+
+const adminBranchFormRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/add-branch',
+  component: AdminBranchForm,
+})
+
+const adminIndexRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/',
+  component: () => {
+    const navigate = useNavigate()
+    React.useEffect(() => {
+      navigate({ to: '/admin/dashboard', replace: true })
+    }, [navigate])
+    return null
+  },
+})
+
+// Sub-Admin Routes
+const subAdminLayoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/sub-admin',
+  component: SubAdminLayout,
+})
+
+const subAdminDashboardRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/dashboard',
+  component: SubAdminDashboard,
+})
+
+const subAdminStaffRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/staff',
+  component: StaffManagement,
+})
+
+const subAdminDepartmentsRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/departments',
+  component: DepartmentManagement,
+})
+
+const subAdminAppointmentsRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/appointments',
+  component: Appointments,
+})
+
+const subAdminPatientsRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/patients',
+  component: Patients,
+})
+
+const subAdminTestRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/test',
+  component: TestPage,
+})
+
+const subAdminAnalyticsRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/analytics',
+  component: Analytics,
+})
+
+const subAdminSettingsRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/settings',
+  component: SettingsPage,
+})
+
+const subAdminIndexRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/',
+  component: () => {
+    const navigate = useNavigate()
+    React.useEffect(() => {
+      navigate({ to: '/sub-admin/dashboard', replace: true })
     }, [navigate])
     return null
   },
@@ -160,11 +412,47 @@ const routeTree = rootRoute.addChildren([
     doctorAvailabilityRoute,
     doctorIndexRoute,
   ]),
+  receptionistLayoutRoute.addChildren([
   receptionistDashboardRoute,
   receptionistPatientsRoute,
   receptionistAppointmentsRoute,
   receptionistPaymentsRoute,
+    receptionistSearchRoute,
   receptionistIndexRoute,
+  ]),
+  masterAdminLayoutRoute.addChildren([
+    masterAdminDashboardRoute,
+    masterAdminHospitalsRoute,
+    masterAdminUsersRoute,
+    masterAdminSettingsRoute,
+    masterAdminSubscriptionsRoute,
+    masterAdminAnalyticsRoute,
+    masterAdminBillingRoute,
+    masterAdminReportsRoute,
+    masterAdminSupportRoute,
+    masterAdminKnowledgeBaseRoute,
+  ]),
+  adminLayoutRoute.addChildren([
+    adminDashboardRoute,
+    adminAnalyticsRoute,
+    adminStaffRoute,
+    adminFinancialRoute,
+    adminBranchFormRoute,
+    adminSettingsRoute,
+    adminAuditRoute,
+    adminIndexRoute,
+  ]),
+  subAdminLayoutRoute.addChildren([
+    subAdminDashboardRoute,
+    subAdminStaffRoute,
+    subAdminDepartmentsRoute,
+    subAdminAppointmentsRoute,
+    subAdminPatientsRoute,
+    subAdminAnalyticsRoute,
+    subAdminSettingsRoute,
+    subAdminTestRoute,
+    subAdminIndexRoute,
+  ]),
   indexRoute,
 ])
 

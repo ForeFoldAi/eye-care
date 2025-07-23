@@ -2,7 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 export { useMutation } from "@tanstack/react-query"; // Re-export for convenience
 
 // ✅ Load your backend URL from .env
-const API_URL = import.meta.env.VITE_API_URL;
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 // 🔁 Throw error if fetch fails
 async function throwIfResNotOk(res: Response) {
@@ -63,10 +63,10 @@ export const getQueryFn = <T>(options: {
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+      retryDelay: 1000,
     },
     mutations: {
       retry: false,

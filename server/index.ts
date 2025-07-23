@@ -1,6 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { createServer } from 'http';
-import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
@@ -9,7 +8,9 @@ import { fileURLToPath } from 'url';
 
 import apiRoutes from './routes/index';
 import { connectDB } from './db/connect';
+import { initializeIndexes } from './db/indexes';
 import { registerRoutes } from './routes';
+import { WebSocketServer } from './websocket';
 
 dotenv.config(); // ✅ Load environment variables
 
@@ -25,14 +26,8 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
-// Configure Socket.IO with CORS
-const io = new Server(httpServer, {
-  cors: {
-    origin: frontendUrl,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    credentials: true,
-  },
-});
+// Initialize WebSocket server
+const wsServer = new WebSocketServer(httpServer);
 
 // ✅ CORS middleware
 app.use(cors({
@@ -70,6 +65,10 @@ async function initializeServer() {
     await connectDB();
     console.log('MongoDB Atlas connected successfully to healthcare database');
 
+    // Initialize database indexes for multi-tenant performance
+    await initializeIndexes();
+    console.log('Database indexes initialized for multi-tenant queries');
+
     await registerRoutes(app);
 
     if (process.env.NODE_ENV === 'development') {
@@ -102,13 +101,8 @@ async function initializeServer() {
       res.status(status).json({ message });
     });
 
-    // ✅ WebSockets (optional)
-    io.on('connection', (socket: Socket) => {
-      console.log(`Client connected: ${socket.id}`);
-      socket.on('disconnect', () => {
-        console.log(`Client disconnected: ${socket.id}`);
-      });
-    });
+    // WebSocket server is already initialized
+    console.log('WebSocket server initialized');
 
     const PORT = parseInt(process.env.PORT || '3000', 10);
     return new Promise<void>((resolve) => {

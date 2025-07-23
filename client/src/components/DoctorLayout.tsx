@@ -1,5 +1,5 @@
 import { Outlet } from "@tanstack/react-router";
-import { authService, User as AuthUser } from "@/lib/auth";
+import { authService, type User as AuthUser } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Layout from "@/components/Layout";
 

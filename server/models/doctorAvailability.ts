@@ -55,4 +55,4 @@ doctorAvailabilitySchema.index(
   { unique: true }
 );
 
-export const DoctorAvailability = mongoose.model('DoctorAvailability', doctorAvailabilitySchema); 
+export const DoctorAvailability = mongoose.models.DoctorAvailability || mongoose.model('DoctorAvailability', doctorAvailabilitySchema); 

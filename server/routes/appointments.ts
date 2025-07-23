@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { Appointment, DoctorAvailability } from '../models';
 import { insertAppointmentSchema } from '../shared/schema';
 import { authenticateToken, authorizeRole, AuthRequest } from '../middleware/auth';
+import { enforceTenantIsolation, buildTenantFilter, TenantRequest } from '../middleware/tenant';
+import { createAuditLogger, SecurityEvents } from '../utils/audit';
 import mongoose from 'mongoose';
 //new
 interface TimeSlot {
@@ -14,13 +16,21 @@ interface TimeSlot {
 
 const router = Router();
 
-// Get all appointments
-router.get('/', authenticateToken, async (req: AuthRequest, res) => {
+// Apply tenant middleware to all routes
+router.use(enforceTenantIsolation);
+
+// Get all appointments (tenant-isolated)
+router.get('/', authenticateToken, async (req: TenantRequest, res) => {
+  const auditLogger = createAuditLogger(req);
+  
   try {
-    const { doctorId, patientId, date } = req.query;
-    console.log('Query params:', { doctorId, patientId, date });
+    const { doctorId, patientId, date, status, page = 1, limit = 10 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
     
-    let query = Appointment.find();
+    console.log('Query params:', { doctorId, patientId, date, status });
+    
+    const tenantFilter = buildTenantFilter(req);
+    let query = Appointment.find(tenantFilter);
 
     // Apply filters
     if (doctorId) {
@@ -28,6 +38,9 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     }
     if (patientId) {
       query = query.where('patientId', patientId);
+    }
+    if (status) {
+      query = query.where('status', status);
     }
     if (date) {
       const startDate = new Date(date as string);
@@ -59,14 +72,39 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
     query = query
       .populate('patientId', 'firstName lastName phone email')
       .populate('doctorId', 'firstName lastName specialization')
-      .sort({ datetime: 1 });
+      .sort({ datetime: 1 })
+      .skip(skip)
+      .limit(Number(limit));
 
-    const appointments = await query.exec();
+    const [appointments, total] = await Promise.all([
+      query.exec(),
+      Appointment.countDocuments(tenantFilter)
+    ]);
+
     console.log('Fetched appointments count:', appointments.length);
     console.log('Fetched appointments:', JSON.stringify(appointments, null, 2));
-    res.json(appointments);
+
+    await auditLogger.logRead('appointment', {
+      filters: { doctorId, patientId, date, status },
+      page: Number(page),
+      limit: Number(limit),
+      totalResults: appointments.length,
+      totalCount: total
+    });
+
+    res.json({
+      data: appointments,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        pages: Math.ceil(total / Number(limit))
+      }
+    });
   } catch (error) {
     console.error('Error fetching appointments:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    await auditLogger.logError('READ', 'appointment', { error: errorMessage }, 'Error fetching appointments');
     res.status(500).json({ message: 'Error fetching appointments' });
   }
 });
@@ -214,6 +252,33 @@ router.patch('/:id/status', authenticateToken, async (req: AuthRequest, res) => 
   } catch (error) {
     console.error('Error updating appointment status:', error);
     res.status(500).json({ message: 'Error updating appointment status' });
+  }
+});
+
+// Update appointment (status, approved, followUpDate)
+router.patch('/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { status, approved, followUpDate } = req.body;
+    const updateFields: any = {};
+    if (status) updateFields.status = status;
+    if (typeof approved !== 'undefined') updateFields.approved = approved;
+    if (followUpDate) updateFields.followUpDate = followUpDate;
+
+    const appointment = await Appointment.findByIdAndUpdate(
+      req.params.id,
+      { $set: updateFields },
+      { new: true }
+    )
+      .populate('patientId', 'firstName lastName phone email')
+      .populate('doctorId', 'firstName lastName specialization');
+
+    if (!appointment) {
+      return res.status(404).json({ message: 'Appointment not found' });
+    }
+    res.json(appointment);
+  } catch (error) {
+    console.error('Error updating appointment:', error);
+    res.status(500).json({ message: 'Error updating appointment' });
   }
 });
 

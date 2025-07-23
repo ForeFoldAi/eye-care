@@ -12,7 +12,10 @@ import {
   Phone,
   ClipboardList,
   Save,
-  Check
+  Check,
+  List,
+  Grid3X3,
+  AlertCircle
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +32,9 @@ import PrescriptionModal from "@/components/PrescriptionModal";
 import { authService } from "@/lib/auth";
 import Layout from "@/components/Layout";
 import LoadingEye from '@/components/ui/LoadingEye';
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
+import SupportTicketModal from "@/components/SupportTicketModal";
 
 interface DashboardStats {
   todayAppointments: number;
@@ -99,6 +105,7 @@ interface AppointmentModification {
   status?: AppointmentStatus;
   approved?: boolean;
   notes?: string;
+  followUpDate?: string;
 }
 
 interface AppointmentState extends Omit<Appointment, 'status'> {
@@ -109,10 +116,27 @@ interface AppointmentState extends Omit<Appointment, 'status'> {
   isApproved: boolean;
 }
 
+interface AppointmentColumns {
+  tokenNumber: number;
+  patientName: string;
+  patientInfo: string;
+  contact: {
+    phone: string;
+    email: string;
+  };
+  time: string;
+  type: string;
+  status: AppointmentStatus;
+  actions: string;
+  id: string;
+}
+
 export default function DoctorDashboard() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const navigate = useNavigate();
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -331,6 +355,14 @@ export default function DoctorDashboard() {
       iconColor: "bg-purple-500",
       action: () => navigate({ to: '/doctor/availability' }),
     },
+    {
+      title: "Support",
+      description: "Get technical support",
+      icon: AlertCircle,
+      color: "bg-orange-50 hover:bg-orange-100",
+      iconColor: "bg-orange-500",
+      action: () => setIsSupportModalOpen(true),
+    },
   ];
 
   const getPatientInitials = (firstName: string, lastName: string) => {
@@ -363,6 +395,8 @@ export default function DoctorDashboard() {
 
   // Initialize appointment states when appointments data changes
   useEffect(() => {
+    // Only initialize if appointmentStates is empty
+    if (Object.keys(appointmentStates).length === 0) {
     const initialStates = todaysAppointments.reduce((acc, appointment) => ({
       ...acc,
       [appointment.id]: {
@@ -373,8 +407,9 @@ export default function DoctorDashboard() {
           isApproved: false
       }
     }), {} as { [key: string]: AppointmentState });
-    
     setAppointmentStates(initialStates);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todaysAppointments]);
 
   // Mutation for updating appointment
@@ -473,12 +508,205 @@ export default function DoctorDashboard() {
     if (state.isApproved) {
       modifications.approved = true;
     }
+    if (state.followUpDate) {
+      modifications.followUpDate = state.followUpDate;
+    }
 
     await updateAppointmentMutation.mutateAsync({
       appointmentId,
       modifications
     });
   };
+
+  const appointmentColumns: ColumnDef<AppointmentColumns>[] = [
+    {
+      accessorKey: "tokenNumber",
+      header: "Token",
+      cell: ({ row }) => (
+        <div className="text-sm font-bold text-medical-blue-600 bg-medical-blue-50 px-2 py-1 rounded-md inline-block">
+          #{row.getValue("tokenNumber")}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "patientName",
+      header: "Patient Name",
+      cell: ({ row }) => (
+        <div>
+          <div className="text-sm font-medium text-gray-900">
+            {row.getValue("patientName")}
+          </div>
+          <div className="text-xs text-gray-500">
+            {row.original.patientInfo}
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "contact",
+      header: "Contact",
+      cell: ({ row }) => {
+        const contact = row.getValue("contact") as { phone: string; email: string };
+        return (
+          <div>
+            <div className="text-sm text-gray-900">{contact.phone}</div>
+            <div className="text-xs text-gray-500">{contact.email}</div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "time",
+      header: "Time",
+      cell: ({ row }) => (
+        <div className="text-sm font-medium text-gray-900">
+          {row.getValue("time")}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "type",
+      header: "Type",
+      cell: ({ row }) => (
+        <Badge variant="outline" className="font-normal border-medical-blue-200 text-medical-blue-700">
+          {row.getValue("type")}
+        </Badge>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const appointmentId = row.original.id;
+        return (
+          <div className="flex flex-col space-y-1">
+            <Select
+              value={appointmentStates[appointmentId]?.status || row.getValue("status")}
+              onValueChange={(value: AppointmentStatus) => handleStatusChange(appointmentId, value)}
+            >
+              <SelectTrigger className="w-32 h-8 text-xs">
+                <SelectValue placeholder="Pending" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></div>
+                    Pending
+                  </div>
+                </SelectItem>
+                <SelectItem value="completed">
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                    Completed
+                  </div>
+                </SelectItem>
+                <SelectItem value="follow-up-required">
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-purple-500 mr-2"></div>
+                    Follow-up Required
+                  </div>
+                </SelectItem>
+                <SelectItem value="cancelled">
+                  <div className="flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
+                    Cancelled
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            {appointmentStates[appointmentId]?.isApproved && (
+              <Badge className="bg-green-50 text-green-700 border-green-200 text-xs">
+                <Check className="w-3 h-3 mr-1" />
+                Approved
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const appointmentId = row.original.id;
+        return (
+          <div className="flex items-center space-x-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const selectedAppointment = todaysAppointments.find(apt => apt.id === appointmentId);
+                if (selectedAppointment) {
+                  setSelectedAppointment(selectedAppointment);
+                  setShowFollowUpModal(true);
+                }
+              }}
+              className="h-8 px-3"
+            >
+              <CalendarPlus className="w-3 h-3 mr-1" />
+              Follow-up
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                const selectedAppointment = todaysAppointments.find(apt => apt.id === appointmentId);
+                if (selectedAppointment) {
+                  const selectedPatient = patients.find(p => p.id === selectedAppointment.patientId._id);
+                  if (selectedPatient) {
+                    setShowPrescriptionModal(true);
+                  }
+                }
+              }}
+              className="h-8 px-3"
+            >
+              <FileText className="w-3 h-3 mr-1" />
+              Prescribe
+            </Button>
+            <Button
+              size="sm"
+              variant={appointmentStates[appointmentId]?.isApproved ? "secondary" : "outline"}
+              onClick={() => handleApprove(appointmentId)}
+              disabled={appointmentStates[appointmentId]?.isApproved}
+              className="h-8 px-3"
+            >
+              <Check className="w-3 h-3 mr-1" />
+              {appointmentStates[appointmentId]?.isApproved ? 'Approved' : 'Approve'}
+            </Button>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => handleSave(appointmentId)}
+              disabled={!appointmentStates[appointmentId]?.isModified}
+              className="h-8 px-3"
+            >
+              <Save className="w-3 h-3 mr-1" />
+              Save
+            </Button>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const appointmentsTableData: AppointmentColumns[] = todaysAppointments.map((appointment) => ({
+    id: appointment.id,
+    tokenNumber: appointment.tokenNumber,
+    patientName: `${appointment.patientId.firstName} ${appointment.patientId.lastName}`,
+    patientInfo: `${appointment.patientId.age} yrs, ${appointment.patientId.gender}`,
+    contact: {
+      phone: appointment.patientId.phone,
+      email: appointment.patientId.email,
+    },
+    time: new Date(appointment.datetime).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    }),
+    type: appointment.type,
+    status: appointment.status,
+    actions: appointment.id,
+  }));
 
   // Render a loading state if user is not set yet
   if (!currentUser) {
@@ -558,6 +786,24 @@ export default function DoctorDashboard() {
                         {todaysAppointments.filter(apt => apt.status === 'completed').length} Completed
                       </span>
                     </div>
+                    <div className="flex items-center gap-1 ml-4">
+                      <Button
+                        size="sm"
+                        variant={viewMode === 'card' ? 'default' : 'outline'}
+                        onClick={() => setViewMode('card')}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Grid3X3 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={viewMode === 'list' ? 'default' : 'outline'}
+                        onClick={() => setViewMode('list')}
+                        className="h-8 w-8 p-0"
+                      >
+                        <List className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -570,7 +816,8 @@ export default function DoctorDashboard() {
                     <h3 className="text-lg font-medium text-gray-900 mb-1">No Appointments Today</h3>
                     <p className="text-gray-500">You have no scheduled appointments for today.</p>
                   </div>
-                ) : (
+                ) : viewMode === 'card' ? (
+                  // Card View
                   todaysAppointments.map((appointment) => (
                     <div
                       key={appointment.id}
@@ -648,41 +895,54 @@ export default function DoctorDashboard() {
                             </div>
                           </div>
                           <div className="flex flex-col items-end space-y-3">
-                            <Select
-                              value={appointmentStates[appointment.id]?.status || appointment.status}
-                              onValueChange={(value: AppointmentStatus) => handleStatusChange(appointment.id, value)}
-                            >
-                              <SelectTrigger className="w-[180px] bg-white">
-                                <SelectValue placeholder="Update Status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pending">
-                                  <div className="flex items-center">
-                                    <div className="w-2 h-2 rounded-full bg-yellow-500 mr-2"></div>
-                                    Pending
+                            <div className="bg-gray-50 border rounded-lg p-2 shadow-sm mb-2 flex flex-row gap-3 items-center">
+                              <span className="text-xs font-medium text-gray-700 mr-2">Status:</span>
+                              <label className="flex items-center space-x-1 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`status-${appointment.id}`}
+                                  value="pending"
+                                  checked={appointmentStates[appointment.id]?.status === 'pending'}
+                                  onChange={() => handleStatusChange(appointment.id, 'pending')}
+                                  className="accent-yellow-500 focus:ring-2 focus:ring-yellow-400 hover:scale-110 transition-transform"
+                                />
+                                <span className="text-xs">Pending</span>
+                              </label>
+                              <label className="flex items-center space-x-1 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`status-${appointment.id}`}
+                                  value="completed"
+                                  checked={appointmentStates[appointment.id]?.status === 'completed'}
+                                  onChange={() => handleStatusChange(appointment.id, 'completed')}
+                                  className="accent-green-500 focus:ring-2 focus:ring-green-400 hover:scale-110 transition-transform"
+                                />
+                                <span className="text-xs">Completed</span>
+                              </label>
+                              <label className="flex items-center space-x-1 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`status-${appointment.id}`}
+                                  value="follow-up-required"
+                                  checked={appointmentStates[appointment.id]?.status === 'follow-up-required'}
+                                  onChange={() => handleStatusChange(appointment.id, 'follow-up-required')}
+                                  className="accent-purple-500 focus:ring-2 focus:ring-purple-400 hover:scale-110 transition-transform"
+                                />
+                                <span className="text-xs">Follow-up</span>
+                              </label>
+                              <label className="flex items-center space-x-1 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`status-${appointment.id}`}
+                                  value="cancelled"
+                                  checked={appointmentStates[appointment.id]?.status === 'cancelled'}
+                                  onChange={() => handleStatusChange(appointment.id, 'cancelled')}
+                                  className="accent-gray-500 focus:ring-2 focus:ring-gray-400 hover:scale-110 transition-transform"
+                                />
+                                <span className="text-xs">Cancelled</span>
+                              </label>
                                   </div>
-                                </SelectItem>
-                                <SelectItem value="completed">
-                                  <div className="flex items-center">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                                    Completed
-                                  </div>
-                                </SelectItem>
-                                <SelectItem value="follow-up-required">
-                                  <div className="flex items-center">
-                                    <div className="w-2 h-2 rounded-full bg-purple-500 mr-2"></div>
-                                    Follow-up Required
-                                  </div>
-                                </SelectItem>
-                                <SelectItem value="cancelled">
-                                  <div className="flex items-center">
-                                    <div className="w-2 h-2 rounded-full bg-gray-500 mr-2"></div>
-                                    Cancelled
-                                  </div>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <div className="flex flex-col space-y-2 w-[180px]">
+                            <div className="w-[180px] mb-1">
                               <div className="grid grid-cols-2 gap-2">
                                 <Button
                                   size="sm"
@@ -739,6 +999,12 @@ export default function DoctorDashboard() {
                       </div>
                     </div>
                   ))
+                ) : (
+                  // Table View
+                  <DataTable
+                    columns={appointmentColumns}
+                    data={appointmentsTableData}
+                  />
                 )}
               </div>
             </CardContent>
@@ -791,14 +1057,14 @@ export default function DoctorDashboard() {
                 <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="p-6">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {quickActions.map((action, index) => {
                   const Icon = action.icon;
                   return (
                     <Button
                       key={index}
                       variant="ghost"
-                      className={`flex flex-col items-center justify-center p-6 ${action.color} transition-colors h-auto text-center`}
+                      className={`flex flex-col items-center justify-center p-6 ${action.color} transition-colors h-auto text-center min-h-[120px]`}
                       onClick={action.action}
                     >
                       <div className={`w-12 h-12 ${action.iconColor} rounded-full flex items-center justify-center mb-3`}>
@@ -907,6 +1173,12 @@ export default function DoctorDashboard() {
               }}
             />
           )}
+          
+          {/* Support Ticket Modal */}
+          <SupportTicketModal 
+            isOpen={isSupportModalOpen} 
+            onClose={() => setIsSupportModalOpen(false)} 
+          />
          </>
         );
 }

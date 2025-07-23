@@ -7,7 +7,7 @@ import { useNavigate } from "@tanstack/react-router";
 
 interface ProtectedRouteProps {
   children: (user: User) => ReactNode;
-  requiredRole?: 'doctor' | 'receptionist';
+  requiredRole?: 'doctor' | 'receptionist' | 'admin' | 'master_admin' | 'sub_admin';
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {

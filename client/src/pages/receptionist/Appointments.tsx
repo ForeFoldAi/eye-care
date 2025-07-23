@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import Layout from "@/components/Layout";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { type User } from "@/lib/auth";
 import { 
   Search,
   Calendar,
@@ -27,9 +24,23 @@ import {
   Edit,
   Plus,
   Users,
-  CalendarPlus
+  CalendarPlus,
+  Grid3X3,
+  List,
+  MoreHorizontal
 } from "lucide-react";
 import LoadingEye from '@/components/ui/LoadingEye';
+import { EnhancedTable } from "@/components/ui/enhanced-table";
+import { type ColumnDef } from "@tanstack/react-table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+
+type ViewMode = 'table' | 'grid';
 
 interface Patient {
   _id: string;
@@ -64,12 +75,14 @@ interface Appointment {
 
 export default function ReceptionistAppointmentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [fromDate, setFromDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [toDate, setToDate] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [doctorFilter, setDoctorFilter] = useState<string>("all");
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   
   // New appointment form state
   const [newAppointment, setNewAppointment] = useState({
@@ -83,10 +96,11 @@ export default function ReceptionistAppointmentsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const API_URL = import.meta.env.VITE_API_URL;
 
   // Fetch all appointments (receptionist can see all)
   const { data: appointmentsData = [], isError, error, isLoading } = useQuery({
-    queryKey: ['/api/appointments', 'receptionist', selectedDate, statusFilter, doctorFilter],
+    queryKey: ['/api/appointments', 'receptionist', fromDate, toDate, statusFilter, doctorFilter],
     queryFn: async () => {
       try {
         const token = localStorage.getItem('token');
@@ -96,7 +110,8 @@ export default function ReceptionistAppointmentsPage() {
 
         let url = `${API_URL}/api/appointments?`;
         const params = new URLSearchParams();
-        if (selectedDate) params.append('date', selectedDate);
+        if (fromDate) params.append('fromDate', fromDate);
+        if (toDate) params.append('toDate', toDate);
         if (statusFilter && statusFilter !== 'all') params.append('status', statusFilter);
         if (doctorFilter && doctorFilter !== 'all') params.append('doctorId', doctorFilter);
         
@@ -136,9 +151,9 @@ export default function ReceptionistAppointmentsPage() {
     retry: 1,
     retryDelay: 1000
   });
-  const API_URL = import.meta.env.VITE_API_URL;
+
   // Fetch patients for booking
-  const { data: patientsData = [] } = useQuery<Patient[]>({
+  const { data: patientsData = [], isLoading: patientsLoading, error: patientsError } = useQuery<Patient[]>({
     queryKey: ['/api/patients'],
     queryFn: async () => {
       const token = localStorage.getItem('token');
@@ -150,9 +165,38 @@ export default function ReceptionistAppointmentsPage() {
       });
       if (!response.ok) throw new Error('Failed to fetch patients');
       const data = await response.json();
-      return Array.isArray(data) ? data : [];
+      
+      // Handle different response formats
+      const patientsArray = data.data?.patients || data.patients || data;
+      
+      // Validate that we have an array
+      if (!Array.isArray(patientsArray)) {
+        console.error('Patients API response is not an array:', data);
+        return [];
+      }
+      
+      // Transform the data to match our Patient interface
+      return patientsArray.map((patient: any) => ({
+        _id: patient._id?.toString() || patient.id?.toString() || '',
+        firstName: patient.firstName || 'Unknown',
+        lastName: patient.lastName || 'Patient',
+        phone: patient.phone || 'N/A',
+        email: patient.email || 'N/A',
+        dateOfBirth: patient.dateOfBirth,
+        gender: patient.gender,
+      }));
     }
   });
+
+  // Debug logging for patients data
+  useEffect(() => {
+    if (patientsData.length > 0) {
+      console.log('Patients loaded successfully:', patientsData);
+    }
+    if (patientsError) {
+      console.error('Error loading patients:', patientsError);
+    }
+  }, [patientsData, patientsError]);
 
   // Fetch doctors for booking
   const { data: doctorsData = [] } = useQuery<Doctor[]>({
@@ -375,6 +419,133 @@ export default function ReceptionistAppointmentsPage() {
     navigate({ to: `/patients/${patientId}/history` });
   };
 
+  // Table columns definition
+  const appointmentColumns: ColumnDef<Appointment>[] = [
+    {
+      accessorKey: 'tokenNumber',
+      header: 'Token',
+      cell: ({ row }) => (
+        <div className="font-medium text-center">
+          <span className="bg-medical-blue-100 text-medical-blue-800 px-1 py-0 rounded text-xs font-medium">
+            #{row.getValue('tokenNumber')}
+          </span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'patientId',
+      header: 'Patient',
+      cell: ({ row }) => {
+        const patient = row.original.patientId;
+        return (
+          <div className="flex items-center space-x-2">
+            <div className="w-6 h-6 bg-medical-blue-100 rounded-full flex items-center justify-center">
+              <span className="text-xs font-medium text-medical-blue-600">
+                {patient.firstName.charAt(0)}{patient.lastName.charAt(0)}
+              </span>
+            </div>
+            <div>
+              <div className="font-medium text-xs">{patient.firstName} {patient.lastName}</div>
+              <div className="text-xs text-gray-500">{patient.phone}</div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'doctorId',
+      header: 'Doctor',
+      cell: ({ row }) => {
+        const doctor = row.original.doctorId;
+        return (
+          <div>
+            <div className="font-medium text-xs">Dr. {doctor.firstName} {doctor.lastName}</div>
+            <div className="text-xs text-gray-500">{doctor.specialization}</div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: 'datetime',
+      header: 'Date & Time',
+      cell: ({ row }) => (
+        <div>
+          <div className="font-medium text-xs">{new Date(row.getValue('datetime')).toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          })}</div>
+          <div className="text-xs text-gray-500">{formatTime(row.getValue('datetime'))}</div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'type',
+      header: 'Type',
+      cell: ({ row }) => (
+        <span className="capitalize bg-gray-100 px-1 py-0 rounded text-xs">
+          {row.getValue('type')}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => (
+        <Badge className={`text-xs px-1 py-0 ${getStatusColor(row.getValue('status'))}`}>
+          {row.getValue('status')}
+        </Badge>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const appointment = row.original;
+        return (
+          <div className="flex space-x-1">
+            {appointment.status === 'scheduled' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleStatusUpdate(appointment._id, 'confirmed')}
+                className="text-medical-green-600 border-medical-green-600 hover:bg-medical-green-50 h-6 w-6 p-0"
+              >
+                <Check className="w-3 h-3" />
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                  <MoreHorizontal className="w-3 h-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleReschedule(appointment)} className="text-xs">
+                  <Calendar className="w-3 h-3 mr-1" />
+                  Reschedule
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => viewPatientHistory(appointment.patientId._id)} className="text-xs">
+                  <FileText className="w-3 h-3 mr-1" />
+                  Patient History
+                </DropdownMenuItem>
+                {(appointment.status === 'scheduled' || appointment.status === 'confirmed') && (
+                  <DropdownMenuItem 
+                    onClick={() => handleStatusUpdate(appointment._id, 'cancelled')}
+                    className="text-red-600 text-xs"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Cancel
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    },
+  ];
+
   // Filter appointments based on search query
   const filteredAppointments = appointmentsData
     .filter((appointment: Appointment) => 
@@ -394,32 +565,32 @@ export default function ReceptionistAppointmentsPage() {
 
   // Render functions
   const renderAppointmentCard = (appointment: Appointment) => (
-    <Card key={appointment._id} className="mb-4 hover:shadow-md transition-shadow">
-      <CardContent className="pt-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <Card key={appointment._id} className="mb-3 hover:shadow-md transition-shadow">
+      <CardContent className="pt-3 pb-3">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
           {/* Patient Information */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <UserIcon className="h-5 w-5 text-blue-600" />
-              <span className="font-semibold text-lg">
+              <UserIcon className="h-3 w-3 text-blue-600" />
+              <span className="font-semibold text-xs">
                 {appointment.patientId.firstName} {appointment.patientId.lastName}
               </span>
             </div>
             
             {appointment.patientId.dateOfBirth && (
-              <div className="text-sm text-gray-600">
-                Age: {calculateAge(appointment.patientId.dateOfBirth)} years
+              <div className="text-xs text-gray-600">
+                Age: {calculateAge(appointment.patientId.dateOfBirth)}y
               </div>
             )}
             
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Phone className="h-4 w-4" />
+            <div className="flex items-center gap-1 text-xs text-gray-600">
+              <Phone className="h-3 w-3" />
               <span>{appointment.patientId.phone}</span>
             </div>
             
             {appointment.patientId.email && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Mail className="h-4 w-4" />
+              <div className="flex items-center gap-1 text-xs text-gray-600">
+                <Mail className="h-3 w-3" />
                 <span className="truncate">{appointment.patientId.email}</span>
               </div>
             )}
@@ -428,62 +599,66 @@ export default function ReceptionistAppointmentsPage() {
               variant="outline"
               size="sm"
               onClick={() => viewPatientHistory(appointment.patientId._id)}
-              className="mt-2"
+              className="mt-2 h-6 text-xs"
             >
-              <FileText className="h-4 w-4 mr-1" />
-              View History
+              <FileText className="h-3 w-3 mr-1" />
+              History
             </Button>
           </div>
 
           {/* Doctor Information */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Stethoscope className="h-5 w-5 text-green-600" />
-              <span className="font-semibold">
+              <Stethoscope className="h-3 w-3 text-green-600" />
+              <span className="font-semibold text-xs">
                 Dr. {appointment.doctorId.firstName} {appointment.doctorId.lastName}
               </span>
             </div>
             
-            <div className="text-sm text-gray-600">
+            <div className="text-xs text-gray-600">
               {appointment.doctorId.specialization}
             </div>
           </div>
 
           {/* Appointment Details */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-green-600" />
-              <span className="font-medium">{formatDate(appointment.datetime)}</span>
+          <div className="space-y-2">
+            <div className="flex items-center gap-1">
+              <Calendar className="h-3 w-3 text-green-600" />
+              <span className="font-medium text-xs">{new Date(appointment.datetime).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+              })}</span>
             </div>
             
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-orange-600" />
-              <span>{formatTime(appointment.datetime)}</span>
+            <div className="flex items-center gap-1">
+              <Clock className="h-3 w-3 text-orange-600" />
+              <span className="text-xs">{formatTime(appointment.datetime)}</span>
             </div>
             
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Type:</span>
-              <span className="capitalize bg-gray-100 px-2 py-1 rounded text-sm">
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-xs">Type:</span>
+              <span className="capitalize bg-gray-100 px-1 py-0 rounded text-xs">
                 {appointment.type}
               </span>
             </div>
             
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Token:</span>
-              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-xs">Token:</span>
+              <span className="bg-blue-100 text-blue-800 px-1 py-0 rounded text-xs font-medium">
                 #{appointment.tokenNumber}
               </span>
             </div>
             
-            <div className="flex items-center gap-2">
-              <span className="font-medium">Status:</span>
-              <Badge className={getStatusColor(appointment.status)}>
+            <div className="flex items-center gap-1">
+              <span className="font-medium text-xs">Status:</span>
+              <Badge className={`text-xs px-1 py-0 ${getStatusColor(appointment.status)}`}>
                 {appointment.status}
               </Badge>
             </div>
             
             {appointment.notes && (
-              <div className="bg-yellow-50 p-2 rounded text-sm border-l-4 border-yellow-400">
+              <div className="bg-yellow-50 p-2 rounded text-xs border-l-2 border-yellow-400">
                 <div className="font-medium text-yellow-800">Notes:</div>
                 <div className="text-yellow-700">{appointment.notes}</div>
               </div>
@@ -491,25 +666,25 @@ export default function ReceptionistAppointmentsPage() {
           </div>
 
           {/* Actions */}
-          <div className="space-y-2">
+          <div className="space-y-1">
             {appointment.status === 'scheduled' && (
               <>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleStatusUpdate(appointment._id, 'confirmed')}
-                  className="w-full text-medical-green-600 border-medical-green-600 hover:bg-medical-green-50"
+                  className="w-full text-medical-green-600 border-medical-green-600 hover:bg-medical-green-50 h-6 text-xs"
                 >
-                  <Check className="h-4 w-4 mr-1" />
+                  <Check className="h-3 w-3 mr-1" />
                   Confirm
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleReschedule(appointment)}
-                  className="w-full"
+                  className="w-full h-6 text-xs"
                 >
-                  <Calendar className="h-4 w-4 mr-1" />
+                  <Calendar className="h-3 w-3 mr-1" />
                   Reschedule
                 </Button>
               </>
@@ -520,9 +695,9 @@ export default function ReceptionistAppointmentsPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => handleReschedule(appointment)}
-                className="w-full"
+                className="w-full h-6 text-xs"
               >
-                <Calendar className="h-4 w-4 mr-1" />
+                <Calendar className="h-3 w-3 mr-1" />
                 Reschedule
               </Button>
             )}
@@ -532,9 +707,9 @@ export default function ReceptionistAppointmentsPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => handleStatusUpdate(appointment._id, 'cancelled')}
-                className="w-full text-medical-red-600 border-medical-red-600 hover:bg-medical-red-50"
+                className="w-full text-medical-red-600 border-medical-red-600 hover:bg-medical-red-50 h-6 text-xs"
               >
-                <X className="h-4 w-4 mr-1" />
+                <X className="h-3 w-3 mr-1" />
                 Cancel
               </Button>
             )}
@@ -545,94 +720,103 @@ export default function ReceptionistAppointmentsPage() {
   );
 
   return (
-    <ProtectedRoute requiredRole="receptionist">
-      {(currentUser: User) => (
-        <Layout user={currentUser}>
-    <div className="space-y-6">
-      <div className="mb-6">
+    <div className="flex flex-col h-[calc(100vh-2rem)] space-y-2 px-4 pt-0 bg-gray-50">
+      {/* Header - Fixed */}
+      <div className="flex-shrink-0 mb-3">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Appointment Management</h2>
-            <p className="text-gray-600">
+            <h2 className="text-lg font-bold text-gray-900 mb-1">Appointment Management</h2>
+            <p className="text-sm text-gray-600">
               Manage all appointments across all doctors
             </p>
           </div>
-                <Button onClick={() => setShowBookingModal(true)} className="bg-medical-blue-600 hover:bg-medical-blue-700">
-            <Plus className="h-4 w-4 mr-2" />
+          <Button onClick={() => setShowBookingModal(true)} className="bg-medical-blue-600 hover:bg-medical-blue-700 h-8 px-3 text-sm">
+            <Plus className="h-3 w-3 mr-1" />
             Book Appointment
           </Button>
         </div>
       </div>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      {/* Overview Cards - Fixed */}
+      <div className="flex-shrink-0 grid grid-cols-1 md:grid-cols-4 gap-3 mb-3">
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-3 pb-3">
             <div className="flex items-center">
-              <Calendar className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Scheduled</p>
-                <p className="text-2xl font-bold text-gray-900">{appointmentStats.scheduled || 0}</p>
+              <Calendar className="h-5 w-5 text-blue-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-500">Scheduled</p>
+                <p className="text-lg font-bold text-gray-900">{appointmentStats.scheduled || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-3 pb-3">
             <div className="flex items-center">
-              <Check className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Confirmed</p>
-                <p className="text-2xl font-bold text-gray-900">{appointmentStats.confirmed || 0}</p>
+              <Check className="h-5 w-5 text-green-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-500">Confirmed</p>
+                <p className="text-lg font-bold text-gray-900">{appointmentStats.confirmed || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-3 pb-3">
             <div className="flex items-center">
-              <Users className="h-8 w-8 text-purple-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Completed</p>
-                <p className="text-2xl font-bold text-gray-900">{appointmentStats.completed || 0}</p>
+              <Users className="h-5 w-5 text-purple-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-500">Completed</p>
+                <p className="text-lg font-bold text-gray-900">{appointmentStats.completed || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-3 pb-3">
             <div className="flex items-center">
-              <X className="h-8 w-8 text-red-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500">Cancelled</p>
-                <p className="text-2xl font-bold text-gray-900">{appointmentStats.cancelled || 0}</p>
+              <X className="h-5 w-5 text-red-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-500">Cancelled</p>
+                <p className="text-lg font-bold text-gray-900">{appointmentStats.cancelled || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Filters - Fixed */}
+      <Card className="flex-shrink-0 mb-3">
+        <CardContent className="pt-3 pb-3">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <div>
-              <Label className="text-sm font-medium text-gray-700">Date</Label>
+              <Label className="text-xs font-medium text-gray-700">From Date</Label>
               <Input
                 type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="mt-1"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="mt-1 h-8 text-sm"
               />
             </div>
             
             <div>
-              <Label className="text-sm font-medium text-gray-700">Doctor</Label>
+              <Label className="text-xs font-medium text-gray-700">To Date</Label>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="mt-1 h-8 text-sm"
+                min={fromDate}
+              />
+            </div>
+            
+            <div>
+              <Label className="text-xs font-medium text-gray-700">Doctor</Label>
               <Select value={doctorFilter} onValueChange={setDoctorFilter}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-1 h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -647,9 +831,9 @@ export default function ReceptionistAppointmentsPage() {
             </div>
             
             <div>
-              <Label className="text-sm font-medium text-gray-700">Status</Label>
+              <Label className="text-xs font-medium text-gray-700">Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="mt-1">
+                <SelectTrigger className="mt-1 h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -663,80 +847,149 @@ export default function ReceptionistAppointmentsPage() {
             </div>
             
             <div>
-              <Label className="text-sm font-medium text-gray-700">Search</Label>
+              <Label className="text-xs font-medium text-gray-700">Search</Label>
               <div className="relative mt-1">
                 <Input
                   type="text"
                   placeholder="Search patients or doctors..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-8 h-8 text-sm"
                 />
-                <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-2 top-2 w-3 h-3 text-gray-400" />
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Appointments List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Appointments for {formatDate(selectedDate)}
-            <Badge variant="secondary" className="ml-2">
-              {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="text-center py-12">
-              <LoadingEye size={48} className="mx-auto mb-4" />
-              <p className="text-gray-500">Loading appointments...</p>
-            </div>
-          ) : isError ? (
-            <div className="text-center py-12 bg-red-50 rounded-lg">
-              <X className="w-8 h-8 text-red-500 mx-auto mb-2" />
-              <p className="text-red-600 font-medium">
-                {error instanceof Error && error.message.includes('HTTP 404')
-                  ? 'No appointments found for the selected date.'
-                  : error instanceof Error
-                  ? error.message
-                  : 'Failed to load appointments'}
-              </p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/appointments'] })}
-              >
-                Try Again
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {filteredAppointments.length > 0 ? (
-                filteredAppointments.map(renderAppointmentCard)
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-hidden">
+        {/* Appointments List */}
+        {viewMode === 'table' ? (
+          <div className="h-full overflow-auto">
+            {isLoading ? (
+              <div className="text-center py-8">
+                <LoadingEye size={32} className="mx-auto mb-2" />
+                <p className="text-gray-500 text-sm">Loading appointments...</p>
+              </div>
+            ) : isError ? (
+              <div className="text-center py-8 bg-red-50 rounded-lg">
+                <X className="w-6 h-6 text-red-500 mx-auto mb-2" />
+                <p className="text-red-600 font-medium text-sm">
+                  {error instanceof Error && error.message.includes('HTTP 404')
+                    ? 'No appointments found for the selected date.'
+                    : error instanceof Error
+                    ? error.message
+                    : 'Failed to load appointments'}
+                </p>
+                <Button
+                  variant="outline"
+                  className="mt-3 h-8 px-3 text-sm"
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/appointments'] })}
+                >
+                  Try Again
+                </Button>
+              </div>
+            ) : (
+              <EnhancedTable
+                data={filteredAppointments}
+                columns={appointmentColumns}
+                searchPlaceholder="Search appointments..."
+                showFooter={true}
+                footerProps={{
+                  showFirstLastButtons: true,
+                  labelRowsPerPage: "Per page:",
+                  labelDisplayedRows: ({ from, to, count }) => 
+                    `${from}-${to} of ${count}`
+                }}
+                viewToggle={{
+                  mode: viewMode,
+                  onToggle: (mode) => setViewMode(mode)
+                }}
+              />
+            )}
+          </div>
+        ) : (
+          <Card className="h-full flex flex-col">
+            <CardHeader className="flex-shrink-0 p-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4" />
+                  Appointments {fromDate && toDate ? `from ${formatDate(fromDate)} to ${formatDate(toDate)}` : fromDate ? `from ${formatDate(fromDate)}` : 'for today'}
+                  <Badge variant="secondary" className="ml-2 text-xs px-1 py-0">
+                    {filteredAppointments.length} appointment{filteredAppointments.length !== 1 ? 's' : ''}
+                  </Badge>
+                </CardTitle>
+                <div className="flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
+                  <Button
+                    size="sm"
+                    variant={viewMode === ('table' as ViewMode) ? 'default' : 'ghost'}
+                    onClick={() => setViewMode('table' as ViewMode)}
+                    className="h-6 px-2"
+                  >
+                    <List className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={viewMode === ('grid' as ViewMode) ? 'default' : 'ghost'}
+                    onClick={() => setViewMode('grid' as ViewMode)}
+                    className="h-6 px-2"
+                  >
+                    <Grid3X3 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto p-3">
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <LoadingEye size={32} className="mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm">Loading appointments...</p>
+                </div>
+              ) : isError ? (
+                <div className="text-center py-8 bg-red-50 rounded-lg">
+                  <X className="w-6 h-6 text-red-500 mx-auto mb-2" />
+                  <p className="text-red-600 font-medium text-sm">
+                    {error instanceof Error && error.message.includes('HTTP 404')
+                      ? 'No appointments found for the selected date.'
+                      : error instanceof Error
+                      ? error.message
+                      : 'Failed to load appointments'}
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-3 h-8 px-3 text-sm"
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/appointments'] })}
+                  >
+                    Try Again
+                  </Button>
+                </div>
               ) : (
-                <div className="text-center py-12 bg-gray-50 rounded-lg">
-                  <div className="w-12 h-12 bg-medical-blue-100 rounded-full flex items-center justify-center text-medical-blue-600 mx-auto mb-4">
-                    <Calendar className="w-6 h-6" />
-                  </div>
-                  <p className="text-gray-500 font-medium text-lg mb-2">
-                    No appointments found for the selected date.
-                  </p>
-                  <p className="text-gray-400">
-                    {searchQuery
-                      ? 'Try adjusting your search criteria or filters.'
-                      : 'There are no appointments scheduled for this date. You can book a new appointment using the button above.'}
-                  </p>
+                <div className="space-y-3 pb-3">
+                  {filteredAppointments.length > 0 ? (
+                    filteredAppointments.map(renderAppointmentCard)
+                  ) : (
+                    <div className="text-center py-8 bg-gray-50 rounded-lg">
+                      <div className="w-10 h-10 bg-medical-blue-100 rounded-full flex items-center justify-center text-medical-blue-600 mx-auto mb-3">
+                        <Calendar className="w-5 h-5" />
+                      </div>
+                      <p className="text-gray-500 font-medium text-sm mb-1">
+                        No appointments found for the selected date.
+                      </p>
+                      <p className="text-gray-400 text-xs">
+                        {searchQuery
+                          ? 'Try adjusting your search criteria or filters.'
+                          : 'There are no appointments scheduled for this date. You can book a new appointment using the button above.'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
             {/* Reschedule Modal */}
             <Dialog open={showRescheduleModal} onOpenChange={setShowRescheduleModal}>
@@ -811,18 +1064,32 @@ export default function ReceptionistAppointmentsPage() {
                 <Select 
                   value={newAppointment.patientId} 
                   onValueChange={(value) => setNewAppointment({...newAppointment, patientId: value})}
+                  disabled={patientsLoading}
                 >
                   <SelectTrigger className="mt-1">
-                    <SelectValue placeholder="Select patient" />
+                    <SelectValue placeholder={patientsLoading ? "Loading patients..." : "Select patient"} />
                   </SelectTrigger>
                   <SelectContent>
-                          {Array.isArray(patientsData) && patientsData.map((patient: Patient) => (
-                      <SelectItem key={patient._id} value={patient._id}>
-                        {patient.firstName} {patient.lastName} - {patient.phone}
-                      </SelectItem>
-                    ))}
+                    {patientsLoading ? (
+                      <div className="p-2 text-sm text-gray-500">Loading patients...</div>
+                    ) : patientsError ? (
+                      <div className="p-2 text-sm text-red-500">Error loading patients</div>
+                    ) : Array.isArray(patientsData) && patientsData.length > 0 ? (
+                      patientsData.map((patient: Patient) => (
+                        <SelectItem key={patient._id} value={patient._id}>
+                          {patient.firstName} {patient.lastName} - {patient.phone}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-500">No patients found</div>
+                    )}
                   </SelectContent>
                 </Select>
+                {patientsError && (
+                  <p className="text-sm text-red-600 mt-1">
+                    Failed to load patients. Please try again.
+                  </p>
+                )}
               </div>
               
               <div>
@@ -903,8 +1170,5 @@ export default function ReceptionistAppointmentsPage() {
         </DialogContent>
       </Dialog>
           </div>
-        </Layout>
-      )}
-    </ProtectedRoute>
   );
 }

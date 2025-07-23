@@ -6,7 +6,7 @@ import { useNavigate } from "@tanstack/react-router";
 
 interface ProtectedRouteProps {
   children: (user: User) => ReactNode;
-  requiredRole?: 'doctor' | 'receptionist';
+  requiredRole?: 'doctor' | 'receptionist' | 'admin' | 'master_admin' | 'sub_admin';
 }
 
 export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
@@ -40,11 +40,32 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
   }
 
   if (error || !data?.user) {
-    authService.logout();
-    useEffect(() => {
-      navigate({ to: '/login', replace: true });
-    }, [navigate]);
-    return null;
+    console.log('ProtectedRoute: Error or no user data, logging out', { error, hasData: !!data, hasUser: !!data?.user });
+    
+    // Only logout if it's a clear authentication error, not a network error
+    if (error && error.message && (
+      error.message.includes('401') || 
+      error.message.includes('403') || 
+      error.message.includes('No auth token') ||
+      error.message.includes('Failed to get current user')
+    )) {
+      authService.logout();
+      useEffect(() => {
+        navigate({ to: '/login', replace: true });
+      }, [navigate]);
+      return null;
+    }
+    
+    // For other errors, just show loading state and retry
+    console.log('ProtectedRoute: Non-auth error, not logging out');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <LoadingEye size={32} className="mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   const user = data.user;

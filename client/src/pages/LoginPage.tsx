@@ -1,25 +1,59 @@
-import { useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { authService } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { Heart } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Heart } from 'lucide-react';
+import { authService } from '@/lib/auth';
+import { useToast } from '@/hooks/use-toast';
 import LoadingEye from '@/components/ui/LoadingEye';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<string>("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
+  // Debug: Check current auth state
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const user = localStorage.getItem('user');
+    console.log('LoginPage: Current auth state:', { 
+      hasToken: !!token, 
+      hasUser: !!user,
+      tokenLength: token?.length,
+      userData: user ? JSON.parse(user) : null
+    });
+  }, []);
+
+  const navigateByRole = (userRole: string) => {
+    switch (userRole) {
+      case 'master_admin':
+        navigate({ to: '/master-admin', replace: true });
+        break;
+      case 'admin':
+        navigate({ to: '/admin', replace: true });
+        break;
+      case 'sub_admin':
+        navigate({ to: '/sub-admin', replace: true });
+        break;
+      case 'doctor':
+        navigate({ to: '/doctor/dashboard', replace: true });
+        break;
+      case 'receptionist':
+        navigate({ to: '/receptionist/dashboard', replace: true });
+        break;
+      default:
+        navigate({ to: '/login', replace: true });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       toast({
         title: "Missing Fields",
@@ -32,7 +66,7 @@ export default function LoginPage() {
     if (!role) {
       toast({
         title: "Role Required",
-        description: "Please select your role (Doctor or Receptionist) to continue.",
+        description: "Please select your role to continue.",
         variant: "destructive",
       });
       return;
@@ -52,11 +86,7 @@ export default function LoginPage() {
 
       // Small delay to ensure token is stored before navigation
       setTimeout(() => {
-        if (response.user.role === 'doctor') {
-          navigate({ to: '/doctor/dashboard', replace: true });
-        } else if (response.user.role === 'receptionist') {
-          navigate({ to: '/receptionist/dashboard', replace: true });
-        }
+        navigateByRole(response.user.role);
       }, 100);
     } catch (error) {
       let errorMsg = error instanceof Error ? error.message : "Invalid email or password. Please check your credentials and try again.";
@@ -74,15 +104,24 @@ export default function LoginPage() {
     }
   };
 
-  const handleDemoLogin = async (userType: 'doctor' | 'receptionist') => {
-    setEmail(userType === 'doctor' ? "doctor@hospital.com" : "receptionist@hospital.com");
-    setPassword(userType === 'doctor' ? "doctor123" : "receptionist123");
+  const handleDemoLogin = async (userType: 'master_admin' | 'admin' | 'sub_admin' | 'doctor' | 'receptionist') => {
+    const credentials = {
+      master_admin: { email: "master@hospital.com", password: "masteradmin123" },
+      admin: { email: "admin@hospital.com", password: "admin123" },
+      sub_admin: { email: "subadmin@hospital.com", password: "subadmin123" },
+      doctor: { email: "doctor@hospital.com", password: "doctor123" },
+      receptionist: { email: "receptionist@hospital.com", password: "receptionist123" }
+    };
+    
+    const creds = credentials[userType];
+    setEmail(creds.email);
+    setPassword(creds.password);
     setRole(userType);
     
     // Submit the form after setting the values
     const demoCredentials = {
-      email: userType === 'doctor' ? "doctor@hospital.com" : "receptionist@hospital.com",
-      password: userType === 'doctor' ? "doctor123" : "receptionist123",
+      email: creds.email,
+      password: creds.password,
       role: userType,
     };
     
@@ -103,11 +142,7 @@ export default function LoginPage() {
 
       // Small delay to ensure token is stored before navigation
       setTimeout(() => {
-        if (response.user.role === 'doctor') {
-          navigate({ to: '/doctor/dashboard', replace: true });
-        } else if (response.user.role === 'receptionist') {
-          navigate({ to: '/receptionist/dashboard', replace: true });
-        }
+        navigateByRole(response.user.role);
       }, 100);
     } catch (error) {
       console.error('Demo login error:', error);
@@ -119,6 +154,78 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleDebugAuth = async () => {
+    try {
+      console.log('Debug: Testing auth state...');
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      
+      console.log('Debug: Local storage:', { token: !!token, user: !!user });
+      
+      if (token && user) {
+        console.log('Debug: Testing getCurrentUser...');
+        const currentUser = await authService.getCurrentUser();
+        console.log('Debug: getCurrentUser result:', currentUser);
+        
+        toast({
+          title: "Debug: Auth Test",
+          description: "Authentication is working! Check console for details.",
+          variant: "default",
+        });
+      } else {
+        console.log('Debug: No token or user in localStorage');
+        toast({
+          title: "Debug: Auth Test",
+          description: "No authentication data found in localStorage.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Debug: Auth test failed:', error);
+      toast({
+        title: "Debug: Auth Test Failed",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleClearStorage = () => {
+    localStorage.clear();
+    console.log('Debug: Local storage cleared');
+    toast({
+      title: "Debug: Storage Cleared",
+      description: "Local storage has been cleared. Please login again.",
+      variant: "default",
+    });
+  };
+
+  const handleTestTokenStorage = () => {
+    const testToken = 'test-token-123';
+    const testUser = { id: '1', email: 'test@test.com', role: 'receptionist' };
+    
+    console.log('Debug: Testing token storage...');
+    localStorage.setItem('token', testToken);
+    localStorage.setItem('user', JSON.stringify(testUser));
+    
+    const retrievedToken = localStorage.getItem('token');
+    const retrievedUser = localStorage.getItem('user');
+    
+    console.log('Debug: Token storage test results:', {
+      storedToken: testToken,
+      retrievedToken,
+      tokensMatch: testToken === retrievedToken,
+      storedUser: testUser,
+      retrievedUser: retrievedUser ? JSON.parse(retrievedUser) : null
+    });
+    
+    toast({
+      title: "Debug: Token Storage Test",
+      description: `Token storage test completed. Check console for results.`,
+      variant: "default",
+    });
   };
 
   return (
@@ -175,6 +282,9 @@ export default function LoginPage() {
                   <SelectValue placeholder="Select your role" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="master_admin">Master Admin</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="sub_admin">Sub Admin</SelectItem>
                   <SelectItem value="doctor">Doctor</SelectItem>
                   <SelectItem value="receptionist">Receptionist</SelectItem>
                 </SelectContent>
@@ -193,7 +303,36 @@ export default function LoginPage() {
           {/* Demo Login Section */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-center text-sm text-gray-500 mb-4">Quick Demo Access</p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="bg-red-50 text-red-700 border-red-200 hover:bg-red-100"
+                onClick={() => handleDemoLogin('master_admin')}
+                disabled={isLoading}
+              >
+                Master Admin
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                onClick={() => handleDemoLogin('admin')}
+                disabled={isLoading}
+              >
+                Admin
+              </Button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                onClick={() => handleDemoLogin('sub_admin')}
+                disabled={isLoading}
+              >
+                Sub Admin
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -201,7 +340,7 @@ export default function LoginPage() {
                 onClick={() => handleDemoLogin('doctor')}
                 disabled={isLoading}
               >
-                Doctor Demo
+                Doctor
               </Button>
               <Button
                 type="button"
@@ -210,7 +349,38 @@ export default function LoginPage() {
                 onClick={() => handleDemoLogin('receptionist')}
                 disabled={isLoading}
               >
-                Receptionist Demo
+                Receptionist
+              </Button>
+            </div>
+            
+            {/* Debug Button */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full text-gray-600 border-gray-300 hover:bg-gray-50"
+                onClick={handleDebugAuth}
+                disabled={isLoading}
+              >
+                Debug Auth State
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full text-red-600 border-red-300 hover:bg-red-50 mt-2"
+                onClick={handleClearStorage}
+                disabled={isLoading}
+              >
+                Clear Local Storage
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full text-blue-600 border-blue-300 hover:bg-blue-50 mt-2"
+                onClick={handleTestTokenStorage}
+                disabled={isLoading}
+              >
+                Test Token Storage
               </Button>
             </div>
           </div>

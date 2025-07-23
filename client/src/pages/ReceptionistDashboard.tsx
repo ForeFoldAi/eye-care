@@ -31,12 +31,14 @@ import {
   CalendarCheck,
   Loader2,
   Download,
+  AlertCircle,
 } from "lucide-react";
 import { useMutation, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { type User as AuthUser } from "@/lib/auth";
 import { authService } from '@/lib/auth';
 import LoadingEye from '@/components/ui/LoadingEye';
+import SupportTicketModal from '@/components/SupportTicketModal';
 
 interface DashboardStats {
   todayAppointments: number;
@@ -94,6 +96,7 @@ export default function ReceptionistDashboard() {
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [lastPayment, setLastPayment] = useState<Payment | null>(null);
@@ -106,6 +109,17 @@ export default function ReceptionistDashboard() {
 
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/dashboard/stats`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard stats');
+      }
+      return response.json();
+    },
   });
   const API_URL = import.meta.env.VITE_API_URL;
   const user = authService.getStoredUser();
@@ -500,7 +514,6 @@ export default function ReceptionistDashboard() {
   return (
     <ProtectedRoute requiredRole="receptionist">
       {(currentUser: AuthUser) => (
-        <Layout user={currentUser}>
           <div className="space-y-8 p-8">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -524,6 +537,18 @@ export default function ReceptionistDashboard() {
                   </div>
                 </Card>
               ))}
+            </div>
+
+            {/* Support Button */}
+            <div className="flex justify-end">
+              <Button 
+                variant="outline"
+                onClick={() => setIsSupportModalOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <AlertCircle className="w-4 h-4" />
+                Support
+              </Button>
             </div>
 
             {/* Quick Actions */}
@@ -885,8 +910,13 @@ export default function ReceptionistDashboard() {
               payment={lastPayment}
               patient={lastPayment && patients ? patients.find(p => p.id === lastPayment.patientId) : undefined}
             />
+            
+            {/* Support Ticket Modal */}
+            <SupportTicketModal 
+              isOpen={isSupportModalOpen} 
+              onClose={() => setIsSupportModalOpen(false)} 
+            />
           </div>
-        </Layout>
       )}
     </ProtectedRoute>
   );

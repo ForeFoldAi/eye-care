@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Bell } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { ChatWidget } from "@/components/chat/ChatWidget";
 
 interface HeaderProps {
   title: string;
@@ -22,12 +24,8 @@ export function Header({ title, action }: HeaderProps) {
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-500">{today}</span>
             {action}
-            <div className="relative">
-              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-gray-600">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full"></span>
-              </Button>
-            </div>
+            <NotificationBell />
+            <ChatWidget />
           </div>
         </div>
       </div>
