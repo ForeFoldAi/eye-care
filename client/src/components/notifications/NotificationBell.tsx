@@ -81,6 +81,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ className })
 
   return (
     <div className={`relative ${className}`}>
+      <NotificationCenter 
+        isOpen={isOpen && false} // Temporarily disable full notification center
+        onClose={() => setIsOpen(false)}
+      />
       {/* Notification Bell Button */}
       <Button
         variant="ghost"

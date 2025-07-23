@@ -306,25 +306,31 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
 
   // Listen for real-time notifications from WebSocket
   useEffect(() => {
-    const handleNewNotification = (event: CustomEvent) => {
-      const notification = event.detail as Notification;
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
-      
-      // Show toast for new notification
-      toast({
-        title: notification.title,
-        description: notification.message
-      });
-    };
+    if (!user) return;
 
-    // Listen for WebSocket events
-    window.addEventListener('new_notification', handleNewNotification as EventListener);
-
-    return () => {
-      window.removeEventListener('new_notification', handleNewNotification as EventListener);
-    };
-  }, [queryClient, toast]);
+    // Import socket for notifications
+    import('../hooks/useNotificationSocket').then(({ notificationSocket }) => {
+      if (notificationSocket) {
+        notificationSocket.on('new_notification', (data: { notification: Notification; unreadCount: number }) => {
+          // Update query cache
+          queryClient.setQueryData(['notifications'], (old: Notification[] | undefined) => {
+            if (!old) return [data.notification];
+            return [data.notification, ...old];
+          });
+          
+          queryClient.setQueryData(['notifications-unread-count'], data.unreadCount);
+          
+          // Show toast
+          toast({
+            title: `🔔 ${data.notification.title}`,
+            description: data.notification.message,
+            duration: 5000,
+            variant: data.notification.priority === 'urgent' ? 'destructive' : 'default'
+          });
+        });
+      }
+    });
+  }, [user, queryClient, toast]);
 
   const value: NotificationContextType = {
     notifications,

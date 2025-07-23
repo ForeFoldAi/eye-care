@@ -33,6 +33,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { authService, type User as AuthUser } from '@/lib/auth';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { ChatWidget } from '@/components/chat/ChatWidget';
 
 interface SubAdminLayoutProps {
   children?: React.ReactNode;
@@ -241,6 +243,12 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
         <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
+        
+        {/* Chat and Notification Components */}
+        <div className="fixed bottom-4 right-4 z-50 flex items-center space-x-2">
+          <NotificationBell />
+          <ChatWidget />
+        </div>
       </div>
     </div>
   );

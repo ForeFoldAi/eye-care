@@ -213,6 +213,24 @@ export class WebSocketServer {
 
         this.io.to(`room:${data.roomId}`).emit('new_message', messageData);
 
+        // Create notifications for other participants using the notification service
+        const otherParticipants = room.participants.filter((p: any) => p.toString() !== user.userId);
+        for (const participantId of otherParticipants) {
+          try {
+            // Use the notification service to create and broadcast chat notifications
+            const { NotificationService } = require('./services/notificationService');
+            await NotificationService.createChatNotification(
+              user.userId,
+              participantId.toString(),
+              data.content,
+              user.hospitalId,
+              user.branchId
+            );
+          } catch (error) {
+            console.error('Error creating chat notification:', error);
+          }
+        }
+
         // Send delivery receipts to participants
         const participants = room.participants.filter((p: any) => p.toString() !== user.userId);
         participants.forEach((participantId: any) => {

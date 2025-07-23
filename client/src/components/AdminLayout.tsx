@@ -38,6 +38,8 @@ import { Badge } from '@/components/ui/badge';
 import { authService, type User as AuthUser } from '@/lib/auth';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useQuery } from '@tanstack/react-query';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { ChatWidget } from '@/components/chat/ChatWidget';
 
 interface AdminLayoutProps {
   children?: React.ReactNode;
@@ -260,10 +262,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
 
             <div className="flex items-center space-x-4">
               {/* Notifications */}
-              <Button variant="ghost" size="sm" className="relative">
-                <Bell className="h-5 w-5 text-gray-400" />
-                <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
-              </Button>
+              <NotificationBell />
 
               {/* Admin Profile Dropdown */}
               <DropdownMenu>
@@ -328,6 +327,11 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
+        
+        {/* Chat and Notification Components */}
+        <div className="fixed bottom-4 right-4 z-50 flex items-center space-x-2">
+          <ChatWidget />
+        </div>
       </div>
 
       {/* Mobile Sidebar Overlay */}

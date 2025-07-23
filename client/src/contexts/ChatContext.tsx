@@ -355,11 +355,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setMessages(prev => [...prev, message]);
       queryClient.invalidateQueries({ queryKey: ['chat-rooms'] });
       
-      // Show notification if not in the current room
-      if (currentRoom?.roomId !== message.roomId) {
+      // Show notification if not in the current room or if user is not focused on chat
+      if (currentRoom?.roomId !== message.roomId || document.hidden) {
         toast({
-          title: `New message from ${message.sender.firstName} ${message.sender.lastName}`,
-          description: message.content,
+          title: `💬 ${message.sender.firstName} ${message.sender.lastName}`,
+          description: message.content.length > 50 ? `${message.content.substring(0, 50)}...` : message.content,
+          duration: 5000
         });
       }
     });
