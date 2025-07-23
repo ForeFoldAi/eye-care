@@ -3,12 +3,10 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+
 import { 
   Bell, 
-  Check, 
   Trash2, 
-  MoreHorizontal,
   Settings
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -81,10 +79,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ className })
 
   return (
     <div className={`relative ${className}`}>
-      <NotificationCenter 
-        isOpen={isOpen && false} // Temporarily disable full notification center
-        onClose={() => setIsOpen(false)}
-      />
+
       {/* Notification Bell Button */}
       <Button
         variant="ghost"

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bell, Settings, Trash2, Check, CheckCheck, Filter, Search, X } from 'lucide-react';
+import { Bell, Trash2, Check, CheckCheck, Filter, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +30,9 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, 
   const filteredNotifications = notifications.filter(notification => {
     const matchesFilter = filter === 'all' || 
       (filter === 'unread' && !notification.isRead) ||
-      (filter !== 'all' && filter !== 'unread' && notification.category === filter);
+      (filter === 'chat' && notification.category === 'chat') ||
+      (filter === 'appointment' && notification.category === 'appointment') ||
+      (filter === 'system' && notification.category === 'system');
     
     const matchesSearch = !searchTerm || 
       notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||

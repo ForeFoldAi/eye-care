@@ -43,20 +43,21 @@ export class NotificationService {
       await notification.save();
       await notification.populate('sender', 'firstName lastName role');
 
-      // Get socket service instance
-      const socketService = SocketService.getInstance();
+      // Get WebSocket instance for broadcasting
+      const WebSocketServer = require('../websocket').WebSocketServer;
+      const socketInstance = WebSocketServer.getInstance();
       
-      // Broadcast to recipients
-      if (data.recipients && data.recipients.length > 0) {
+      // Broadcast to recipients if socket instance exists
+      if (data.recipients && data.recipients.length > 0 && socketInstance) {
         for (const recipientId of data.recipients) {
-          const recipientSocketId = socketService.userSockets.get(recipientId);
-          if (recipientSocketId) {
+          const recipientSocketId = socketInstance.userSockets?.get(recipientId);
+          if (recipientSocketId && socketInstance.io) {
             const unreadCount = await Notification.countDocuments({
               recipients: recipientId,
               'readBy.user': { $ne: recipientId }
             });
 
-            socketService.io.to(recipientSocketId).emit('new_notification', {
+            socketInstance.io.to(recipientSocketId).emit('new_notification', {
               notification: notification.toObject(),
               unreadCount
             });
@@ -73,7 +74,7 @@ export class NotificationService {
   static async createChatNotification(senderId: string, recipientId: string, messageContent: string, hospitalId: string, branchId?: string): Promise<void> {
     // Get sender details
     const User = require('../models').User;
-    const sender = await User.findById(senderId).select('firstName lastName role');
+    const sender: any = await User.findById(senderId).select('firstName lastName role');
     
     if (!sender) return;
 
