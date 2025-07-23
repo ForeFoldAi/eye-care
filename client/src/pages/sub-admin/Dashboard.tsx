@@ -3,26 +3,17 @@ import { useNavigate } from '@tanstack/react-router';
 import { 
   Building2, 
   Users, 
-  MapPin, 
   TrendingUp, 
-  Settings, 
-  Plus,
   Activity,
   BarChart3,
   Calendar,
-  DollarSign,
   UserPlus,
   Stethoscope,
-  ClipboardList,
-  Heart,
   Clock,
   Star,
-  ArrowUpRight,
   AlertTriangle,
   CheckCircle,
-  AlertCircle,
-  Phone,
-  Mail
+  AlertCircle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -60,19 +51,12 @@ interface StaffMember {
   avatar?: string;
 }
 
-interface RecentActivity {
+interface Activity {
   id: string;
   type: 'appointment' | 'patient' | 'staff' | 'emergency';
   message: string;
   timestamp: string;
   status?: 'success' | 'warning' | 'error';
-}
-
-interface Activity {
-  type: string;
-  status: string;  // or more specific type like 'success' | 'warning' | 'error'
-  message: string;
-  timestamp: string;
 }
 const API_URL = import.meta.env.VITE_API_URL; // Use environment variable directly
 const SubAdminDashboard: React.FC = () => {
