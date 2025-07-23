@@ -3,7 +3,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-export default defineConfig({
+export default defineConfig(async ({ command }) => ({
   plugins: [
     react(),
     runtimeErrorOverlay(),
@@ -27,9 +27,11 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    host: '0.0.0.0',
+    host: true,
     port: 3000,
-    allowedHosts: ['all'],
+    fs: {
+      allow: ['..']
+    },
     proxy: {
       '/health': {
         target: 'http://localhost:5000',
@@ -80,8 +82,15 @@ export default defineConfig({
     },
     strictPort: false,
     cors: true,
+    hmr: {
+      host: '0.0.0.0',
+      clientPort: 443
+    },
     watch: {
       usePolling: true,
     },
   },
-});
+  define: {
+    global: 'globalThis',
+  },
+}));
