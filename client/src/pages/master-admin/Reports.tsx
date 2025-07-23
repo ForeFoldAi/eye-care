@@ -341,7 +341,7 @@ const ReportsPage: React.FC = () => {
 
     return hospitals.map((hospital: Hospital) => {
       const hospitalInvoices = invoices.filter((inv: Invoice) => 
-        inv.hospitalId._id === hospital._id
+        inv.hospitalId?._id === hospital._id
       );
 
       const totalPaid = hospitalInvoices

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EnhancedTable } from '@/components/ui/enhanced-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { 
-  DollarSign, 
+   
   CreditCard, 
   FileText, 
   Download, 
@@ -524,8 +524,8 @@ const BillingPage: React.FC = () => {
       header: "Hospital",
       cell: ({ row }) => (
         <div>
-          <p className="font-medium">{row.original.hospitalId.name}</p>
-          <p className="text-sm text-gray-500">{row.original.hospitalId.email}</p>
+          <p className="font-medium">{row.original.hospitalId?.name || 'N/A'}</p>
+          <p className="text-sm text-gray-500">{row.original.hospitalId?.email || 'N/A'}</p>
         </div>
       ),
     },
@@ -534,8 +534,8 @@ const BillingPage: React.FC = () => {
       header: "Plan",
       cell: ({ row }) => (
         <div>
-          <p className="font-medium">{row.original.subscriptionId.planName}</p>
-          <p className="text-sm text-gray-500">{row.original.subscriptionId.planType}</p>
+          <p className="font-medium">{row.original.subscriptionId?.planName || 'N/A'}</p>
+          <p className="text-sm text-gray-500">{row.original.subscriptionId?.planType || 'N/A'}</p>
         </div>
       ),
     },
