@@ -1,0 +1,70 @@
+Project Overview
+Project Name: Hospital Management System (Multi-Tenant, Full-Stack)
+1. Purpose
+This project is a comprehensive hospital management platform designed for multi-tenant use (multiple hospitals/branches on a single system). It streamlines hospital operations, including patient management, staff/department management, billing, analytics, and more, with a focus on security, scalability, and real-time data.
+2. Tech Stack
+Frontend: React (with TypeScript), React Query, Chart.js, Tailwind CSS
+Backend: Node.js, Express, TypeScript
+Database: MongoDB (with Mongoose ODM)
+Authentication: JWT-based, with role-based access control
+Other: WebSockets for real-time features, RESTful API design, file upload/download support
+3. Key Features
+Multi-Tenancy
+Each hospital and its branches are isolated in data and access.
+Admins, sub-admins, doctors, and receptionists have role-based access.
+Core Modules
+Authentication & Authorization: Secure login, JWT tokens, role checks.
+Patient Management: Register, view, and manage patients per branch.
+Staff & Department Management: Add/edit staff, assign to departments, manage department data.
+Billing & Invoicing: Generate, view, and export invoices; handle payments and outstanding balances.
+Analytics & Reporting: Real-time dashboards for financials, operational stats, and department performance.
+System Configuration: Manage hospital/branch settings, subscription plans, and more.
+Notifications: In-app notifications for key events.
+Support & Tickets: Raise and track support tickets.
+File Handling: Upload/download hospital logos, export reports as CSV.
+UI/UX
+Responsive layouts with sidebar navigation.
+Data tables with filtering, sorting, and export options.
+Chart visualizations for analytics.
+Null-safe accessors and error handling for robust user experience.
+4. Code Structure
+Frontend (client/)
+src/pages/: Main pages for each role (admin, sub-admin, master-admin, doctor, receptionist).
+src/components/: Shared UI components (modals, tables, layouts, notifications).
+src/contexts/: React Contexts for global state (e.g., chat, notifications).
+src/hooks/: Custom React hooks.
+src/lib/: Utility functions (auth, constants, query client).
+src/shared/: Shared TypeScript types and schemas.
+Backend (server/)
+routes/: Express route files for each resource (auth, analytics, billing, branches, etc.).
+models/: Mongoose models for MongoDB collections.
+middleware/: Auth and tenant middleware for security and data isolation.
+db/: Database connection and seed scripts.
+utils/: Utility functions (e.g., audit logging, receipt generation).
+config/: Database and environment configuration.
+5. Security & Data Integrity
+All sensitive routes are protected by JWT authentication and role-based middleware.
+Data is always filtered by hospital and branch to ensure isolation.
+All user input is validated and sanitized.
+Null checks and TypeScript typings prevent runtime errors.
+6. Recent Fixes & Enhancements
+Removed all mock data; all data is now fetched from MongoDB.
+Added missing backend endpoints for branch activities and staff.
+Fixed 404/500 errors on analytics and branch routes.
+Improved UI/UX: default table views, rupee symbols, removed irrelevant metrics (e.g., bed occupancy).
+Null-safe accessors in tables and reports to prevent runtime errors.
+Dynamic hospital logo fetching and display.
+All buttons, icons, and forms are now wired to real data and functionality.
+7. How to Run
+Install dependencies in both client/ and server/ folders.
+Set up environment variables (MongoDB URI, JWT secret, etc.).
+Start the backend (cd server && npm run dev).
+Start the frontend (cd client && npm run dev).
+Access the app at http://localhost:5173 (or as configured).
+8. Who Should Use This?
+Hospital administrators, branch managers, doctors, and receptionists.
+SaaS providers looking to offer hospital management as a service.
+Developers seeking a robust, scalable, and secure full-stack template for healthcare.
+In summary:
+This project is a full-featured, production-ready hospital management system with a modern tech stack, strong security, and a focus on real-world operational needs. All data is real (no mock data), and the system is designed for multi-tenant, multi-role use.
+If you need a README or onboarding guide for Replit, let me know!
