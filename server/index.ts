@@ -29,15 +29,16 @@ const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 // Initialize WebSocket server
 const wsServer = new WebSocketServer(httpServer);
 
-// ✅ CORS middleware
+// ✅ CORS middleware - Allow local development
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`Origin not allowed by CORS: ${origin}`));
-    }
-  },
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+    frontendUrl,
+    ...allowedOrigins
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],

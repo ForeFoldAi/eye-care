@@ -19,9 +19,17 @@ export class WebSocketServer {
   constructor(server: HTTPServer) {
     this.io = new SocketIOServer(server, {
       cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:5173",
-        methods: ["GET", "POST"]
-      }
+        origin: [
+          "http://localhost:3000",
+          "http://localhost:5173", 
+          "http://127.0.0.1:3000",
+          "http://127.0.0.1:5173",
+          process.env.FRONTEND_URL || "http://localhost:5173"
+        ],
+        methods: ["GET", "POST"],
+        credentials: true
+      },
+      transports: ['websocket', 'polling']
     });
 
     this.setupMiddleware();

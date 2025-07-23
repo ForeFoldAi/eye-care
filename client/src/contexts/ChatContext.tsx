@@ -133,7 +133,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   // API functions
   const fetchRooms = async () => {
-    const response = await fetch('/api/chat/rooms', {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const response = await fetch(`${API_URL}/api/chat/rooms`, {
       headers: {
         'Authorization': `Bearer ${authService.getToken()}`
       }
@@ -143,7 +144,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   };
 
   const fetchMessages = async (roomId: string, page = 1) => {
-    const response = await fetch(`/api/chat/rooms/${roomId}/messages?page=${page}&limit=50`, {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const response = await fetch(`${API_URL}/api/chat/rooms/${roomId}/messages?page=${page}&limit=50`, {
       headers: {
         'Authorization': `Bearer ${authService.getToken()}`
       }
@@ -153,7 +155,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   };
 
   const fetchMessageableUsers = async () => {
-    const response = await fetch('/api/chat/messageable-users', {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const response = await fetch(`${API_URL}/api/chat/messageable-users`, {
       headers: {
         'Authorization': `Bearer ${authService.getToken()}`
       }
@@ -163,7 +166,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   };
 
   const createDirectRoom = async (participantId: string) => {
-    const response = await fetch('/api/chat/rooms/direct', {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const response = await fetch(`${API_URL}/api/chat/rooms/direct`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -177,7 +181,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   const sendMessageAPI = async (roomId: string, content: string, messageType = 'text', replyTo?: string) => {
     try {
-      const response = await fetch(`/api/chat/rooms/${roomId}/messages`, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${API_URL}/api/chat/rooms/${roomId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -211,7 +216,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   };
 
   const markAsReadAPI = async (roomId: string) => {
-    await fetch(`/api/chat/rooms/${roomId}/read`, {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    await fetch(`${API_URL}/api/chat/rooms/${roomId}/read`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${authService.getToken()}`
@@ -220,7 +226,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   };
 
   const updateStatusAPI = async (status: string) => {
-    await fetch('/api/chat/status', {
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    await fetch(`${API_URL}/api/chat/status`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -292,10 +299,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const connect = () => {
     if (!user || socket || isConnected) return;
 
-    // In development, connect to the same origin to use Vite's proxy
-    const wsUrl = import.meta.env.DEV 
-      ? window.location.origin 
-      : (import.meta.env.VITE_API_URL || 'http://localhost:3000');
+    // Connect to the server directly for WebSocket
+    const wsUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
     const newSocket = io(wsUrl, {
       auth: {
@@ -304,7 +309,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      timeout: 20000
+      timeout: 20000,
+      transports: ['websocket', 'polling']
     });
 
     newSocket.on('connect', () => {

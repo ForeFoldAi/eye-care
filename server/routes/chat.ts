@@ -622,4 +622,38 @@ router.get('/online-users', authenticateToken, async (req: AuthRequest, res) => 
   }
 });
 
+// Get messageable users
+router.get('/messageable-users', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
+    const hospitalId = req.user?.hospitalId;
+
+    if (!userId || !userRole) {
+      return res.status(400).json({ message: 'User context required' });
+    }
+
+    const User = require('../models').User;
+    const query = getMessageableUsers(userRole, hospitalId);
+    
+    // Exclude current user
+    query._id = { $ne: new mongoose.Types.ObjectId(userId) };
+
+    const users = await User.find(query)
+      .select('firstName lastName role email')
+      .sort({ firstName: 1, lastName: 1 });
+
+    res.json({
+      success: true,
+      users
+    });
+  } catch (error) {
+    console.error('Error fetching messageable users:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error fetching users' 
+    });
+  }
+});
+
 export default router; 

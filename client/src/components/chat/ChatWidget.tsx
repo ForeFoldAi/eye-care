@@ -3,14 +3,12 @@ import { useChat } from '@/contexts/ChatContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   MessageCircle, 
   X, 
   Send, 
   Users, 
-  Plus,
   MoreVertical,
   Search,
   Phone,
@@ -31,7 +29,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ className }) => {
   const [searchQuery, setSearchQuery] = useState('');
   
   const {
-    socket,
     isConnected,
     currentRoom,
     messages,
@@ -42,17 +39,21 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ className }) => {
     leaveRoom,
     sendMessage,
     startTyping,
-    stopTyping
+    stopTyping,
+    connect
   } = useChat();
 
   const user = authService.getStoredUser();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-connect and scroll to bottom when new messages arrive
   useEffect(() => {
+    if (!isConnected && user) {
+      connect();
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages, isConnected, user, connect]);
 
   // Handle typing indicators
   useEffect(() => {
@@ -126,7 +127,8 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ className }) => {
     } else {
       // Create new direct room
       try {
-        const response = await fetch('/api/chat/rooms/direct', {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${API_URL}/api/chat/rooms/direct`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -162,12 +164,6 @@ export const ChatWidget: React.FC<ChatWidgetProps> = ({ className }) => {
 
   const filteredUsers = (messageableUsers || []).filter(user => 
     `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredRooms = (rooms || []).filter(room => 
-    room.type === 'direct' 
-      ? getOtherParticipant()?.firstName.toLowerCase().includes(searchQuery.toLowerCase())
-      : room.name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (!user) return null;
