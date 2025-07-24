@@ -107,16 +107,27 @@ export const authService = {
     try {
       await waitForServer();
       
+      const requestData = {
+        email,
+        password,
+        role,
+      };
+      
+      console.log('Login request data:', {
+        email: requestData.email,
+        passwordLength: requestData.password?.length,
+        role: requestData.role,
+        emailValid: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(requestData.email || ''),
+        roleValid: ['master_admin', 'admin', 'sub_admin', 'doctor', 'receptionist'].includes(requestData.role),
+        passwordValid: (requestData.password?.length || 0) >= 6
+      });
+      
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-      email,
-      password,
-      role,
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
