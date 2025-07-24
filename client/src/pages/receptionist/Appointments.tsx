@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { ChatWidget } from '@/components/chat/ChatWidget';
 import { 
   Search,
   Calendar,
@@ -133,7 +134,8 @@ export default function ReceptionistAppointmentsPage() {
         }
 
         const data = await response.json();
-        return data;
+        // Handle the new API response format
+        return data.data || data || [];
         
       } catch (error) {
         console.error('Error fetching appointments:', error);
@@ -446,11 +448,14 @@ export default function ReceptionistAppointmentsPage() {
             </div>
             <div>
               <div className="font-medium text-xs">{patient.firstName} {patient.lastName}</div>
-              <div className="text-xs text-gray-500">{patient.phone}</div>
-            </div>
-          </div>
-        );
-      },
+              <div className="text-xs text-gray-500">{patient.phone}        </div>
+      </div>
+      
+      {/* Chat Widget - Fixed Bottom Right */}
+      <ChatWidget />
+    </div>
+  );
+},
     },
     {
       accessorKey: 'doctorId',

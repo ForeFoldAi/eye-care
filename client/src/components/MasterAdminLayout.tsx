@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from '@tanstack/react-router';
 import { 
   Building2, 
@@ -77,8 +77,11 @@ const MasterAdminLayout: React.FC<MasterAdminLayoutProps> = ({ children }) => {
   const location = useLocation();
   const [currentUser, setCurrentUser] = React.useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [hospitalCount, setHospitalCount] = useState(0);
+  const [subscriptionCount, setSubscriptionCount] = useState(0);
+  const [supportCount, setSupportCount] = useState(0);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const getUser = async () => {
       try {
         const userData = await authService.getCurrentUser();
@@ -88,6 +91,31 @@ const MasterAdminLayout: React.FC<MasterAdminLayoutProps> = ({ children }) => {
       }
     };
     getUser();
+
+    // Helper to fetch count with auth
+    const fetchCount = async (url: string, setter: (n: number) => void) => {
+      try {
+        const token = authService.getToken?.() || localStorage.getItem('token');
+        const res = await fetch(url, {
+          headers: {
+            'Authorization': token ? `Bearer ${token}` : '',
+            'Content-Type': 'application/json',
+          },
+        });
+        const data = await res.json();
+        console.log('Count response for', url, data);
+        // Try to find count in data.count, data.data.count, or fallback
+        const count = data.count ?? data.data?.count ?? 0;
+        setter(typeof count === 'number' ? count : 0);
+      } catch (err) {
+        console.error('Error fetching count for', url, err);
+        setter(0);
+      }
+    };
+
+    fetchCount('/api/hospitals/count', setHospitalCount);
+    fetchCount('/api/subscriptions/count', setSubscriptionCount);
+    fetchCount('/api/support/count', setSupportCount);
   }, []);
 
   const navigation = [
@@ -102,21 +130,21 @@ const MasterAdminLayout: React.FC<MasterAdminLayoutProps> = ({ children }) => {
       href: '/master-admin/hospitals', 
       icon: Building2,
       description: 'Manage client hospitals',
-      badge: '12'
+      badge: hospitalCount > 0 ? String(hospitalCount) : undefined
     },
     { 
       name: 'Subscriptions', 
       href: '/master-admin/subscriptions', 
       icon: CreditCard,
       description: 'License and billing management',
-      badge: '8'
+      badge: subscriptionCount > 0 ? String(subscriptionCount) : undefined
     },
     { 
       name: 'Support', 
       href: '/master-admin/support', 
       icon: Ticket,
       description: 'Helpdesk and tickets',
-      badge: '3',
+      badge: supportCount > 0 ? String(supportCount) : undefined,
       badgeColor: 'bg-red-500'
     },
     { 

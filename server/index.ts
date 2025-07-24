@@ -20,7 +20,7 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 // ✅ Load environment variables
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
@@ -108,7 +108,7 @@ async function initializeServer() {
     // WebSocket server is already initialized
     console.log('WebSocket server initialized');
 
-    const serverPort = parseInt(process.env.PORT || '5000', 10);
+    const serverPort = parseInt(process.env.PORT || '3000', 10);
     return new Promise<void>((resolve) => {
       httpServer.listen(serverPort, '0.0.0.0', () => {
         console.log(`Server running at http://localhost:${serverPort}`);

@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { ChatWidget } from '@/components/chat/ChatWidget';
 
 type ViewMode = 'table' | 'grid';
 
@@ -1112,6 +1113,9 @@ export default function PatientsPage() {
               )}
             </DialogContent>
           </Dialog>
-        </div>
+        
+        {/* Chat Widget - Fixed Bottom Right */}
+        <ChatWidget />
+      </div>
   );
 } 

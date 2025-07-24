@@ -16,11 +16,8 @@ interface TimeSlot {
 
 const router = Router();
 
-// Apply tenant middleware to all routes
-router.use(enforceTenantIsolation);
-
 // Get all appointments (tenant-isolated)
-router.get('/', authenticateToken, async (req: TenantRequest, res) => {
+router.get('/', authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {
   const auditLogger = createAuditLogger(req);
   
   try {
@@ -110,7 +107,7 @@ router.get('/', authenticateToken, async (req: TenantRequest, res) => {
 });
 
 // Get appointment by ID
-router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
+router.get('/:id', authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {
   try {
     const appointment = await Appointment.findById(req.params.id)
       .populate('patientId', 'firstName lastName phone email')
@@ -127,7 +124,7 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Create new appointment
-router.post('/', authenticateToken, authorizeRole(['receptionist']), async (req: AuthRequest, res) => {
+router.post('/', authenticateToken, enforceTenantIsolation, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
@@ -256,7 +253,7 @@ router.patch('/:id/status', authenticateToken, async (req: AuthRequest, res) => 
 });
 
 // Update appointment (status, approved, followUpDate)
-router.patch('/:id', authenticateToken, async (req: AuthRequest, res) => {
+router.patch('/:id', authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {
   try {
     const { status, approved, followUpDate } = req.body;
     const updateFields: any = {};
@@ -283,7 +280,7 @@ router.patch('/:id', authenticateToken, async (req: AuthRequest, res) => {
 });
 
 // Update appointment
-router.put('/:id', authenticateToken, authorizeRole(['receptionist']), async (req: AuthRequest, res) => {
+router.put('/:id', authenticateToken, enforceTenantIsolation, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
   try {
     const appointmentData = insertAppointmentSchema.parse(req.body);
     const appointment = await Appointment.findByIdAndUpdate(
@@ -304,7 +301,7 @@ router.put('/:id', authenticateToken, authorizeRole(['receptionist']), async (re
 });
 
 // Delete appointment
-router.delete('/:id', authenticateToken, authorizeRole(['receptionist']), async (req: AuthRequest, res) => {
+router.delete('/:id', authenticateToken, enforceTenantIsolation, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
   try {
     const appointment = await Appointment.findByIdAndDelete(req.params.id);
     if (!appointment) {

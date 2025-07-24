@@ -147,19 +147,32 @@ const SupportPage: React.FC = () => {
   const { data: statsData, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['support-stats'],
     queryFn: async (): Promise<{ success: boolean; stats: SupportStats }> => {
+      console.log('Fetching support statistics...');
+      const token = authService.getToken();
+      console.log('Token available:', !!token);
+      
       const response = await fetch('/api/support/stats/overview', {
         headers: {
-          'Authorization': `Bearer ${authService.getToken()}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
 
+      console.log('Support stats response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch support statistics');
+        const errorText = await response.text();
+        console.error('Support stats error response:', errorText);
+        throw new Error(`Failed to fetch support statistics: ${response.status} ${errorText}`);
       }
 
-      return response.json();
+      const data = await response.json();
+      console.log('Support stats data:', data);
+      return data;
     },
     refetchInterval: 30000, // Refetch every 30 seconds
+    retry: 3,
+    retryDelay: 1000,
   });
 
   // Fetch detailed analytics

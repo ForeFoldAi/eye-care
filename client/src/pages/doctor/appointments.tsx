@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { ChatWidget } from '@/components/chat/ChatWidget';
 import { 
   Search,
   Calendar,
@@ -175,6 +176,9 @@ export default function DoctorAppointmentsPage() {
               const data = await response.json();
               console.log('Successfully fetched appointments:', data);
               
+              // Handle the new API response format
+              const appointmentsArray = data.data || data || [];
+              
               // If this is the general appointments endpoint, filter by current doctor
               // (This should ideally be done on the backend)
               if (url.includes('/api/appointments?') && !url.includes('doctorOnly')) {
@@ -182,7 +186,7 @@ export default function DoctorAppointmentsPage() {
                 // If not, you might need to get current user info and filter here
               }
               
-              return data;
+              return appointmentsArray;
             }
             
             lastError = new Error(`HTTP ${response.status}: ${await response.text()}`);
@@ -703,6 +707,9 @@ export default function DoctorAppointmentsPage() {
           )}
         </DialogContent>
       </Dialog>
+      
+      {/* Chat Widget - Fixed Bottom Right */}
+      <ChatWidget />
     </div>
   );
 }

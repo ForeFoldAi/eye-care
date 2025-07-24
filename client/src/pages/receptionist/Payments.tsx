@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { ChatWidget } from '@/components/chat/ChatWidget';
 import { 
   Search,
   IndianRupee,
@@ -491,11 +492,14 @@ export default function PaymentsPage() {
             </div>
             <div>
               <div className="font-medium text-xs">{patient.firstName} {patient.lastName}</div>
-              <div className="text-xs text-gray-500">P-{patient.id}</div>
-            </div>
-          </div>
-        );
-      },
+              <div className="text-xs text-gray-500">P-{patient.id}        </div>
+      </div>
+      
+      {/* Chat Widget - Fixed Bottom Right */}
+      <ChatWidget />
+    </div>
+  );
+},
     },
     {
       accessorKey: 'amount',

@@ -7,11 +7,8 @@ import { createAuditLogger, SecurityEvents } from '../utils/audit';
 
 const router = Router();
 
-// Apply tenant middleware to all routes
-router.use(enforceTenantIsolation);
-
 // Get all patients (tenant-isolated)
-router.get('/', authenticateToken, async (req: TenantRequest, res) => {
+router.get('/', authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {
   const auditLogger = createAuditLogger(req);
   
   try {
@@ -67,7 +64,7 @@ router.get('/', authenticateToken, async (req: TenantRequest, res) => {
 });
 
 // Get patient by ID (tenant-isolated)
-router.get('/:id', authenticateToken, async (req: TenantRequest, res) => {
+router.get('/:id', authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {
   const auditLogger = createAuditLogger(req);
   
   try {
@@ -103,7 +100,7 @@ router.get('/:id', authenticateToken, async (req: TenantRequest, res) => {
 });
 
 // Create new patient (tenant-isolated)
-router.post('/', authenticateToken, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
+router.post('/', authenticateToken, enforceTenantIsolation, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
   const auditLogger = createAuditLogger(req);
   
   try {
@@ -154,7 +151,7 @@ router.post('/', authenticateToken, authorizeRole(['receptionist']), async (req:
 });
 
 // Update patient (tenant-isolated)
-router.put('/:id', authenticateToken, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
+router.put('/:id', authenticateToken, enforceTenantIsolation, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
   const auditLogger = createAuditLogger(req);
   
   try {
@@ -219,7 +216,7 @@ router.put('/:id', authenticateToken, authorizeRole(['receptionist']), async (re
 });
 
 // Delete patient (tenant-isolated)
-router.delete('/:id', authenticateToken, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
+router.delete('/:id', authenticateToken, enforceTenantIsolation, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
   const auditLogger = createAuditLogger(req);
   
   try {

@@ -18,7 +18,19 @@ import {
   LayoutGrid,
   Table as TableIcon,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Filter,
+  Calendar,
+  Clock,
+  Shield,
+  Activity,
+  TrendingUp,
+  CheckCircle,
+  XCircle,
+  Settings,
+  Star,
+  BarChart3,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -516,71 +528,151 @@ const Hospitals: React.FC = () => {
     );
   }
 
+  // Calculate statistics
+  const totalHospitals = hospitals?.length || 0;
+  const activeHospitals = hospitals?.filter((h: Hospital) => h.isActive).length || 0;
+  const inactiveHospitals = totalHospitals - activeHospitals;
+  const recentlyAdded = hospitals?.filter((h: Hospital) => {
+    const createdDate = new Date(h.createdAt);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return createdDate > thirtyDaysAgo;
+  }).length || 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Enhanced Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Client Hospitals</h1>
-              <p className="text-gray-600 mt-1">Manage all client hospitals using Forefold's system</p>
+          <div className="flex flex-col space-y-4 py-6">
+            {/* Main Header */}
+            <div className="flex justify-between items-start">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Building2 className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Client Hospitals</h1>
+                  <p className="text-gray-600 mt-1">Manage and monitor all client hospitals in Forefold's ecosystem</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => refetch()}
+                  disabled={isLoading}
+                  className="shadow-sm"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                  )}
+                  Refresh
+                </Button>
+                
+                {/* Export Dropdown */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="shadow-sm">
+                      <Download className="w-4 h-4 mr-2" />
+                      Export
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={exportToCSV}>
+                      <FileSpreadsheet className="w-4 h-4 mr-2" />
+                      Export as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={exportToExcel}>
+                      <FileSpreadsheet className="w-4 h-4 mr-2" />
+                      Export as Excel
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Onboard Hospital
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center space-x-2">
+                        <Building2 className="w-5 h-5 text-blue-600" />
+                        <span>Add New Client Hospital</span>
+                      </DialogTitle>
+                      <DialogDescription>
+                        Onboard a new hospital to Forefold's management system with comprehensive setup
+                      </DialogDescription>
+                    </DialogHeader>
+                    <HospitalForm 
+                      onSuccess={() => {
+                        setIsAddModalOpen(false);
+                        queryClient.invalidateQueries({ queryKey: ['master-admin', 'hospitals'] });
+                      }}
+                      onCancel={() => setIsAddModalOpen(false)}
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => refetch()}
-                disabled={isLoading}
-              >
-                <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
+            
+            {/* Quick Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-700">Total Hospitals</p>
+                    <p className="text-2xl font-bold text-blue-900">{totalHospitals}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <Building2 className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+              </div>
               
-              {/* Export Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Download className="w-4 h-4 mr-2" />
-                    Export
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={exportToCSV}>
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Export as CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={exportToExcel}>
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    Export as Excel
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-700">Active Hospitals</p>
+                    <p className="text-2xl font-bold text-green-900">{activeHospitals}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+              </div>
               
-              <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Onboard Hospital
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>Add New Client Hospital</DialogTitle>
-                    <DialogDescription>
-                      Onboard a new hospital to Forefold's management system
-                    </DialogDescription>
-                  </DialogHeader>
-                  <HospitalForm 
-                    onSuccess={() => {
-                      setIsAddModalOpen(false);
-                      queryClient.invalidateQueries({ queryKey: ['master-admin', 'hospitals'] });
-                    }}
-                    onCancel={() => setIsAddModalOpen(false)}
-                  />
-                </DialogContent>
-              </Dialog>
+              <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-red-700">Inactive Hospitals</p>
+                    <p className="text-2xl font-bold text-red-900">{inactiveHospitals}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
+                    <XCircle className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-700">Recently Added</p>
+                    <p className="text-2xl font-bold text-purple-900">{recentlyAdded}</p>
+                    <p className="text-xs text-purple-600 mt-1">Last 30 days</p>
+                  </div>
+                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-white" />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

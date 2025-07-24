@@ -280,9 +280,13 @@ const AnalyticsPage: React.FC = () => {
     const invoices = billingData.invoices;
 
     return hospitals.slice(0, 10).map((hospital: any) => {
-      const hospitalInvoices = invoices.filter((inv: any) => 
-        inv.hospitalId._id === hospital._id
-      );
+      const hospitalInvoices = invoices.filter((inv: any) => {
+        // Handle both cases: hospitalId as string or as object with _id
+        const invoiceHospitalId = typeof inv.hospitalId === 'string' 
+          ? inv.hospitalId 
+          : inv.hospitalId?._id;
+        return invoiceHospitalId === hospital._id;
+      });
 
       const revenue = hospitalInvoices
         .filter((inv: any) => inv.status === 'paid')

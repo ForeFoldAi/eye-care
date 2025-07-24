@@ -83,13 +83,13 @@ router.get('/my-tickets', authenticateToken, async (req: AuthRequest, res) => {
     const skip = (Number(page) - 1) * Number(limit);
 
     const [tickets, total] = await Promise.all([
-      SupportTicket.find({ createdBy: req.user?.id })
+      SupportTicket.find({ createdBy: String(req.user?.id) })
         .populate('hospitalId', 'name')
         .populate('assignedTo', 'firstName lastName email')
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit)),
-      SupportTicket.countDocuments({ createdBy: req.user?.id })
+      SupportTicket.countDocuments({ createdBy: String(req.user?.id) })
     ]);
 
     res.json({
@@ -110,14 +110,14 @@ router.get('/my-tickets', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
-// Get all tickets (for master admin)
+// Get all tickets (for master admin and support_agent)
 router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    // Only master admin can access all tickets
-    if (req.user?.role !== 'master_admin') {
+    // Only master admin or support_agent can access all tickets
+    if (!['master_admin', 'support_agent'].includes(String(req.user?.role))) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. Only master admin can view all tickets.'
+        message: 'Access denied. Only master admin or support agent can view all tickets.'
       });
     }
 
@@ -126,13 +126,13 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
 
     // Build filter query
     const filter: any = {};
-    if (status && status !== 'all') filter.status = status;
-    if (priority && priority !== 'all') filter.priority = priority;
-    if (category && category !== 'all') filter.category = category;
-    if (search) {
+    if (typeof status !== 'undefined' && String(status) !== 'all') filter.status = String(status);
+    if (typeof priority !== 'undefined' && String(priority) !== 'all') filter.priority = String(priority);
+    if (typeof category !== 'undefined' && String(category) !== 'all') filter.category = String(category);
+    if (typeof search !== 'undefined' && String(search)) {
       filter.$or = [
-        { subject: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { subject: { $regex: String(search), $options: 'i' } },
+        { description: { $regex: String(search), $options: 'i' } }
       ];
     }
 
@@ -166,14 +166,15 @@ router.get('/', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
-// Get support statistics (for master admin)
+// Get support statistics (for master admin and support_agent)
 router.get('/stats/overview', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    // Only master admin can access statistics
-    if (req.user?.role !== 'master_admin') {
+    console.log('User in /stats/overview:', req.user); // DEBUG LOG
+    // Only master admin or support_agent can access statistics
+    if (!['master_admin', 'support_agent'].includes(String(req.user?.role))) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. Only master admin can view statistics.'
+        message: 'Access denied. Only master admin or support agent can view statistics.'
       });
     }
 
@@ -252,23 +253,24 @@ router.get('/stats/overview', authenticateToken, async (req: AuthRequest, res) =
   }
 });
 
-// Get detailed analytics data
+// Get detailed analytics data (for master admin and support_agent)
 router.get('/analytics/detailed', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    // Only master admin can access detailed analytics
-    if (req.user?.role !== 'master_admin') {
+    // Only master admin or support_agent can access detailed analytics
+    if (!['master_admin', 'support_agent'].includes(String(req.user?.role))) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. Only master admin can view detailed analytics.'
+        message: 'Access denied. Only master admin or support agent can view detailed analytics.'
       });
     }
 
     const { timeRange = '30d' } = req.query;
     
+    let timeRangeStr = typeof timeRange === 'string' ? timeRange : '30d';
     // Calculate date range
     const endDate = new Date();
     const startDate = new Date();
-    switch (timeRange) {
+    switch (timeRangeStr) {
       case '7d':
         startDate.setDate(endDate.getDate() - 7);
         break;
@@ -417,14 +419,14 @@ router.get('/analytics/detailed', authenticateToken, async (req: AuthRequest, re
   }
 });
 
-// Get knowledge base statistics
+// Get knowledge base statistics (for master admin and support_agent)
 router.get('/knowledge-base/stats', authenticateToken, async (req: AuthRequest, res) => {
   try {
-    // Only master admin can access knowledge base stats
-    if (req.user?.role !== 'master_admin') {
+    // Only master admin or support_agent can access knowledge base stats
+    if (!['master_admin', 'support_agent'].includes(String(req.user?.role))) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied. Only master admin can view knowledge base statistics.'
+        message: 'Access denied. Only master admin or support agent can view knowledge base statistics.'
       });
     }
 
@@ -480,8 +482,8 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     // Check if user has access to this ticket
-    if (ticket.createdBy.toString() !== req.user?.id && 
-        req.user?.role !== 'master_admin') {
+    if (String(ticket.createdBy) !== String(req.user?.id) && 
+        String(req.user?.role) !== 'master_admin') {
       return res.status(403).json({ 
         success: false,
         message: 'Access denied' 
@@ -507,7 +509,7 @@ router.patch('/:id/status', authenticateToken, async (req: AuthRequest, res) => 
     const { status } = req.body;
 
     // Only master admin can update ticket status
-    if (req.user?.role !== 'master_admin') {
+    if (String(req.user?.role) !== 'master_admin') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Only master admin can update ticket status.'
@@ -553,7 +555,7 @@ router.patch('/:id/assign', authenticateToken, async (req: AuthRequest, res) => 
     const { assignedTo } = req.body;
 
     // Only master admin can assign tickets
-    if (req.user?.role !== 'master_admin') {
+    if (String(req.user?.role) !== 'master_admin') {
       return res.status(403).json({
         success: false,
         message: 'Access denied. Only master admin can assign tickets.'

@@ -6,11 +6,8 @@ import mongoose from 'mongoose';
 
 const router = Router();
 
-// Apply tenant middleware to all routes
-router.use(enforceTenantIsolation);
-
 // Get audit logs (admin and master_admin only)
-router.get('/', authenticateToken, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
+router.get('/', authenticateToken, enforceTenantIsolation, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
   try {
     const { 
       userId, 
@@ -63,7 +60,7 @@ router.get('/', authenticateToken, authorizeRole(['admin', 'master_admin']), asy
 });
 
 // Get security events (admin and master_admin only)
-router.get('/security', authenticateToken, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
+router.get('/security', authenticateToken, enforceTenantIsolation, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
   try {
     const { startDate, endDate, page = 1, limit = 50 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
@@ -96,7 +93,7 @@ router.get('/security', authenticateToken, authorizeRole(['admin', 'master_admin
 });
 
 // Get user activity (admin and master_admin only)
-router.get('/user/:userId', authenticateToken, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
+router.get('/user/:userId', authenticateToken, enforceTenantIsolation, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
   try {
     const { days = 30 } = req.query;
     const userId = new mongoose.Types.ObjectId(req.params.userId);
@@ -126,7 +123,7 @@ router.get('/user/:userId', authenticateToken, authorizeRole(['admin', 'master_a
 });
 
 // Get audit statistics (admin and master_admin only)
-router.get('/stats', authenticateToken, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
+router.get('/stats', authenticateToken, enforceTenantIsolation, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
   try {
     const { days = 30 } = req.query;
     const startDate = new Date();
@@ -173,7 +170,7 @@ router.get('/stats', authenticateToken, authorizeRole(['admin', 'master_admin'])
 });
 
 // Export audit logs (admin and master_admin only)
-router.post('/export', authenticateToken, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
+router.post('/export', authenticateToken, enforceTenantIsolation, authorizeRole(['admin', 'master_admin']), async (req: TenantRequest, res) => {
   try {
     const { 
       userId, 

@@ -5,7 +5,6 @@ import { useState, useEffect } from "react";
 import { authService, type User as AuthUser } from "@/lib/auth";
 import { ROLES } from "@/lib/constants";
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { ChatWidget } from '@/components/chat/ChatWidget';
 import { 
   Tooltip,
   TooltipContent,
@@ -208,7 +207,6 @@ export default function Layout({ children, user }: LayoutProps) {
             <div className="flex items-center justify-between">
               <div className="w-64 flex items-center space-x-3">
                 <NotificationBell />
-                <ChatWidget className="relative" />
               </div>
               <div className="text-center flex-1">
                 <h1 className="text-xl font-semibold text-gray-900">

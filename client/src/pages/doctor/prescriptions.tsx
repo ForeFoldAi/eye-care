@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { ChatWidget } from '@/components/chat/ChatWidget';
 import { 
   Search,
   FileText,
@@ -137,8 +138,8 @@ export default function DoctorPrescriptionsPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-2xl font-bold">Prescriptions</CardTitle>
-                <div className="flex items-center space-x-2">
-                      <Input
+                                  <div className="flex items-center space-x-2">
+                        <Input
                         placeholder="Search prescriptions..."
                     className="max-w-sm"
                         value={searchQuery}
@@ -246,6 +247,9 @@ export default function DoctorPrescriptionsPage() {
             }}
           />
       )}
+      
+      {/* Chat Widget - Fixed Bottom Right */}
+      <ChatWidget />
     </div>
   );
 }

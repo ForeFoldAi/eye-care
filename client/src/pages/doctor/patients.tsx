@@ -43,6 +43,7 @@ import {
 import { format } from "date-fns";
 import { EnhancedTable } from "@/components/ui/enhanced-table";
 import { cn } from "@/lib/utils";
+import { ChatWidget } from '@/components/chat/ChatWidget';
 
 interface Patient {
   id: string;
@@ -508,6 +509,9 @@ export default function DoctorPatientsPage() {
           </div>
         </div>
       </div>
+      
+      {/* Chat Widget - Fixed Bottom Right */}
+      <ChatWidget />
     </div>
   );
 

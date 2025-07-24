@@ -39,6 +39,7 @@ import { type User as AuthUser } from "@/lib/auth";
 import { authService } from '@/lib/auth';
 import LoadingEye from '@/components/ui/LoadingEye';
 import SupportTicketModal from '@/components/SupportTicketModal';
+import { ChatWidget } from '@/components/chat/ChatWidget';
 
 interface DashboardStats {
   todayAppointments: number;
@@ -148,7 +149,12 @@ export default function ReceptionistDashboard() {
 
   const { data: patients, isLoading: isLoadingPatients } = useQuery<Patient[]>({
     queryKey: ['patients'],
-    queryFn: () => fetchWithAuth(`${API_URL}/api/patients`),
+    queryFn: async () => {
+      const response = await fetchWithAuth(`${API_URL}/api/patients`);
+      // Handle the new API response format
+      const patientsArray = response.data?.patients || response.patients || response || [];
+      return Array.isArray(patientsArray) ? patientsArray : [];
+    },
     retry: 1
   });
 
@@ -189,7 +195,9 @@ export default function ReceptionistDashboard() {
       const response = await fetch(`${API_URL}/api/doctors`);
       if (!response.ok) throw new Error('Failed to fetch doctors');
       const data = await response.json();
-      return data.map((doctor: any) => ({
+      // Handle the new API response format
+      const doctorsArray = data.data || data || [];
+      return doctorsArray.map((doctor: any) => ({
         id: doctor._id?.toString() || doctor.id || '',
         firstName: doctor.firstName,
         lastName: doctor.lastName,
@@ -201,7 +209,11 @@ export default function ReceptionistDashboard() {
 
   const { data: appointments = [], isLoading: isLoadingAppointments } = useQuery<Appointment[]>({
     queryKey: ['appointments'],
-    queryFn: () => fetchWithAuth(`${API_URL}/api/appointments`),
+    queryFn: async () => {
+      const response = await fetchWithAuth(`${API_URL}/api/appointments`);
+      // Handle the new API response format
+      return response.data || response || [];
+    },
     retry: 1
   });
 
@@ -902,6 +914,9 @@ export default function ReceptionistDashboard() {
               isOpen={isSupportModalOpen} 
               onClose={() => setIsSupportModalOpen(false)} 
             />
+            
+            {/* Chat Widget - Fixed Bottom Right */}
+            <ChatWidget />
           </div>
       )}
     </ProtectedRoute>

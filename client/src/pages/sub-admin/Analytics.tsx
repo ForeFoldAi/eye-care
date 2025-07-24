@@ -126,7 +126,7 @@ const Analytics: React.FC = () => {
         headers: { 'Authorization': `Bearer ${authService.getToken()}` }
       });
       if (!response.ok) throw new Error('Failed to fetch analytics data');
-      return response.json() as AnalyticsData;
+      return (await response.json()) as AnalyticsData;
     }
   });
 
@@ -288,12 +288,11 @@ const Analytics: React.FC = () => {
   };
 
   const operationalRadarData = {
-    labels: ['Bed Occupancy', 'Equipment Utilization', 'Staff Efficiency', 'Response Time Score'],
+    labels: ['Equipment Utilization', 'Staff Efficiency', 'Response Time Score'],
     datasets: [
       {
         label: 'Current Performance',
         data: [
-          analyticsData.operationalMetrics?.bedOccupancy || 0,
           analyticsData.operationalMetrics?.equipmentUtilization || 0,
           analyticsData.operationalMetrics?.staffEfficiency || 0,
           100 - parseFloat(analyticsData.operationalMetrics?.emergencyResponseTime || '10') * 10 // Convert response time to performance score
@@ -427,19 +426,6 @@ const Analytics: React.FC = () => {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600">Bed Occupancy</p>
-                    <p className="text-xl font-bold text-gray-900">{analyticsData.operationalMetrics.bedOccupancy}%</p>
-                  </div>
-                  <Building2 className="w-8 h-8 text-blue-500" />
-                </div>
-                <Progress value={analyticsData.operationalMetrics.bedOccupancy} className="mt-3" />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
                     <p className="text-sm text-gray-600">Staff Efficiency</p>
                     <p className="text-xl font-bold text-gray-900">{analyticsData.operationalMetrics.staffEfficiency}%</p>
                   </div>
@@ -538,18 +524,6 @@ const Analytics: React.FC = () => {
 
         <TabsContent value="operational" className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Bed Occupancy</p>
-                    <p className="text-2xl font-bold">{analyticsData.operationalMetrics.bedOccupancy}%</p>
-                  </div>
-                  <Building2 className="w-8 h-8 text-blue-500" />
-                </div>
-              </CardContent>
-            </Card>
-
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">

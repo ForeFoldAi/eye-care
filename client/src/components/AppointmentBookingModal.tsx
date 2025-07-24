@@ -141,7 +141,9 @@ const { data: doctors = [] } = useQuery<Doctor[]>({
       }
 
       const data = await response.json();
-      return data.map((doctor: any) => ({
+      // Handle the new API response format
+      const doctorsArray = data.data || data || [];
+      return doctorsArray.map((doctor: any) => ({
         id: doctor._id?.toString() || doctor.id || '',
         firstName: doctor.firstName,
         lastName: doctor.lastName,

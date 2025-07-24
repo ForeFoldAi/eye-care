@@ -26,6 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { ChatWidget } from '@/components/chat/ChatWidget';
 import { type User as AuthUser } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PrescriptionModal from "@/components/PrescriptionModal";
@@ -187,7 +188,9 @@ export default function DoctorDashboard() {
       });
       if (!response.ok) throw new Error('Failed to fetch appointments');
       const data = await response.json();
-      return data.map((apt: any) => ({
+      // Handle the new API response format
+      const appointmentsArray = data.data || data || [];
+      return appointmentsArray.map((apt: any) => ({
         id: apt._id?.toString() || apt.id || '',
         patientId: {
           _id: apt.patientId._id?.toString() || '',
@@ -233,7 +236,9 @@ export default function DoctorDashboard() {
       if (!response.ok) throw new Error('Failed to fetch prescriptions');
     
       const data = await response.json();
-      return data.map((pres: any) => ({
+      // Handle the new API response format
+      const prescriptionsArray = data.data || data || [];
+      return prescriptionsArray.map((pres: any) => ({
         id: pres._id?.toString() || pres.id || '',
         patientId: pres.patientId?.toString() || '',
         doctorId: pres.doctorId?.toString() || '',
@@ -1179,6 +1184,9 @@ export default function DoctorDashboard() {
             isOpen={isSupportModalOpen} 
             onClose={() => setIsSupportModalOpen(false)} 
           />
+          
+          {/* Chat Widget - Fixed Bottom Right */}
+          <ChatWidget />
          </>
         );
 }
