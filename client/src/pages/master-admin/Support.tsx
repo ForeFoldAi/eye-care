@@ -118,6 +118,8 @@ interface PaginationInfo {
   pages: number;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const SupportPage: React.FC = () => {
   const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = useState('tickets');
@@ -151,7 +153,7 @@ const SupportPage: React.FC = () => {
       const token = authService.getToken();
       console.log('Token available:', !!token);
       
-      const response = await fetch('/api/support/stats/overview', {
+      const response = await fetch(`${API_URL}/api/support/stats/overview`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -179,7 +181,7 @@ const SupportPage: React.FC = () => {
   const { data: detailedAnalytics, isLoading: analyticsLoading, error: analyticsError } = useQuery({
     queryKey: ['support-detailed-analytics'],
     queryFn: async () => {
-      const response = await fetch('/api/support/analytics/detailed', {
+      const response = await fetch(`${API_URL}/api/support/analytics/detailed`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
@@ -197,7 +199,7 @@ const SupportPage: React.FC = () => {
   const { data: kbStats, isLoading: kbLoading, error: kbError } = useQuery({
     queryKey: ['knowledge-base-stats'],
     queryFn: async () => {
-      const response = await fetch('/api/support/knowledge-base/stats', {
+      const response = await fetch(`${API_URL}/api/support/knowledge-base/stats`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
@@ -215,7 +217,7 @@ const SupportPage: React.FC = () => {
   const { data: kbArticles, isLoading: kbArticlesLoading, error: kbArticlesError } = useQuery({
     queryKey: ['knowledge-base-articles'],
     queryFn: async () => {
-      const response = await fetch('/api/knowledge-base/articles', {
+      const response = await fetch(`${API_URL}/api/knowledge-base/articles`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
@@ -243,7 +245,7 @@ const SupportPage: React.FC = () => {
       if (filterPriority !== 'all') params.append('priority', filterPriority);
       if (filterCategory !== 'all') params.append('category', filterCategory);
 
-      const response = await fetch(`/api/support?${params}`, {
+      const response = await fetch(`${API_URL}/api/support?${params}`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
@@ -260,7 +262,7 @@ const SupportPage: React.FC = () => {
   // Mutations for ticket actions
   const updateTicketStatusMutation = useMutation({
     mutationFn: async ({ ticketId, status }: { ticketId: string; status: string }) => {
-      const response = await fetch(`/api/support/${ticketId}/status`, {
+      const response = await fetch(`${API_URL}/api/support/${ticketId}/status`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -294,7 +296,7 @@ const SupportPage: React.FC = () => {
 
   const assignTicketMutation = useMutation({
     mutationFn: async ({ ticketId, assignedTo }: { ticketId: string; assignedTo: string }) => {
-      const response = await fetch(`/api/support/${ticketId}/assign`, {
+      const response = await fetch(`${API_URL}/api/support/${ticketId}/assign`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -329,7 +331,7 @@ const SupportPage: React.FC = () => {
 
   const createTicketMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch('/api/support', {
+      const response = await fetch(`${API_URL}/api/support`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -135,11 +135,13 @@ const BillingPage: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
   // Fetch billing statistics
   const { data: billingStats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['billing-stats'],
     queryFn: async (): Promise<BillingStats> => {
-      const response = await fetch('/api/master-admin/revenue-analytics', {
+      const response = await fetch(`${API_URL}/api/master-admin/revenue-analytics`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
@@ -173,7 +175,7 @@ const BillingPage: React.FC = () => {
       if (selectedStatus !== 'all') params.append('status', selectedStatus);
       if (searchTerm) params.append('search', searchTerm);
 
-      const response = await fetch(`/api/master-admin/billing?${params}`, {
+      const response = await fetch(`${API_URL}/api/master-admin/billing?${params}`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
@@ -193,7 +195,7 @@ const BillingPage: React.FC = () => {
     queryFn: async (): Promise<Payment[]> => {
       try {
         // Try to fetch from subscription payments endpoint first
-        const response = await fetch('/api/master-admin/subscription-payments', {
+        const response = await fetch(`${API_URL}/api/master-admin/subscription-payments`, {
           headers: {
             'Authorization': `Bearer ${authService.getToken()}`
           }
@@ -207,7 +209,7 @@ const BillingPage: React.FC = () => {
       }
 
       // Fallback: Use billing data to create payment records
-      const billingResponse = await fetch('/api/master-admin/billing?status=paid&limit=100', {
+      const billingResponse = await fetch(`${API_URL}/api/master-admin/billing?status=paid&limit=100`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
@@ -247,7 +249,7 @@ const BillingPage: React.FC = () => {
   const { data: subscriptionPlansData, isLoading: plansLoading, error: plansError } = useQuery({
     queryKey: ['subscription-plans'],
     queryFn: async (): Promise<{ plans: SubscriptionPlan[] }> => {
-      const response = await fetch('/api/master-admin/subscription-plans', {
+      const response = await fetch(`${API_URL}/api/master-admin/subscription-plans`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
@@ -264,7 +266,7 @@ const BillingPage: React.FC = () => {
   // Mark invoice as paid mutation
   const markAsPaidMutation = useMutation({
     mutationFn: async ({ invoiceId, paymentMethod, transactionId }: { invoiceId: string; paymentMethod: string; transactionId?: string }) => {
-      const response = await fetch(`/api/master-admin/billing/${invoiceId}/mark-paid`, {
+      const response = await fetch(`${API_URL}/api/master-admin/billing/${invoiceId}/mark-paid`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -470,7 +472,7 @@ const BillingPage: React.FC = () => {
   };
 
   const handleExportInvoices = () => {
-    const exportData = invoices.map(invoice => ({
+    const exportData = invoicesData?.invoices.map(invoice => ({
       'Invoice ID': invoice.invoiceId,
       'Hospital Name': invoice.hospitalId.name,
       'Hospital Email': invoice.hospitalId.email,
@@ -482,12 +484,12 @@ const BillingPage: React.FC = () => {
       'Due Date': new Date(invoice.dueDate).toLocaleDateString(),
       'Created Date': new Date(invoice.createdAt).toLocaleDateString(),
       'Description': invoice.description
-    }));
+    })) || [];
     exportToCSV(exportData, 'invoices');
   };
 
   const handleExportPayments = () => {
-    const exportData = payments.map(payment => ({
+    const exportData = (paymentsData ?? []).map(payment => ({
       'Receipt Number': payment.receiptNumber,
       'Hospital Name': payment.hospitalId.name,
       'Hospital Email': payment.hospitalId.email,
