@@ -1,4 +1,5 @@
 import { apiRequest } from "./queryClient";
+import { API_CONFIG, getApiUrl } from "./config";
 
 export interface User {
   id: string;
@@ -24,7 +25,7 @@ export interface AuthResponse {
   user: User;
 }
 
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:3000') + '/api';
+const API_BASE_URL = API_CONFIG.api.base;
 
 
 // Initialize auth interceptor
@@ -34,7 +35,7 @@ let isInterceptorInitialized = false;
 const waitForServer = async (retries = 10, delay = 1000): Promise<void> => {
   for (let i = 0; i < retries; i++) {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/health`);
+      const response = await fetch(getApiUrl('health'));
       if (response.ok) {
         console.log('Server is ready');
         return;
@@ -59,8 +60,13 @@ const setupAuthInterceptor = () => {
     // Get the current token
     const token = authService.getToken();
     
-    // Only modify API requests
-    if (token && typeof url === 'string' && (url.startsWith('/api') || url.includes('/api/'))) {
+    // Only modify API requests (both relative and absolute API URLs)
+    const isApiRequest = typeof url === 'string' && 
+      (url.startsWith('/api') || 
+       url.includes('/api/') || 
+       (API_CONFIG.baseURL && url.startsWith(API_CONFIG.baseURL)));
+    
+    if (token && isApiRequest) {
       // Create new headers object
       const headers = new Headers(options.headers || {});
       headers.set('Authorization', `Bearer ${token}`);
