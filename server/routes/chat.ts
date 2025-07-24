@@ -22,9 +22,16 @@ const canMessageUser = (senderRole: string, recipientRole: string): boolean => {
 };
 
 // Helper function to get users user can message
-const getMessageableUsers = (userRole: string, hospitalId: string) => {
+const getMessageableUsers = (userRole: string, hospitalId?: string) => {
   const allowedRoles = MESSAGING_RULES[userRole as keyof typeof MESSAGING_RULES] || [];
-  return { role: { $in: allowedRoles }, hospitalId, isActive: true };
+  const query: any = { role: { $in: allowedRoles }, isActive: true };
+  
+  // Add hospitalId filter only if it exists
+  if (hospitalId) {
+    query.hospitalId = hospitalId;
+  }
+  
+  return query;
 };
 
 // Create chat room schema

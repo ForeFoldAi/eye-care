@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { Request, Response, NextFunction } from 'express';
 import { 
   insertAppointmentSchema
-} from "./schemas";
+} from "./shared/schema";
 import mongoose from 'mongoose';
 import { User, Appointment } from './models'; 
 import { authenticateToken, authorizeRole } from './middleware/auth';

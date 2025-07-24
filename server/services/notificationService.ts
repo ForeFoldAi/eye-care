@@ -181,7 +181,7 @@ export class NotificationService {
         role: { $in: data.roleTargets },
         isActive: true
       }).select('_id');
-      recipients = [...recipients, ...roleUsers.map(user => user._id.toString())];
+      recipients = [...recipients, ...roleUsers.map((user: any) => user._id.toString())];
     }
 
     const notificationData: NotificationData = {
