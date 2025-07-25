@@ -42,7 +42,7 @@ export const useNotificationSocket = () => {
     if (!user) return;
 
     // Connect to WebSocket for notifications
-    notificationSocket = io('ws://localhost:5000', {
+    notificationSocket = io('ws://localhost:3000', {
       path: '/ws',
       auth: {
         token: authService.getToken()

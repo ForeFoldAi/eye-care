@@ -17,7 +17,14 @@ import {
   TrendingUp,
   Stethoscope,
   ClipboardList,
-  MapPin
+  MapPin,
+  Mail,
+  Phone,
+  Shield,
+  Eye,
+  EyeOff,
+  Save,
+  Edit3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -35,6 +42,10 @@ import { authService, type User as AuthUser } from '@/lib/auth';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { ChatWidget } from '@/components/chat/ChatWidget';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 interface SubAdminLayoutProps {
   children?: React.ReactNode;
@@ -43,6 +54,33 @@ interface SubAdminLayoutProps {
 const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const [showProfileSettings, setShowProfileSettings] = React.useState(false);
+  const [showNotifications, setShowNotifications] = React.useState(false);
+  const { toast } = useToast();
+
+  // Profile settings state
+  const [profileData, setProfileData] = React.useState({
+    firstName: user.firstName || '',
+    lastName: user.lastName || '',
+    email: user.email || '',
+    phone: '',
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+    showCurrentPassword: false,
+    showNewPassword: false,
+    showConfirmPassword: false
+  });
+
+  // Notification settings state
+  const [notificationSettings, setNotificationSettings] = React.useState({
+    emailNotifications: true,
+    pushNotifications: true,
+    appointmentReminders: true,
+    systemUpdates: true,
+    patientAlerts: true,
+    staffUpdates: false
+  });
 
   const navigation = [
     { 
@@ -64,6 +102,12 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       description: 'Manage branch staff'
     },
     { 
+      name: 'Doctor Availability', 
+      href: '/sub-admin/doctor-availability', 
+      icon: Stethoscope,
+      description: 'Manage doctor schedules and availability'
+    },
+    { 
       name: 'Patients', 
       href: '/sub-admin/patients', 
       icon: User,
@@ -75,8 +119,6 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       icon: Calendar,
       description: 'Appointment scheduling and management'
     },
-   
-    
     { 
       name: 'Analytics', 
       href: '/sub-admin/analytics', 
@@ -94,6 +136,81 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
   const handleLogout = () => {
     authService.logout();
     window.location.href = '/login';
+  };
+
+  // Profile settings handlers
+  const handleProfileUpdate = async () => {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Profile Updated",
+        description: "Your profile information has been successfully updated.",
+      });
+      setShowProfileSettings(false);
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (profileData.newPassword !== profileData.confirmPassword) {
+      toast({
+        title: "Password Mismatch",
+        description: "New password and confirm password do not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Password Changed",
+        description: "Your password has been successfully updated.",
+      });
+      
+      // Reset password fields
+      setProfileData(prev => ({
+        ...prev,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      }));
+    } catch (error) {
+      toast({
+        title: "Password Change Failed",
+        description: "Failed to change password. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Notification settings handlers
+  const handleNotificationSettingsUpdate = async () => {
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Settings Updated",
+        description: "Your notification preferences have been saved.",
+      });
+      setShowNotifications(false);
+    } catch (error) {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update notification settings. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -149,11 +266,11 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowProfileSettings(true)}>
                     <User className="w-4 h-4 mr-2" />
                     Profile Settings
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowNotifications(true)}>
                     <Bell className="w-4 h-4 mr-2" />
                     Notifications
                   </DropdownMenuItem>
@@ -226,6 +343,19 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
 
       {/* Main content */}
       <div className="flex-1 lg:ml-72">
+        {/* Desktop Header */}
+        <div className="hidden lg:block bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between h-16 px-6">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-xl font-semibold text-gray-900">Branch Management</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+              <NotificationBell />
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Header */}
         <div className="sticky top-0 z-30 bg-white border-b border-gray-200 lg:hidden">
           <div className="flex items-center justify-between h-16 px-4">
             <Button
@@ -236,7 +366,9 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
               <Menu className="w-5 h-5" />
             </Button>
             <h1 className="text-lg font-semibold text-gray-900">Branch Management</h1>
-            <div className="w-8" /> {/* Spacer */}
+            <div className="flex items-center space-x-2">
+              <NotificationBell />
+            </div>
           </div>
         </div>
 
@@ -244,12 +376,277 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
           <Outlet />
         </main>
         
-        {/* Chat and Notification Components */}
-        <div className="fixed bottom-4 right-4 z-50 flex items-center space-x-2">
-          <NotificationBell />
+        {/* Chat Widget */}
+        <div className="fixed bottom-4 right-4 z-50">
           <ChatWidget />
         </div>
       </div>
+
+      {/* Profile Settings Modal */}
+      <Dialog open={showProfileSettings} onOpenChange={setShowProfileSettings}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Profile Settings</DialogTitle>
+            <DialogDescription>
+              Update your personal information and change your password
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Personal Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Personal Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={profileData.firstName}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, firstName: e.target.value }))}
+                    placeholder="Enter your first name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={profileData.lastName}
+                    onChange={(e) => setProfileData(prev => ({ ...prev, lastName: e.target.value }))}
+                    placeholder="Enter your last name"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      id="email"
+                      type="email"
+                      value={profileData.email}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="Enter your email"
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={profileData.phone}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder="Enter your phone number"
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+              </div>
+              <Button onClick={handleProfileUpdate} className="w-full">
+                <Save className="w-4 h-4 mr-2" />
+                Update Profile
+              </Button>
+            </div>
+
+            <div className="border-t pt-6">
+              {/* Password Change */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900">Change Password</h3>
+                <div>
+                  <Label htmlFor="currentPassword">Current Password</Label>
+                  <div className="relative">
+                    <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      id="currentPassword"
+                      type={profileData.showCurrentPassword ? "text" : "password"}
+                      value={profileData.currentPassword}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                      placeholder="Enter current password"
+                      className="pl-10 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setProfileData(prev => ({ ...prev, showCurrentPassword: !prev.showCurrentPassword }))}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {profileData.showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="newPassword">New Password</Label>
+                    <div className="relative">
+                      <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Input
+                        id="newPassword"
+                        type={profileData.showNewPassword ? "text" : "password"}
+                        value={profileData.newPassword}
+                        onChange={(e) => setProfileData(prev => ({ ...prev, newPassword: e.target.value }))}
+                        placeholder="Enter new password"
+                        className="pl-10 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setProfileData(prev => ({ ...prev, showNewPassword: !prev.showNewPassword }))}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {profileData.showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <div className="relative">
+                      <Shield className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Input
+                        id="confirmPassword"
+                        type={profileData.showConfirmPassword ? "text" : "password"}
+                        value={profileData.confirmPassword}
+                        onChange={(e) => setProfileData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                        placeholder="Confirm new password"
+                        className="pl-10 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setProfileData(prev => ({ ...prev, showConfirmPassword: !prev.showConfirmPassword }))}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {profileData.showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <Button onClick={handlePasswordChange} className="w-full">
+                  <Shield className="w-4 h-4 mr-2" />
+                  Change Password
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notifications Settings Modal */}
+      <Dialog open={showNotifications} onOpenChange={setShowNotifications}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Notification Settings</DialogTitle>
+            <DialogDescription>
+              Manage your notification preferences and alerts
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Mail className="w-5 h-5 text-blue-500" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Email Notifications</h4>
+                    <p className="text-sm text-gray-600">Receive notifications via email</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.emailNotifications}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, emailNotifications: e.target.checked }))}
+                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Bell className="w-5 h-5 text-green-500" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Push Notifications</h4>
+                    <p className="text-sm text-gray-600">Receive real-time push notifications</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.pushNotifications}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, pushNotifications: e.target.checked }))}
+                  className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Calendar className="w-5 h-5 text-purple-500" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Appointment Reminders</h4>
+                    <p className="text-sm text-gray-600">Get reminded about upcoming appointments</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.appointmentReminders}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, appointmentReminders: e.target.checked }))}
+                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Settings className="w-5 h-5 text-orange-500" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">System Updates</h4>
+                    <p className="text-sm text-gray-600">Receive system maintenance notifications</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.systemUpdates}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, systemUpdates: e.target.checked }))}
+                  className="w-4 h-4 text-orange-600 rounded focus:ring-orange-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <User className="w-5 h-5 text-red-500" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Patient Alerts</h4>
+                    <p className="text-sm text-gray-600">Get notified about patient emergencies</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.patientAlerts}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, patientAlerts: e.target.checked }))}
+                  className="w-4 h-4 text-red-600 rounded focus:ring-red-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex items-center space-x-3">
+                  <Users className="w-5 h-5 text-indigo-500" />
+                  <div>
+                    <h4 className="font-medium text-gray-900">Staff Updates</h4>
+                    <p className="text-sm text-gray-600">Receive updates about staff changes</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={notificationSettings.staffUpdates}
+                  onChange={(e) => setNotificationSettings(prev => ({ ...prev, staffUpdates: e.target.checked }))}
+                  className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <Button onClick={handleNotificationSettingsUpdate} className="w-full">
+              <Save className="w-4 h-4 mr-2" />
+              Save Notification Settings
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

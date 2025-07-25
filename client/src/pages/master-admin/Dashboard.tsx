@@ -57,7 +57,12 @@ import {
   Pause,
   RotateCcw,
   IndianRupee,
-  X
+  X,
+  List,
+  BarChart3 as BarChart3Icon,
+  Download as DownloadIcon,
+  Share2,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -67,7 +72,16 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { authService } from '@/lib/auth';
+import { useToast } from '@/hooks/use-toast';
 
 interface SystemStats {
   totalHospitals: number;
@@ -204,6 +218,7 @@ const MasterAdminDashboard: React.FC = () => {
   const [selectedActivity, setSelectedActivity] = useState<ActivityLogItem | null>(null);
   const [showActivityDetails, setShowActivityDetails] = useState(false);
   const navigate = useNavigate();
+  const { toast } = useToast();
   const API_URL = import.meta.env.VITE_API_URL;
 
   // Fetch system statistics
@@ -386,6 +401,73 @@ const MasterAdminDashboard: React.FC = () => {
     if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`;
     return `${Math.floor(diffInMinutes / 1440)} days ago`;
+  };
+
+  // Handler functions for dropdown menu actions
+  const handleActivityActions = {
+    viewAll: () => {
+      toast({
+        title: "View All Activities",
+        description: "Navigating to analytics page...",
+      });
+      // Navigate to analytics page for detailed activity log
+      navigate({ to: '/master-admin/analytics' });
+    },
+    exportData: () => {
+      toast({
+        title: "Export Data",
+        description: "Preparing activity data for export...",
+      });
+      // Implement CSV/Excel export functionality
+      // This would typically trigger a download
+    },
+    filterByType: () => {
+      toast({
+        title: "Filter Activities",
+        description: "Opening filter options...",
+      });
+      // Show filter modal
+    },
+    refreshData: () => {
+      toast({
+        title: "Refreshing Data",
+        description: "Updating activity data...",
+      });
+      handleRefresh();
+    }
+  };
+
+  const handleHospitalActions = {
+    viewAll: () => {
+      toast({
+        title: "View All Hospitals",
+        description: "Navigating to hospitals list...",
+      });
+      // Navigate to hospitals list page
+      navigate({ to: '/master-admin/hospitals' });
+    },
+    exportData: () => {
+      toast({
+        title: "Export Data",
+        description: "Preparing hospital data for export...",
+      });
+      // Implement CSV/Excel export functionality
+      // This would typically trigger a download
+    },
+    compareHospitals: () => {
+      toast({
+        title: "Compare Hospitals",
+        description: "Opening hospital comparison view...",
+      });
+      // Show comparison modal
+    },
+    refreshData: () => {
+      toast({
+        title: "Refreshing Data",
+        description: "Updating hospital data...",
+      });
+      handleRefresh();
+    }
   };
 
 
@@ -637,9 +719,27 @@ const MasterAdminDashboard: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Recent Activity</span>
-                  <Button variant="ghost" size="sm">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuLabel>Activity Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleActivityActions.viewAll} className="cursor-pointer">
+                        <List className="w-4 h-4 mr-2" />
+                        View All Activities
+                      </DropdownMenuItem>
+                      
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleActivityActions.refreshData} className="cursor-pointer">
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh Data
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -679,9 +779,31 @@ const MasterAdminDashboard: React.FC = () => {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Top Hospitals</span>
-                  <Button variant="ghost" size="sm">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuLabel>Hospital Actions</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleHospitalActions.viewAll} className="cursor-pointer">
+                        <Building2 className="w-4 h-4 mr-2" />
+                        View All Hospitals
+                      </DropdownMenuItem>
+                      
+                      <DropdownMenuItem onClick={handleHospitalActions.compareHospitals} className="cursor-pointer">
+                        <BarChart3Icon className="w-4 h-4 mr-2" />
+                        Compare Hospitals
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleHospitalActions.refreshData} className="cursor-pointer">
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Refresh Data
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </CardTitle>
               </CardHeader>
               <CardContent>

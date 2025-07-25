@@ -205,8 +205,8 @@ export default function Layout({ children, user }: LayoutProps) {
         <header className="bg-white border-b border-gray-200">
           <div className="px-4 py-2">
             <div className="flex items-center justify-between">
-              <div className="w-64 flex items-center space-x-3">
-                <NotificationBell />
+              <div className="w-64">
+                {/* Left side - empty for balance */}
               </div>
               <div className="text-center flex-1">
                 <h1 className="text-xl font-semibold text-gray-900">
@@ -218,9 +218,12 @@ export default function Layout({ children, user }: LayoutProps) {
                     : 'Manage appointments and patient records'}
                 </p>
               </div>
-              <div className="w-64 text-right">
+              <div className="w-64 flex items-center justify-end space-x-3">
+                <div className="text-right">
                   <p className="text-sm text-gray-900">{date}</p>
                   <p className="text-xs text-gray-500">{time}</p>
+                </div>
+                <NotificationBell />
               </div>
             </div>
           </div>

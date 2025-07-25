@@ -32,11 +32,13 @@ import AdminFinancialManagement from '@/pages/admin/FinancialManagement'
 import AdminSystemConfiguration from '@/pages/admin/SystemConfiguration'
 import AdminAuditCompliance from '@/pages/admin/AuditCompliance'
 import AdminBranchForm from '@/pages/admin/BranchForm'
+import AdminDoctorAvailability from '@/pages/admin/DoctorAvailability'
 import AdminLayout from '@/components/AdminLayout'
 import SubAdminDashboard from '@/pages/sub-admin/Dashboard'
 import SubAdminLayout from '@/components/SubAdminLayout'
 import StaffManagement from '@/pages/sub-admin/StaffManagement'
 import DepartmentManagement from '@/pages/sub-admin/DepartmentManagement'
+import SubAdminDoctorAvailability from '@/pages/sub-admin/DoctorAvailability'
 import Appointments from '@/pages/sub-admin/Appointments'
 import Patients from '@/pages/sub-admin/Patients'
 import TestPage from '@/pages/sub-admin/TestPage'
@@ -309,6 +311,18 @@ const adminBranchFormRoute = createRoute({
   component: AdminBranchForm,
 })
 
+const adminDepartmentManagementRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/department-management',
+  component: DepartmentManagement,
+})
+
+const adminDoctorAvailabilityRoute = createRoute({
+  getParentRoute: () => adminLayoutRoute,
+  path: '/doctor-availability',
+  component: AdminDoctorAvailability,
+})
+
 const adminIndexRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: '/',
@@ -344,6 +358,12 @@ const subAdminDepartmentsRoute = createRoute({
   getParentRoute: () => subAdminLayoutRoute,
   path: '/departments',
   component: DepartmentManagement,
+})
+
+const subAdminDoctorAvailabilityRoute = createRoute({
+  getParentRoute: () => subAdminLayoutRoute,
+  path: '/doctor-availability',
+  component: SubAdminDoctorAvailability,
 })
 
 const subAdminAppointmentsRoute = createRoute({
@@ -438,6 +458,8 @@ const routeTree = rootRoute.addChildren([
     adminStaffRoute,
     adminFinancialRoute,
     adminBranchFormRoute,
+    adminDepartmentManagementRoute,
+    adminDoctorAvailabilityRoute,
     adminSettingsRoute,
     adminAuditRoute,
     adminIndexRoute,
@@ -446,6 +468,7 @@ const routeTree = rootRoute.addChildren([
     subAdminDashboardRoute,
     subAdminStaffRoute,
     subAdminDepartmentsRoute,
+    subAdminDoctorAvailabilityRoute,
     subAdminAppointmentsRoute,
     subAdminPatientsRoute,
     subAdminAnalyticsRoute,

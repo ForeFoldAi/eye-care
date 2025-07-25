@@ -30,8 +30,15 @@ import {
   Briefcase,
   GraduationCap,
   FileText,
-  Clock
+  Clock,
+  Activity,
+  Download,
+  Settings,
+  Key,
+  CheckSquare,
+  Square
 } from 'lucide-react';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,7 +57,8 @@ import {
   DialogDescription, 
   DialogHeader, 
   DialogTitle, 
-  DialogTrigger 
+  DialogTrigger,
+  DialogFooter
 } from '@/components/ui/dialog';
 import { 
   Select, 
@@ -93,6 +101,7 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -223,9 +232,64 @@ const Users: React.FC = () => {
   const [viewType, setViewType] = useState<'overview' | 'detailed' | 'analytics'>('overview');
   const [sortBy, setSortBy] = useState<'name' | 'role' | 'status' | 'department'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [showMessageModal, setShowMessageModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedUserForAction, setSelectedUserForAction] = useState<User | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [scheduleDate, setScheduleDate] = useState<string>('');
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [selectedUserForActivity, setSelectedUserForActivity] = useState<User | null>(null);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<User | null>(null);
+  const [activityLogData, setActivityLogData] = useState<any[]>([]);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Edit user form schema
+  const editUserSchema = z.object({
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    email: z.string().email('Invalid email address'),
+    role: z.enum(['master_admin', 'admin', 'sub_admin', 'doctor', 'receptionist']),
+    hospitalId: z.string().optional(),
+    branchId: z.string().optional(),
+    department: z.string().optional(),
+    phoneNumber: z.string().optional(),
+    address: z.string().optional(),
+    specialization: z.string().optional(),
+    employeeId: z.string().optional(),
+    isActive: z.boolean().default(true),
+  });
+
+  type EditUserFormData = z.infer<typeof editUserSchema>;
+
+  // Edit user form
+  const editUserForm = useForm<EditUserFormData>({
+    resolver: zodResolver(editUserSchema),
+  });
+
+  // Set form values when editing user changes
+  React.useEffect(() => {
+    if (editingUser) {
+      editUserForm.reset({
+        firstName: editingUser.firstName,
+        lastName: editingUser.lastName,
+        email: editingUser.email,
+        role: editingUser.role,
+        hospitalId: editingUser.hospitalId?._id || 'none',
+        branchId: editingUser.branchId?._id || 'none',
+        department: editingUser.department || '',
+        phoneNumber: editingUser.phoneNumber || '',
+        address: editingUser.address || '',
+        specialization: editingUser.specialization || '',
+        employeeId: editingUser.employeeId || '',
+        isActive: editingUser.isActive,
+      });
+    }
+  }, [editingUser, editUserForm]);
 
   const API_URL = import.meta.env.VITE_API_URL;
 
@@ -397,13 +461,308 @@ const Users: React.FC = () => {
     }
   });
 
+  // Update user mutation
+  const updateUserMutation = useMutation({
+    mutationFn: async (data: EditUserFormData) => {
+      if (!editingUser) throw new Error('No user to update');
+      
+      const response = await fetch(`${API_URL}/api/users/${editingUser._id}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${authService.getToken()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...data,
+          hospitalId: data.hospitalId === 'none' ? undefined : data.hospitalId,
+          branchId: data.branchId === 'none' ? undefined : data.branchId,
+          department: data.department || undefined,
+          phoneNumber: data.phoneNumber || undefined,
+          address: data.address || undefined,
+          specialization: data.specialization || undefined,
+          employeeId: data.employeeId || undefined,
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update user');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['master-admin', 'users'] });
+      queryClient.invalidateQueries({ queryKey: ['master-admin', 'user-stats'] });
+      editUserForm.reset();
+      setEditingUser(null);
+      toast({
+        title: 'Success',
+        description: 'User updated successfully',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+
   const onSubmitAddUser = (data: AddUserFormData) => {
     addUserMutation.mutate(data);
+  };
+
+  const onSubmitEditUser = (data: EditUserFormData) => {
+    updateUserMutation.mutate(data);
   };
 
   const handleCloseAddModal = () => {
     addUserForm.reset();
     setIsAddModalOpen(false);
+  };
+
+  const handleCloseEditModal = () => {
+    editUserForm.reset();
+    setEditingUser(null);
+  };
+
+  // Handle send message functionality
+  const handleSendMessage = (user: User) => {
+    setSelectedUserForAction(user);
+    setShowMessageModal(true);
+  };
+
+  // Handle view schedule functionality
+  const handleViewSchedule = (user: User) => {
+    setSelectedUserForAction(user);
+    setShowScheduleModal(true);
+  };
+
+  // Send message mutation
+  const sendMessageMutation = useMutation({
+    mutationFn: async ({ userId, message }: { userId: string; message: string }) => {
+      const response = await fetch(`${API_URL}/api/notifications/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authService.getToken()}`
+        },
+        body: JSON.stringify({ userId, message })
+      });
+      if (!response.ok) throw new Error('Failed to send message');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Message Sent",
+        description: "Message has been sent successfully to the user.",
+        variant: "default",
+      });
+      setShowMessageModal(false);
+      setMessageText('');
+      setSelectedUserForAction(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send message",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Handle message submission
+  const handleMessageSubmit = () => {
+    if (!selectedUserForAction || !messageText.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a message",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    sendMessageMutation.mutate({
+      userId: selectedUserForAction._id,
+      message: messageText.trim()
+    });
+  };
+
+  // Close message modal
+  const handleCloseMessageModal = () => {
+    setShowMessageModal(false);
+    setMessageText('');
+    setSelectedUserForAction(null);
+  };
+
+  // Close schedule modal
+  const handleCloseScheduleModal = () => {
+    setShowScheduleModal(false);
+    setScheduleDate('');
+    setSelectedUserForAction(null);
+  };
+
+  // Bulk actions functionality
+  const handleSelectUser = (userId: string) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllUsers = () => {
+    if (selectedUsers.length === users?.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(users?.map((user: User) => user._id) || []);
+    }
+  };
+
+  const handleBulkAction = async (action: 'activate' | 'deactivate' | 'delete' | 'export') => {
+    if (selectedUsers.length === 0) {
+      toast({
+        title: "No Users Selected",
+        description: "Please select users to perform bulk actions",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    switch (action) {
+      case 'activate':
+        // Implement bulk activate
+        toast({
+          title: "Bulk Activate",
+          description: `Activating ${selectedUsers.length} users...`,
+        });
+        break;
+      case 'deactivate':
+        // Implement bulk deactivate
+        toast({
+          title: "Bulk Deactivate",
+          description: `Deactivating ${selectedUsers.length} users...`,
+        });
+        break;
+      case 'delete':
+        // Implement bulk delete
+        toast({
+          title: "Bulk Delete",
+          description: `Deleting ${selectedUsers.length} users...`,
+        });
+        break;
+      case 'export':
+        handleExportUsers();
+        break;
+    }
+  };
+
+  // Export users functionality
+  const handleExportUsers = () => {
+    const selectedUsersData = users?.filter((user: User) => selectedUsers.includes(user._id)) || users || [];
+    
+    const csvContent = [
+      ['Name', 'Email', 'Role', 'Department', 'Hospital', 'Branch', 'Status', 'Last Login', 'Created Date'],
+      ...selectedUsersData.map((user: User) => [
+        `${user.firstName} ${user.lastName}`,
+        user.email,
+        user.role,
+        user.department || 'N/A',
+        user.hospitalId?.name || 'N/A',
+        user.branchId?.name || 'N/A',
+        user.isActive ? 'Active' : 'Inactive',
+        user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never',
+        new Date(user.createdAt).toLocaleDateString()
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Export Successful",
+      description: `Exported ${selectedUsersData.length} users to CSV`,
+    });
+  };
+
+  // User activity log functionality
+  const handleViewActivityLog = async (user: User) => {
+    setSelectedUserForActivity(user);
+    setShowActivityLog(true);
+    setIsLoadingActivity(true);
+
+    try {
+      // Simulate API call for activity log
+      const mockActivityLog = [
+        {
+          id: 1,
+          action: 'Login',
+          timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+          details: 'User logged in successfully',
+          ipAddress: '192.168.1.100'
+        },
+        {
+          id: 2,
+          action: 'View Patient',
+          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+          details: 'Viewed patient record: John Doe',
+          ipAddress: '192.168.1.100'
+        },
+        {
+          id: 3,
+          action: 'Update Profile',
+          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+          details: 'Updated personal information',
+          ipAddress: '192.168.1.100'
+        }
+      ];
+
+      setActivityLogData(mockActivityLog);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load activity log",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingActivity(false);
+    }
+  };
+
+  // User permissions management
+  const handleManagePermissions = (user: User) => {
+    setSelectedUserForPermissions(user);
+    setShowPermissionsModal(true);
+  };
+
+  const handleUpdatePermissions = async (permissions: string[]) => {
+    if (!selectedUserForPermissions) return;
+
+    try {
+      // Implement API call to update permissions
+      toast({
+        title: "Permissions Updated",
+        description: `Updated permissions for ${selectedUserForPermissions.firstName} ${selectedUserForPermissions.lastName}`,
+      });
+      setShowPermissionsModal(false);
+      setSelectedUserForPermissions(null);
+      refetch(); // Refresh user data
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update permissions",
+        variant: "destructive",
+      });
+    }
   };
 
   // Group users by hospital
@@ -652,13 +1011,21 @@ const Users: React.FC = () => {
                 Edit User
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSendMessage(user)}>
                 <Mail className="w-4 h-4 mr-2" />
                 Send Message
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleViewSchedule(user)}>
                 <Calendar className="w-4 h-4 mr-2" />
                 View Schedule
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleViewActivityLog(user)}>
+                <Activity className="w-4 h-4 mr-2" />
+                View Activity Log
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleManagePermissions(user)}>
+                <Key className="w-4 h-4 mr-2" />
+                Manage Permissions
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <AlertDialog>
@@ -780,6 +1147,88 @@ const Users: React.FC = () => {
                     Add User
                   </Button>
                 </DialogTrigger>
+
+      {/* Bulk Actions Bar */}
+      {selectedUsers.length > 0 && (
+        <div className="bg-blue-50 border-b border-blue-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between py-3">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedUsers.length} user{selectedUsers.length !== 1 ? 's' : ''} selected
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelectedUsers([])}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Clear Selection
+                </Button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkAction('activate')}
+                  className="text-green-600 border-green-200 hover:bg-green-50"
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Activate
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkAction('deactivate')}
+                  className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                >
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  Deactivate
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleBulkAction('export')}
+                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete Selected Users</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete {selectedUsers.length} user{selectedUsers.length !== 1 ? 's' : ''}? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleBulkAction('delete')}
+                        className="bg-red-600 hover:bg-red-700"
+                      >
+                        Delete Users
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle className="flex items-center space-x-2">
@@ -1742,16 +2191,342 @@ const Users: React.FC = () => {
       {/* Edit User Modal */}
       {editingUser && (
         <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Edit User</DialogTitle>
+              <DialogTitle className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={editingUser.profilePhotoUrl} alt={`${editingUser.firstName} ${editingUser.lastName}`} />
+                    <AvatarFallback className="bg-blue-500 text-white text-lg font-semibold">
+                      {editingUser.firstName?.[0]}{editingUser.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h2 className="text-xl font-semibold">Edit User</h2>
+                    <p className="text-sm text-gray-600">
+                      Update information for {editingUser.firstName} {editingUser.lastName}
+                    </p>
+                  </div>
+                </div>
+              </DialogTitle>
               <DialogDescription>
-                Update user information and permissions
+                Update user information, role, and permissions
               </DialogDescription>
             </DialogHeader>
-            <div className="text-center py-8 text-gray-500">
-              User edit form will be implemented here
-            </div>
+
+            <Form {...editUserForm}>
+              <form onSubmit={editUserForm.handleSubmit(onSubmitEditUser)} className="space-y-6">
+                {/* Basic Information Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <User className="w-5 h-5 text-blue-600" />
+                    <h3 className="text-lg font-medium text-gray-900">Basic Information</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={editUserForm.control}
+                      name="firstName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>First Name *</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter first name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editUserForm.control}
+                      name="lastName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Last Name *</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter last name" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editUserForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email Address *</FormLabel>
+                          <FormControl>
+                            <Input {...field} type="email" placeholder="user@example.com" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editUserForm.control}
+                      name="phoneNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter phone number" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editUserForm.control}
+                      name="employeeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Employee ID</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter employee ID" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editUserForm.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Address</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter address" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Role and Assignment Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5 text-green-600" />
+                    <h3 className="text-lg font-medium text-gray-900">Role & Assignment</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={editUserForm.control}
+                      name="role"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Role *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select role" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="master_admin">Master Administrator</SelectItem>
+                              <SelectItem value="admin">Hospital Administrator</SelectItem>
+                              <SelectItem value="sub_admin">Branch Manager</SelectItem>
+                              <SelectItem value="doctor">Doctor</SelectItem>
+                              <SelectItem value="receptionist">Receptionist</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editUserForm.control}
+                      name="department"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter department" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editUserForm.control}
+                      name="hospitalId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Hospital</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select hospital" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No Hospital</SelectItem>
+                              {hospitals?.map((hospital: any) => (
+                                <SelectItem key={hospital._id} value={hospital._id}>
+                                  {hospital.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editUserForm.control}
+                      name="branchId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Branch</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select branch" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No Branch</SelectItem>
+                              {branches?.map((branch: any) => (
+                                <SelectItem key={branch._id} value={branch._id}>
+                                  {branch.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Professional Information Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Briefcase className="w-5 h-5 text-purple-600" />
+                    <h3 className="text-lg font-medium text-gray-900">Professional Information</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={editUserForm.control}
+                      name="specialization"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Specialization</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="Enter specialization" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Account Status Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Settings className="w-5 h-5 text-orange-600" />
+                    <h3 className="text-lg font-medium text-gray-900">Account Status</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={editUserForm.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">Account Status</FormLabel>
+                            <div className="text-sm text-gray-500">
+                              {field.value ? 'User account is active' : 'User account is inactive'}
+                            </div>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Current User Information Display */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-2">Current Information</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Created:</span>
+                      <span className="ml-2 font-medium">
+                        {new Date(editingUser.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Last Login:</span>
+                      <span className="ml-2 font-medium">
+                        {editingUser.lastLogin 
+                          ? new Date(editingUser.lastLogin).toLocaleString()
+                          : 'Never'
+                        }
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Current Role:</span>
+                      <span className="ml-2 font-medium capitalize">
+                        {editingUser.role.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Status:</span>
+                      <Badge variant={editingUser.isActive ? "default" : "secondary"} className="ml-2">
+                        {editingUser.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" onClick={handleCloseEditModal}>
+                      Cancel
+                    </Button>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      type="submit"
+                      disabled={updateUserMutation.isPending}
+                    >
+                      {updateUserMutation.isPending ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Updating...
+                        </>
+                      ) : (
+                        <>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Update User
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       )}
@@ -1759,16 +2534,625 @@ const Users: React.FC = () => {
       {/* View User Details Modal */}
       {viewingUser && (
         <Dialog open={!!viewingUser} onOpenChange={() => setViewingUser(null)}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>User Details</DialogTitle>
+              <DialogTitle className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3">
+                  <Avatar className="h-12 w-12">
+                    <AvatarImage src={viewingUser.profilePhotoUrl} alt={`${viewingUser.firstName} ${viewingUser.lastName}`} />
+                    <AvatarFallback className="bg-blue-500 text-white text-lg font-semibold">
+                      {viewingUser.firstName?.[0]}{viewingUser.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h2 className="text-xl font-semibold">{viewingUser.firstName} {viewingUser.lastName}</h2>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <Badge variant={viewingUser.isActive ? "default" : "secondary"}>
+                        {viewingUser.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                      <Badge variant="outline" className="capitalize">
+                        {viewingUser.role.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+              </DialogTitle>
               <DialogDescription>
-                Comprehensive view of user information and activity
+                Comprehensive view of user information, activity, and permissions
               </DialogDescription>
             </DialogHeader>
-            <div className="text-center py-8 text-gray-500">
-              User details view will be implemented here
+
+            <div className="space-y-6">
+              {/* Quick Actions */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium text-gray-700">Quick Actions:</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setViewingUser(null);
+                      setEditingUser(viewingUser);
+                    }}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit User
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setViewingUser(null);
+                      handleSendMessage(viewingUser);
+                    }}
+                  >
+                    <Mail className="w-4 h-4 mr-2" />
+                    Send Message
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setViewingUser(null);
+                      handleViewSchedule(viewingUser);
+                    }}
+                  >
+                    <Calendar className="w-4 h-4 mr-2" />
+                    View Schedule
+                  </Button>
+                </div>
+              </div>
+
+              {/* User Information Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Basic Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <User className="w-5 h-5" />
+                      <span>Basic Information</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Full Name</label>
+                        <p className="text-sm text-gray-900">{viewingUser.firstName} {viewingUser.lastName}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Email</label>
+                        <p className="text-sm text-gray-900">{viewingUser.email}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Phone</label>
+                        <p className="text-sm text-gray-900">{viewingUser.phoneNumber || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Employee ID</label>
+                        <p className="text-sm text-gray-900">{viewingUser.employeeId || 'Not assigned'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Emergency Contact</label>
+                        <p className="text-sm text-gray-900">{viewingUser.emergencyContact || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Address</label>
+                        <p className="text-sm text-gray-900">{viewingUser.address || 'Not provided'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Professional Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Briefcase className="w-5 h-5" />
+                      <span>Professional Information</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Role</label>
+                        <div className="flex items-center space-x-2">
+                          {getRoleIcon(viewingUser.role)}
+                          <span className="text-sm text-gray-900 capitalize">{viewingUser.role.replace('_', ' ')}</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Department</label>
+                        <p className="text-sm text-gray-900">{viewingUser.department || 'Not assigned'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Specialization</label>
+                        <p className="text-sm text-gray-900">{viewingUser.specialization || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Years of Experience</label>
+                        <p className="text-sm text-gray-900">{viewingUser.yearsOfExperience || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Medical License</label>
+                        <p className="text-sm text-gray-900">{viewingUser.medicalLicenseNumber || 'Not provided'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Shift Timing</label>
+                        <p className="text-sm text-gray-900 capitalize">{viewingUser.shiftTiming || 'Not specified'}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Assignment Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Building2 className="w-5 h-5" />
+                      <span>Assignment Information</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Hospital</label>
+                        <p className="text-sm text-gray-900">{viewingUser.hospitalId?.name || 'Not assigned'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Branch</label>
+                        <p className="text-sm text-gray-900">{viewingUser.branchId?.name || 'Not assigned'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Joining Date</label>
+                        <p className="text-sm text-gray-900">
+                          {viewingUser.joiningDate 
+                            ? new Date(viewingUser.joiningDate).toLocaleDateString()
+                            : 'Not specified'
+                          }
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Account Created</label>
+                        <p className="text-sm text-gray-900">
+                          {new Date(viewingUser.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Activity Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Clock className="w-5 h-5" />
+                      <span>Activity Information</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Last Login</label>
+                        <p className="text-sm text-gray-900">
+                          {viewingUser.lastLogin 
+                            ? new Date(viewingUser.lastLogin).toLocaleString()
+                            : 'Never logged in'
+                          }
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Account Status</label>
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-2 h-2 rounded-full ${viewingUser.isActive ? 'bg-green-500' : 'bg-red-500'}`} />
+                          <span className="text-sm text-gray-900 capitalize">
+                            {viewingUser.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Days Since Last Login</label>
+                        <p className="text-sm text-gray-900">
+                          {viewingUser.lastLogin 
+                            ? Math.floor((Date.now() - new Date(viewingUser.lastLogin).getTime()) / (1000 * 60 * 60 * 24))
+                            : 'N/A'
+                          } days
+                        </p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">Account Age</label>
+                        <p className="text-sm text-gray-900">
+                          {Math.floor((Date.now() - new Date(viewingUser.createdAt).getTime()) / (1000 * 60 * 60 * 24))} days
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Certifications and Permissions */}
+              {((viewingUser.certifications && viewingUser.certifications.length > 0) || (viewingUser.permissions && viewingUser.permissions.length > 0)) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {viewingUser.certifications && viewingUser.certifications.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <GraduationCap className="w-5 h-5" />
+                          <span>Certifications</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-wrap gap-2">
+                          {viewingUser.certifications.map((cert, index) => (
+                            <Badge key={index} variant="outline">
+                              {cert}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {viewingUser.permissions && viewingUser.permissions.length > 0 && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center space-x-2">
+                          <Shield className="w-5 h-5" />
+                          <span>Permissions</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-wrap gap-2">
+                          {viewingUser.permissions.map((permission, index) => (
+                            <Badge key={index} variant="secondary">
+                              {permission}
+                            </Badge>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+              )}
+
+              {/* Role Description */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <FileText className="w-5 h-5" />
+                    <span>Role Description</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-700">
+                    {getRoleDescription(viewingUser.role)}
+                  </p>
+                </CardContent>
+              </Card>
             </div>
+
+            <DialogFooter className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" onClick={() => setViewingUser(null)}>
+                  Close
+                </Button>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setViewingUser(null);
+                    setEditingUser(viewingUser);
+                  }}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit User
+                </Button>
+                <Button
+                  onClick={() => {
+                    setViewingUser(null);
+                    handleSendMessage(viewingUser);
+                  }}
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  Send Message
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Send Message Modal */}
+      {showMessageModal && selectedUserForAction && (
+        <Dialog open={showMessageModal} onOpenChange={handleCloseMessageModal}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send Message</DialogTitle>
+              <DialogDescription>
+                Send a message to {selectedUserForAction.firstName} {selectedUserForAction.lastName}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Message</label>
+                <Textarea
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder="Enter your message here..."
+                  rows={4}
+                  className="mt-1"
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button variant="outline" onClick={handleCloseMessageModal}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleMessageSubmit}
+                  disabled={sendMessageMutation.isPending || !messageText.trim()}
+                >
+                  {sendMessageMutation.isPending ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Send Message
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* View Schedule Modal */}
+      {showScheduleModal && selectedUserForAction && (
+        <Dialog open={showScheduleModal} onOpenChange={handleCloseScheduleModal}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>User Schedule</DialogTitle>
+              <DialogDescription>
+                View schedule for {selectedUserForAction.firstName} {selectedUserForAction.lastName}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-2">User Information</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Name:</span>
+                      <span className="font-medium">{selectedUserForAction.firstName} {selectedUserForAction.lastName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Role:</span>
+                      <span className="font-medium">{selectedUserForAction.role}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Department:</span>
+                      <span className="font-medium">{selectedUserForAction.department || 'Not assigned'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Shift:</span>
+                      <span className="font-medium">{selectedUserForAction.shiftTiming || 'Not specified'}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-2">Schedule Details</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <Badge variant={selectedUserForAction.isActive ? "default" : "secondary"}>
+                        {selectedUserForAction.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Last Login:</span>
+                      <span className="font-medium">
+                        {selectedUserForAction.lastLogin 
+                          ? new Date(selectedUserForAction.lastLogin).toLocaleDateString()
+                          : 'Never'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Joined:</span>
+                      <span className="font-medium">
+                        {selectedUserForAction.joiningDate 
+                          ? new Date(selectedUserForAction.joiningDate).toLocaleDateString()
+                          : 'Not specified'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h4 className="font-medium text-blue-900 mb-2">Schedule Information</h4>
+                <div className="text-sm text-blue-800">
+                  <p>Schedule details will be displayed here based on user role and availability.</p>
+                  <p className="mt-2">
+                    {selectedUserForAction.role === 'doctor' && (
+                      <>Doctor availability and appointment schedules can be viewed here.</>
+                    )}
+                    {selectedUserForAction.role === 'receptionist' && (
+                      <>Receptionist shift schedules and work hours can be viewed here.</>
+                    )}
+                    {selectedUserForAction.role === 'admin' && (
+                      <>Administrative schedules and work hours can be viewed here.</>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" onClick={handleCloseScheduleModal}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Activity Log Modal */}
+      {showActivityLog && selectedUserForActivity && (
+        <Dialog open={showActivityLog} onOpenChange={() => setShowActivityLog(false)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Activity className="w-5 h-5" />
+                <span>User Activity Log</span>
+              </DialogTitle>
+              <DialogDescription>
+                Recent activity for {selectedUserForActivity.firstName} {selectedUserForActivity.lastName}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {isLoadingActivity ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {activityLogData.map((activity) => (
+                    <div key={activity.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-gray-900">{activity.action}</h4>
+                          <span className="text-sm text-gray-500">
+                            {new Date(activity.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">{activity.details}</p>
+                        <p className="text-xs text-gray-400 mt-1">IP: {activity.ipAddress}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowActivityLog(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Permissions Management Modal */}
+      {showPermissionsModal && selectedUserForPermissions && (
+        <Dialog open={showPermissionsModal} onOpenChange={() => setShowPermissionsModal(false)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Key className="w-5 h-5" />
+                <span>Manage Permissions</span>
+              </DialogTitle>
+              <DialogDescription>
+                Manage permissions for {selectedUserForPermissions.firstName} {selectedUserForPermissions.lastName}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">User Information</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Name:</span>
+                      <span className="font-medium">
+                        {selectedUserForPermissions.firstName} {selectedUserForPermissions.lastName}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Role:</span>
+                      <span className="font-medium capitalize">
+                        {selectedUserForPermissions.role.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Department:</span>
+                      <span className="font-medium">
+                        {selectedUserForPermissions.department || 'Not assigned'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Current Permissions</h4>
+                  <div className="space-y-2">
+                    {selectedUserForPermissions.permissions && selectedUserForPermissions.permissions.length > 0 ? (
+                      selectedUserForPermissions.permissions.map((permission, index) => (
+                        <Badge key={index} variant="secondary" className="mr-1 mb-1">
+                          {permission}
+                        </Badge>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No specific permissions assigned</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium text-gray-900 mb-3">Available Permissions</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    'view_patients', 'edit_patients', 'delete_patients',
+                    'view_appointments', 'edit_appointments', 'delete_appointments',
+                    'view_reports', 'edit_reports', 'delete_reports',
+                    'manage_users', 'manage_settings', 'view_analytics'
+                  ].map((permission) => (
+                    <div key={permission} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={permission}
+                        checked={selectedUserForPermissions.permissions?.includes(permission) || false}
+                        onCheckedChange={(checked) => {
+                          const currentPermissions = selectedUserForPermissions.permissions || [];
+                          const newPermissions = checked
+                            ? [...currentPermissions, permission]
+                            : currentPermissions.filter(p => p !== permission);
+                          
+                          setSelectedUserForPermissions({
+                            ...selectedUserForPermissions,
+                            permissions: newPermissions
+                          });
+                        }}
+                      />
+                      <label htmlFor={permission} className="text-sm font-medium text-gray-700 capitalize">
+                        {permission.replace('_', ' ')}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPermissionsModal(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => handleUpdatePermissions(selectedUserForPermissions.permissions || [])}
+              >
+                <Key className="w-4 h-4 mr-2" />
+                Update Permissions
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}

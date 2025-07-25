@@ -7,6 +7,7 @@ import {
   Building2, 
   Bell, 
   LogOut,
+  Hospital,
   Menu,
   X,
   User,
@@ -21,7 +22,9 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  LayoutDashboard
+  LayoutDashboard,
+  Users,
+  Stethoscope
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -80,6 +83,18 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       description: 'Create new branch location'
     },
     { 
+      name: 'Department Management', 
+      href: '/admin/department-management', 
+      icon: Users,
+      description: 'Manage hospital departments'
+    },
+    { 
+      name: 'Doctor Availability', 
+      href: '/admin/doctor-availability', 
+      icon: Stethoscope,
+      description: 'Manage doctor schedules and availability'
+    },
+    { 
       name: 'Staff Management', 
       href: '/admin/staff', 
       icon: User,
@@ -97,7 +112,6 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       icon: TrendingUp,
       description: 'Advanced reporting and insights'
     },
-    
     { 
       name: 'Audit & Compliance', 
       href: '/admin/audit', 
@@ -110,8 +124,6 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       icon: Settings,
       description: 'System settings and preferences'
     },
-    
-    
   ];
 
   const handleLogout = () => {
@@ -120,70 +132,51 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       {/* Sidebar */}
       <div className={cn(
-        "fixed inset-y-0 left-0 z-50 bg-white shadow-lg transform transition-all duration-300 ease-in-out",
-        "lg:relative lg:translate-x-0 lg:transition-none",
+        "fixed top-0 left-0 bottom-0 z-50 bg-white shadow-lg border-r border-gray-200 transform transition-all duration-300 ease-in-out",
+        "lg:relative lg:translate-x-0 lg:transition-none lg:top-0 lg:bottom-0",
         mobileSidebarOpen ? "translate-x-0 w-64" : "-translate-x-full w-64",
         desktopSidebarCollapsed ? "lg:w-20" : "lg:w-64"
       )}>
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-          {!desktopSidebarCollapsed && (
-            <div className="flex items-center space-x-3">
-              {/* Updated logo section */}
-              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-200">
-                {hospitalData?.logoUrl ? (
-                  <img 
-                    src={hospitalData.logoUrl}
-                    alt={`${hospitalData.name} Logo`}
-                    className="w-full h-full object-contain p-0.5"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <IndianRupee className="w-5 h-5 text-blue-600" />
-                )}
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+            {!desktopSidebarCollapsed ? (
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                  {hospitalData?.logoUrl ? (
+                    <img 
+                      src={hospitalData.logoUrl}
+                      alt={`${hospitalData.name} Logo`}
+                      className="w-8 h-8 object-contain rounded-lg"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <Hospital className="w-6 h-6 text-white" />
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-lg font-semibold text-gray-900">
+                    {hospitalData?.name || 'Admin Panel'}
+                  </h1>
+                  <p className="text-xs text-gray-500">
+                    {hospitalData?.name ? 'Administration' : 'Hospital Management'}
+                  </p>
+                </div>
               </div>
-              
-              <div>
-                <h1 className="text-lg font-semibold text-gray-900">
-                  {hospitalData?.name || 'Admin Panel'}
-                </h1>
-                <p className="text-xs text-gray-500">
-                  {hospitalData?.name ? 'Administration' : 'Hospital Management'}
-                </p>
+            ) : (
+              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                <Hospital className="w-6 h-6 text-white" />
               </div>
-            </div>
-          )}
-          {desktopSidebarCollapsed && (
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mx-auto">
-              <IndianRupee className="w-5 h-5 text-white" />
-            </div>
-          )}
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-              className="lg:hidden"
-            >
-              {mobileSidebarOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setDesktopSidebarCollapsed(!desktopSidebarCollapsed)}
-              className="hidden lg:flex"
-            >
-              {desktopSidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </Button>
+            )}
           </div>
-        </div>
 
-        <nav className="mt-6 px-3">
-          <div className="space-y-1">
+          {/* Navigation */}
+          <nav className="flex-1 mt-6 px-3 space-y-2 overflow-hidden">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
               return (
@@ -191,35 +184,31 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                   key={item.name}
                   to={item.href}
                   className={cn(
-                    "group flex items-center px-3 py-3 text-sm font-medium rounded-lg transition-colors",
+                    "group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors duration-200",
                     isActive
-                      ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600"
-                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900",
+                      ? "bg-blue-50 text-blue-700 border border-blue-200 shadow-sm"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
                     desktopSidebarCollapsed ? "justify-center" : ""
                   )}
                 >
                   <item.icon
                     className={cn(
-                      isActive ? "text-blue-600" : "text-gray-400 group-hover:text-gray-500",
+                      "w-5 h-5",
+                      isActive ? "text-blue-600" : "text-gray-500 group-hover:text-gray-700",
                       desktopSidebarCollapsed ? "mx-auto" : "mr-3"
                     )}
                   />
                   {!desktopSidebarCollapsed && (
-                    <div className="flex-1">
-                      <div className="font-medium">{item.name}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">{item.description}</div>
-                    </div>
+                    <span className="flex-1 whitespace-nowrap">{item.name}</span>
                   )}
                 </Link>
               );
             })}
-          </div>
-        </nav>
+          </nav>
 
-        {/* Quick Stats */}
-        {!desktopSidebarCollapsed && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
-            <div className="space-y-3">
+          {/* Footer */}
+          {!desktopSidebarCollapsed && (
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">System Status</span>
                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
@@ -227,23 +216,23 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                   Online
                 </Badge>
               </div>
-              
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="bg-white shadow-sm border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between h-16 px-4">
             <div className="flex items-center space-x-4">
+              {/* Mobile menu toggle */}
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-                className="lg:hidden"
+                className="lg:hidden text-gray-600 hover:text-gray-900 hover:bg-gray-100"
               >
                 {mobileSidebarOpen ? (
                   <X className="h-5 w-5" />
@@ -252,9 +241,30 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                 )}
               </Button>
               
+              {/* Desktop sidebar toggle */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setDesktopSidebarCollapsed(!desktopSidebarCollapsed)}
+                className="hidden lg:flex items-center space-x-2 hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:text-gray-900"
+                title={desktopSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                {desktopSidebarCollapsed ? (
+                  <>
+                    <ChevronRight className="h-4 w-4" />
+                    <span className="text-sm font-medium">Expand</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="text-sm font-medium">Collapse</span>
+                  </>
+                )}
+              </Button>
+              
               <div className="flex items-center space-x-2">
-                <Building2 className="h-5 w-5 text-gray-400" />
-                <span className="text-sm text-gray-600">
+                <Building2 className="h-5 w-5 text-gray-500" />
+                <span className="text-sm text-gray-700 font-medium">
                   Hospital Administration
                 </span>
               </div>
@@ -324,8 +334,10 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-auto">
-          <Outlet />
+        <main className="flex-1 overflow-hidden">
+          <div className="h-full overflow-auto">
+            <Outlet />
+          </div>
         </main>
         
         {/* Chat and Notification Components */}

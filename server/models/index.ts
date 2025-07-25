@@ -98,6 +98,7 @@ export const Payment = mongoose.models.Payment || mongoose.model('Payment', paym
 
 // Export new models
 export * from './user';
+export * from './notification';
 export * from './patient';
 export * from './appointment';
 export * from './payment';

@@ -97,14 +97,23 @@ router.get('/unread-count', authenticateToken, async (req: AuthRequest, res) => 
   try {
     const userId = req.user?.id;
     const hospitalId = req.user?.hospitalId;
+    const userRole = req.user?.role;
+
+    console.log('unread-count: Request from user:', { userId, hospitalId, userRole });
 
     if (!userId) {
+      console.log('unread-count: No user ID provided');
       return res.status(400).json({ message: 'User context required' });
     }
 
     // For master_admin, they might not have a hospitalId
-    if (!hospitalId && req.user?.role !== 'master_admin') {
-      return res.status(400).json({ message: 'Hospital context required' });
+    if (!hospitalId && userRole !== 'master_admin') {
+      console.log('unread-count: No hospitalId and user is not master_admin');
+      // Instead of returning 400, return 0 count for users without hospital context
+      return res.json({
+        success: true,
+        count: 0
+      });
     }
 
     const query: any = {
@@ -118,13 +127,18 @@ router.get('/unread-count', authenticateToken, async (req: AuthRequest, res) => 
       query.hospitalId = hospitalId;
     }
 
+    console.log('unread-count: Query:', query);
+
     const count = await Notification.countDocuments(query);
+
+    console.log('unread-count: Found count:', count);
 
     res.json({
       success: true,
       count
     });
   } catch (error) {
+    console.error('unread-count: Error:', error);
     res.status(500).json({ 
       success: false,
       message: 'Error fetching unread count' 
@@ -461,6 +475,119 @@ router.get('/stats', authenticateToken, async (req: AuthRequest, res) => {
     res.status(500).json({ 
       success: false,
       message: 'Error fetching notification statistics' 
+    });
+  }
+});
+
+// Send message to specific user
+router.post('/send-message', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { userId, message } = req.body;
+    const senderId = req.user?.id;
+    const hospitalId = req.user?.hospitalId;
+    const userRole = req.user?.role;
+
+    if (!senderId || !userId || !message) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Missing required fields: userId and message are required' 
+      });
+    }
+
+    // For master_admin, they might not have a hospitalId
+    if (!hospitalId && userRole !== 'master_admin') {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Hospital context required' 
+      });
+    }
+
+    // Validate message length
+    if (message.trim().length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Message cannot be empty' 
+      });
+    }
+
+    if (message.length > 1000) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Message too long (max 1000 characters)' 
+      });
+    }
+
+    // Check if recipient user exists
+    const { User } = await import('../models');
+    const recipient = await User.findById(userId);
+    
+    if (!recipient) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Recipient user not found' 
+      });
+    }
+
+    // For master_admin, they can send to any user
+    // For other users, check if they have permission to send to this user
+    if (userRole !== 'master_admin') {
+      const allowedRoles = NOTIFICATION_PERMISSIONS[userRole as keyof typeof NOTIFICATION_PERMISSIONS];
+      if (!allowedRoles || !allowedRoles.includes(recipient.role)) {
+        return res.status(403).json({ 
+          success: false,
+          message: 'Insufficient permissions to send message to this user' 
+        });
+      }
+
+      // Check if recipient is in the same hospital (for non-master_admin users)
+      if (recipient.hospitalId?.toString() !== hospitalId) {
+        return res.status(403).json({ 
+          success: false,
+          message: 'Can only send messages to users in the same hospital' 
+        });
+      }
+    }
+
+    // Get sender details for the notification title
+    const sender = await User.findById(senderId).select('firstName lastName');
+    const senderName = sender ? `${sender.firstName} ${sender.lastName}` : 'System';
+
+    // Create the notification
+    const notification = new Notification({
+      notificationId: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      hospitalId: hospitalId || recipient.hospitalId,
+      type: 'individual',
+      title: `Message from ${senderName}`,
+      message: message.trim(),
+      sender: senderId,
+      recipients: [new mongoose.Types.ObjectId(userId)],
+      priority: 'medium',
+      category: 'chat',
+      isActive: true
+    });
+
+    await notification.save();
+    await notification.populate('sender', 'firstName lastName role');
+
+    // Broadcast via WebSocket if available
+    try {
+      // Note: WebSocket broadcasting is handled by the notification service
+      // The notification will be automatically broadcasted when saved
+      console.log(`Message sent to user ${userId}: ${message.substring(0, 50)}...`);
+    } catch (socketError) {
+      console.log('WebSocket broadcast failed (non-critical):', socketError);
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Message sent successfully',
+      notification
+    });
+  } catch (error) {
+    console.error('Error sending message:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error sending message' 
     });
   }
 });
