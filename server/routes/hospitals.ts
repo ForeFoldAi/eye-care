@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
-import { Hospital, User } from '../models';
+import { Hospital, User, Subscription } from '../models';
 import { insertHospitalSchema, insertUserSchema } from '../shared/schema';
 import { authenticateToken, authorizeRole, AuthRequest } from '../middleware/auth';
 
@@ -14,7 +14,43 @@ router.get('/', authenticateToken, authorizeRole(['master_admin']), async (req: 
       .populate('adminId', 'firstName lastName email')
       .sort({ createdAt: -1 });
     
-    res.json(hospitals);
+    // Get subscription information for each hospital
+    const hospitalsWithSubscription = await Promise.all(
+      hospitals.map(async (hospital) => {
+        const subscription = await Subscription.findOne({ 
+          hospitalId: hospital._id,
+          isActive: true 
+        }).sort({ createdAt: -1 });
+
+        // Determine subscription status
+        let subscriptionStatus = 'not_assigned';
+        if (subscription) {
+          if (subscription.status === 'active' || subscription.status === 'trial') {
+            subscriptionStatus = 'active';
+          } else if (subscription.status === 'suspended' || subscription.status === 'expired' || subscription.status === 'cancelled') {
+            subscriptionStatus = 'inactive';
+          }
+        }
+
+        return {
+          ...hospital.toObject(),
+          subscription: subscription ? {
+            _id: subscription._id,
+            planName: subscription.planName,
+            planType: subscription.planType,
+            status: subscription.status,
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            nextBillingDate: subscription.nextBillingDate,
+            monthlyCost: subscription.monthlyCost,
+            currency: subscription.currency
+          } : null,
+          subscriptionStatus
+        };
+      })
+    );
+    
+    res.json(hospitalsWithSubscription);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching hospitals' });
   }
@@ -28,7 +64,43 @@ router.get('/my-hospitals', authenticateToken, authorizeRole(['admin']), async (
       .populate('adminId', 'firstName lastName email')
       .sort({ createdAt: -1 });
     
-    res.json(hospitals);
+    // Get subscription information for each hospital
+    const hospitalsWithSubscription = await Promise.all(
+      hospitals.map(async (hospital) => {
+        const subscription = await Subscription.findOne({ 
+          hospitalId: hospital._id,
+          isActive: true 
+        }).sort({ createdAt: -1 });
+
+        // Determine subscription status
+        let subscriptionStatus = 'not_assigned';
+        if (subscription) {
+          if (subscription.status === 'active' || subscription.status === 'trial') {
+            subscriptionStatus = 'active';
+          } else if (subscription.status === 'suspended' || subscription.status === 'expired' || subscription.status === 'cancelled') {
+            subscriptionStatus = 'inactive';
+          }
+        }
+
+        return {
+          ...hospital.toObject(),
+          subscription: subscription ? {
+            _id: subscription._id,
+            planName: subscription.planName,
+            planType: subscription.planType,
+            status: subscription.status,
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            nextBillingDate: subscription.nextBillingDate,
+            monthlyCost: subscription.monthlyCost,
+            currency: subscription.currency
+          } : null,
+          subscriptionStatus
+        };
+      })
+    );
+    
+    res.json(hospitalsWithSubscription);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching hospitals' });
   }

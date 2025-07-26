@@ -15,7 +15,7 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  DollarSign,
+  
   Ticket,
   CreditCard,
   FileText,
@@ -384,7 +384,7 @@ const MasterAdminDashboard: React.FC = () => {
       Building2,
       Users,
       User: Users, // Map 'User' to 'Users' icon
-      DollarSign,
+      IndianRupee,
       Ticket,
       CreditCard
     };

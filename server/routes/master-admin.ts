@@ -733,7 +733,7 @@ router.get('/activity-log', authenticateToken, async (req: AuthRequest, res) => 
           title: 'Payment received',
           description: `₹${payment.amount} - ${payment.patientId?.firstName} ${payment.patientId?.lastName}`,
           time: payment.createdAt,
-          icon: 'DollarSign',
+          icon: 'IndianRupee',
           color: 'text-emerald-600 bg-emerald-50',
           details: {
             amount: payment.amount,
@@ -862,12 +862,34 @@ router.get('/hospitals', async (req: AuthRequest, res) => {
           Branch.countDocuments({ hospitalId: hospital._id, isActive: true }),
           User.countDocuments({ hospitalId: hospital._id, isActive: true }),
           Patient.countDocuments({ hospitalId: hospital._id }),
-          Subscription.findOne({ hospitalId: hospital._id, status: 'active' }),
+          Subscription.findOne({ hospitalId: hospital._id, isActive: true }).sort({ createdAt: -1 }),
           Analytics.findOne({ hospitalId: hospital._id }).sort({ date: -1 })
         ]);
 
+        // Determine subscription status
+        let subscriptionStatus = 'not_assigned';
+        if (subscription) {
+          if (subscription.status === 'active' || subscription.status === 'trial') {
+            subscriptionStatus = 'active';
+          } else if (subscription.status === 'suspended' || subscription.status === 'expired' || subscription.status === 'cancelled') {
+            subscriptionStatus = 'inactive';
+          }
+        }
+
         return {
           ...hospital.toObject(),
+          subscription: subscription ? {
+            _id: subscription._id,
+            planName: subscription.planName,
+            planType: subscription.planType,
+            status: subscription.status,
+            startDate: subscription.startDate,
+            endDate: subscription.endDate,
+            nextBillingDate: subscription.nextBillingDate,
+            monthlyCost: subscription.monthlyCost,
+            currency: subscription.currency
+          } : null,
+          subscriptionStatus,
           stats: {
             branches: branchCount,
             users: userCount,

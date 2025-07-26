@@ -53,8 +53,12 @@ export default function LoginPage() {
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTime, setLockoutTime] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Slideshow images
+  const slideshowImages = ['/1.jpg', '/2.jpg', '/3.jpg', '/4.jpg', '/5.jpg'];
 
   // Lockout timer effect
   useEffect(() => {
@@ -86,6 +90,17 @@ export default function LoginPage() {
       setRole(rememberedRole);
     }
   }, []);
+
+  // Slideshow effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prevIndex) => 
+        prevIndex === slideshowImages.length - 1 ? 0 : prevIndex + 1
+      );
+    }, 4000); // Change image every 4 seconds
+
+    return () => clearInterval(interval);
+  }, [slideshowImages.length]);
 
   // Email validation
   const validateEmail = (email: string): string | undefined => {
@@ -280,8 +295,8 @@ export default function LoginPage() {
       icon: UserCog, 
       email: 'admin@hospital.com',
       description: 'Administrative access',
-      bgClass: 'bg-gradient-to-r from-blue-500 to-cyan-500',
-      hoverClass: 'hover:from-blue-600 hover:to-cyan-600'
+      bgClass: 'bg-gradient-to-r from-emerald-500 to-teal-500',
+      hoverClass: 'hover:from-emerald-600 hover:to-teal-600'
     },
     { 
       type: 'sub_admin' as const, 
@@ -353,12 +368,37 @@ export default function LoginPage() {
   const passwordStrength = calculatePasswordStrength(password);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-indigo-900 to-purple-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decorations */}
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background slideshow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-emerald-400/20 to-cyan-400/20 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-indigo-400/10 to-purple-400/10 rounded-full blur-3xl"></div>
+        {/* Slideshow images */}
+        {slideshowImages.map((image, index) => (
+          <div
+            key={image}
+            className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-1000 ease-in-out ${
+              index === currentImageIndex ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ backgroundImage: `url(${image})` }}
+          />
+        ))}
+        
+        {/* Overlay gradient for better text readability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-900/60 via-slate-800/50 to-zinc-900/60"></div>
+        
+        {/* Slideshow indicators */}
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+          {slideshowImages.map((_, index) => (
+            <button
+              key={index}
+              className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                index === currentImageIndex 
+                  ? 'bg-white scale-125' 
+                  : 'bg-white/50 hover:bg-white/75'
+              }`}
+              onClick={() => setCurrentImageIndex(index)}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Loading overlay */}
@@ -372,34 +412,38 @@ export default function LoginPage() {
       )}
 
       <div className="w-full max-w-lg relative z-10">
-        <Card className="shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+        <Card className="shadow-2xl border-0 bg-white/20 backdrop-blur-md">
           <CardHeader className="text-center pb-6">
             <div className="flex items-center justify-center mb-6">
               <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-br from-medical-blue-500 to-medical-blue-600 rounded-2xl flex items-center justify-center shadow-lg transform rotate-3">
-                  <Heart className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg transform rotate-3 p-2">
+                  <img 
+                    src="/logo.png" 
+                    alt="ForeFold HMS Logo" 
+                    className="w-full h-full object-contain"
+                  />
                 </div>
                 <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-full flex items-center justify-center">
                   <Sparkles className="w-3 h-3 text-white" />
                 </div>
               </div>
             </div>
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+            <CardTitle className="text-3xl font-bold text-white">
               Welcome to ForeFold HMS
             </CardTitle>
-            <CardDescription className="text-lg text-gray-600 mt-2">
+            <CardDescription className="text-lg text-white/90 mt-2">
               Sign in to access your healthcare dashboard
             </CardDescription>
           </CardHeader>
 
           <CardContent>
             <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="login" className="flex items-center gap-2">
+              <TabsList className="grid w-full grid-cols-2 gap-3 mb-6 bg-white/10 backdrop-blur-sm">
+                <TabsTrigger value="login" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=inactive]:text-white/80 hover:text-white">
                   <User className="w-4 h-4" />
                   Login
                 </TabsTrigger>
-                <TabsTrigger value="demo" className="flex items-center gap-2">
+                <TabsTrigger value="demo" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=inactive]:text-white/80 hover:text-white">
                   <Sparkles className="w-4 h-4" />
                   Quick Demo
                 </TabsTrigger>
@@ -429,7 +473,7 @@ export default function LoginPage() {
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Email Field */}
                   <div className="space-y-2">
-                    <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="email" className="text-sm font-medium text-white">
                       Email Address
                     </Label>
                     <div className="relative">
@@ -446,7 +490,7 @@ export default function LoginPage() {
                         className={`pl-10 transition-all duration-200 ${
                           errors.email && touched.email 
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
-                            : 'border-gray-300 focus:border-medical-blue-500 focus:ring-medical-blue-200'
+                            : 'border-gray-300 focus:border-emerald-500 focus:ring-emerald-200'
                         }`}
                         placeholder="Enter your email address"
                         disabled={isLoading || isLocked}
@@ -471,7 +515,7 @@ export default function LoginPage() {
 
                   {/* Password Field */}
                   <div className="space-y-2">
-                    <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                    <Label htmlFor="password" className="text-sm font-medium text-white">
                       Password
                     </Label>
                     <div className="relative">
@@ -488,7 +532,7 @@ export default function LoginPage() {
                         className={`pl-10 pr-10 transition-all duration-200 ${
                           errors.password && touched.password 
                             ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
-                            : 'border-gray-300 focus:border-medical-blue-500 focus:ring-medical-blue-200'
+                            : 'border-gray-300 focus:border-emerald-500 focus:ring-emerald-200'
                         }`}
                         placeholder="Enter your password"
                         disabled={isLoading || isLocked}
@@ -536,7 +580,7 @@ export default function LoginPage() {
 
                   {/* Role Selection */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium text-gray-700">Role</Label>
+                    <Label className="text-sm font-medium text-white">Role</Label>
                     <Select
                       value={role} 
                       onValueChange={(value) => {
@@ -549,7 +593,7 @@ export default function LoginPage() {
                       <SelectTrigger className={`transition-all duration-200 ${
                         errors.role && touched.role 
                           ? 'border-red-300 focus:border-red-500 focus:ring-red-200' 
-                          : 'border-gray-300 focus:border-medical-blue-500 focus:ring-medical-blue-200'
+                          : 'border-gray-300 focus:border-emerald-500 focus:ring-emerald-200'
                       }`}>
                         <SelectValue placeholder="Select your role" />
                       </SelectTrigger>
@@ -562,7 +606,7 @@ export default function LoginPage() {
                         </SelectItem>
                         <SelectItem value="admin">
                           <div className="flex items-center gap-2">
-                            <UserCog className="w-4 h-4 text-blue-500" />
+                            <UserCog className="w-4 h-4 text-emerald-500" />
                             Admin
                           </div>
                         </SelectItem>
@@ -601,10 +645,10 @@ export default function LoginPage() {
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="rounded border-gray-300 text-medical-blue-600 focus:ring-medical-blue-500"
+                      className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                       disabled={isLoading || isLocked}
                     />
-                    <Label htmlFor="remember" className="text-sm text-gray-600 cursor-pointer">
+                    <Label htmlFor="remember" className="text-sm text-white/90 cursor-pointer">
                       Remember my email and role
                     </Label>
                   </div>
@@ -612,7 +656,7 @@ export default function LoginPage() {
                   {/* Submit Button */}
                   <Button
                     type="submit"
-                    className="w-full bg-gradient-to-r from-medical-blue-500 to-medical-blue-600 hover:from-medical-blue-600 hover:to-medical-blue-700 text-white font-medium py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                    className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-medium py-3 rounded-lg transition-all duration-200 transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     disabled={isLoading || isLocked}
                   >
                     {isLoading ? (
@@ -628,11 +672,11 @@ export default function LoginPage() {
               </TabsContent>
 
               <TabsContent value="demo" className="space-y-6">
-                <div className="text-center mb-6">
-                  <p className="text-sm text-gray-600">
-                    Try different user roles with pre-configured demo accounts
-                  </p>
-                </div>
+                                  <div className="text-center mb-6">
+                    <p className="text-sm text-white/80">
+                      Try different user roles with pre-configured demo accounts
+                    </p>
+                  </div>
                 
                 <div className="grid gap-3">
                   {demoUsers.map((user) => {
@@ -665,7 +709,7 @@ export default function LoginPage() {
         </Card>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-sm text-gray-500">
+        <div className="text-center mt-8 text-sm text-white/70">
           <p>© 2025 EyeCare Health Management System</p>
           <p className="mt-1">Secure • Reliable • Professional</p>
         </div>

@@ -238,9 +238,14 @@ const StaffManagement = () => {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted!', { editingStaff: !!editingStaff, formData });
     
-    // Validate required fields
-    const requiredFields = [
+    // Validate required fields - different for add vs edit
+    const requiredFields = editingStaff ? [
+      { field: 'firstName', label: 'First Name' },
+      { field: 'lastName', label: 'Last Name' },
+      { field: 'email', label: 'Email' },
+    ] : [
       { field: 'firstName', label: 'First Name' },
       { field: 'lastName', label: 'Last Name' },
       { field: 'email', label: 'Email' },
@@ -288,8 +293,8 @@ const StaffManagement = () => {
     
     try {
       if (editingStaff) {
-        // Update existing staff member with all available fields
-        await updateStaff(editingStaff._id, {
+        console.log('Updating staff member:', editingStaff._id);
+        console.log('Update data:', {
           firstName: formData.firstName,
           lastName: formData.lastName,
           email: formData.email,
@@ -303,7 +308,33 @@ const StaffManagement = () => {
           employeeId: formData.employeeId,
           joiningDate: formData.joiningDate,
           shiftTiming: formData.shiftTiming,
-
+          highestQualification: formData.highestQualification,
+          medicalLicenseNumber: formData.medicalLicenseNumber,
+          yearsOfExperience: formData.yearsOfExperience,
+          certifications: formData.certifications,
+          previousHospitals: formData.previousHospitals,
+          currentAddress: formData.currentAddress,
+          permanentAddress: formData.permanentAddress,
+          city: formData.city,
+          state: formData.state,
+          zipCode: formData.zipCode,
+        });
+        
+        // Update existing staff member with all available fields
+        await updateStaff(editingStaff._id, {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phoneNumber: formData.contactNumber,
+          role: formData.systemRole, // Use systemRole for the actual role
+          specialization: formData.specialization,
+          department: formData.department,
+          gender: formData.gender,
+          dateOfBirth: formData.dateOfBirth,
+          emergencyContact: formData.emergencyContact,
+          employeeId: formData.employeeId,
+          joiningDate: formData.joiningDate,
+          shiftTiming: formData.shiftTiming,
           highestQualification: formData.highestQualification,
           medicalLicenseNumber: formData.medicalLicenseNumber,
           yearsOfExperience: formData.yearsOfExperience,
@@ -316,6 +347,8 @@ const StaffManagement = () => {
           zipCode: formData.zipCode,
           // Note: We don't update password in edit mode for security
         });
+        
+        console.log('Staff member updated successfully');
         
         toast({
           title: "Staff Member Updated",
@@ -346,6 +379,7 @@ const StaffManagement = () => {
       
       resetForm();
     } catch (error) {
+      console.error('Error in handleSubmit:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save staff member",
@@ -363,7 +397,7 @@ const StaffManagement = () => {
       gender: staffMember.gender || 'male',
       dateOfBirth: staffMember.dateOfBirth || '',
       photo: null,
-      contactNumber: staffMember.phone || '',
+      contactNumber: staffMember.phone || staffMember.phoneNumber || '',
       email: staffMember.email,
       emergencyContact: staffMember.emergencyContact || '',
       role: staffMember.role as any,
@@ -384,7 +418,7 @@ const StaffManagement = () => {
       state: staffMember.state || '',
       zipCode: staffMember.zipCode || '',
       username: '', // Don't pre-fill username for security
-      systemRole: staffMember.role as any,
+      systemRole: staffMember.role as any, // Set systemRole to match the actual role
       password: '', // Don't pre-fill password for security
       confirmPassword: '',
       idProof: null,
@@ -1203,6 +1237,39 @@ const StaffManagement = () => {
                   />
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Gender</Label>
+                  <RadioGroup
+                    value={formData.gender}
+                    onValueChange={(value) => handleInputChange('gender', value)}
+                    className="flex space-x-4 mt-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="male" id="editMale" />
+                      <Label htmlFor="editMale">Male</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="female" id="editFemale" />
+                      <Label htmlFor="editFemale">Female</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="other" id="editOther" />
+                      <Label htmlFor="editOther">Other</Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+                <div>
+                  <Label htmlFor="editDateOfBirth">Date of Birth</Label>
+                  <Input
+                    id="editDateOfBirth"
+                    type="date"
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
 
             <Separator />
@@ -1287,6 +1354,186 @@ const StaffManagement = () => {
                       <SelectItem value="receptionist">Receptionist</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editEmployeeId">Employee ID</Label>
+                  <Input
+                    id="editEmployeeId"
+                    value={formData.employeeId}
+                    onChange={(e) => handleInputChange('employeeId', e.target.value)}
+                    placeholder="Employee ID"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editJoiningDate">Joining Date</Label>
+                  <Input
+                    id="editJoiningDate"
+                    type="date"
+                    value={formData.joiningDate}
+                    onChange={(e) => handleInputChange('joiningDate', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editShiftTiming">Shift Timing</Label>
+                  <Select 
+                    value={formData.shiftTiming || ''} 
+                    onValueChange={(value) => handleInputChange('shiftTiming', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select shift timing" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="morning">Morning (06:00 - 14:00)</SelectItem>
+                      <SelectItem value="evening">Evening (14:00 - 22:00)</SelectItem>
+                      <SelectItem value="night">Night (22:00 - 06:00)</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="editEmergencyContact">Emergency Contact</Label>
+                  <Input
+                    id="editEmergencyContact"
+                    type="tel"
+                    value={formData.emergencyContact}
+                    onChange={(e) => handleInputChange('emergencyContact', e.target.value)}
+                    placeholder="Emergency contact number"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Section C: Qualifications & Experience */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-purple-700 font-bold text-sm">C</span>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Qualifications & Experience</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editHighestQualification">Highest Qualification</Label>
+                  <Input
+                    id="editHighestQualification"
+                    value={formData.highestQualification}
+                    onChange={(e) => handleInputChange('highestQualification', e.target.value)}
+                    placeholder="e.g., MBBS, MD, BSc Nursing"
+                  />
+                </div>
+                {(formData.role === 'doctor' || formData.role === 'nurse') && (
+                  <div>
+                    <Label htmlFor="editMedicalLicenseNumber">Medical License Number</Label>
+                    <Input
+                      id="editMedicalLicenseNumber"
+                      value={formData.medicalLicenseNumber}
+                      onChange={(e) => handleInputChange('medicalLicenseNumber', e.target.value)}
+                      placeholder="License number"
+                    />
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editYearsOfExperience">Years of Experience</Label>
+                  <Input
+                    id="editYearsOfExperience"
+                    type="number"
+                    min="0"
+                    value={formData.yearsOfExperience}
+                    onChange={(e) => handleInputChange('yearsOfExperience', parseInt(e.target.value) || 0)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editCertifications">Certifications</Label>
+                  <Input
+                    id="editCertifications"
+                    value={formData.certifications}
+                    onChange={(e) => handleInputChange('certifications', e.target.value)}
+                    placeholder="Comma-separated certifications"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="editPreviousHospitals">Previous Hospitals Worked</Label>
+                <Textarea
+                  id="editPreviousHospitals"
+                  value={formData.previousHospitals}
+                  onChange={(e) => handleInputChange('previousHospitals', e.target.value)}
+                  placeholder="List previous hospitals or healthcare facilities"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Section D: Address Information */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                  <span className="text-orange-700 font-bold text-sm">D</span>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Address Information</h3>
+              </div>
+              
+              <div>
+                <Label htmlFor="editCurrentAddress">Current Address</Label>
+                <Textarea
+                  id="editCurrentAddress"
+                  value={formData.currentAddress}
+                  onChange={(e) => handleInputChange('currentAddress', e.target.value)}
+                  placeholder="Enter current address"
+                  rows={3}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="editPermanentAddress">Permanent Address</Label>
+                <Textarea
+                  id="editPermanentAddress"
+                  value={formData.permanentAddress}
+                  onChange={(e) => handleInputChange('permanentAddress', e.target.value)}
+                  placeholder="Enter permanent address"
+                  rows={3}
+                />
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="editCity">City</Label>
+                  <Input
+                    id="editCity"
+                    value={formData.city}
+                    onChange={(e) => handleInputChange('city', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editState">State</Label>
+                  <Input
+                    id="editState"
+                    value={formData.state}
+                    onChange={(e) => handleInputChange('state', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="editZipCode">ZIP Code</Label>
+                  <Input
+                    id="editZipCode"
+                    value={formData.zipCode}
+                    onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                  />
                 </div>
               </div>
             </div>

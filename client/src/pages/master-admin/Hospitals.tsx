@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Building2, 
@@ -111,6 +111,18 @@ interface Hospital {
     };
     workingDays: string[];
   };
+  subscription?: {
+    _id: string;
+    planName: string;
+    planType: string;
+    status: string;
+    startDate: string;
+    endDate: string;
+    nextBillingDate: string;
+    monthlyCost: number;
+    currency: string;
+  };
+  subscriptionStatus: 'active' | 'inactive' | 'not_assigned';
 }
 
 // Transform API hospital data to form structure
@@ -167,9 +179,21 @@ const transformHospitalForForm = (hospital: Hospital) => {
 
 const Hospitals: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'not_assigned'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+  const [isStatsVisible, setIsStatsVisible] = useState(true);
   
+  // Scroll handler to hide/show stats cards
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY;
+      setIsStatsVisible(scrollTop < 100);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   // Define columns for the enhanced table
   const columns: ColumnDef<Hospital>[] = [
     {
@@ -240,14 +264,47 @@ const Hospitals: React.FC = () => {
       },
     },
     {
-      accessorKey: "isActive",
+      accessorKey: "subscriptionStatus",
       header: "Status",
       cell: ({ row }) => {
         const hospital = row.original;
+        const getStatusVariant = (status: string) => {
+          switch (status) {
+            case 'active':
+              return "default";
+            case 'inactive':
+              return "destructive";
+            case 'not_assigned':
+              return "secondary";
+            default:
+              return "secondary";
+          }
+        };
+
+        const getStatusText = (status: string) => {
+          switch (status) {
+            case 'active':
+              return 'Active';
+            case 'inactive':
+              return 'Inactive';
+            case 'not_assigned':
+              return 'Not Assigned';
+            default:
+              return 'Unknown';
+          }
+        };
+
         return (
-          <Badge variant={hospital.isActive ? "default" : "secondary"}>
-            {hospital.isActive ? 'Active' : 'Inactive'}
-          </Badge>
+          <div className="flex flex-col space-y-1">
+            <Badge variant={getStatusVariant(hospital.subscriptionStatus)}>
+              {getStatusText(hospital.subscriptionStatus)}
+            </Badge>
+            {hospital.subscription && (
+              <span className="text-xs text-gray-500">
+                {hospital.subscription.planName}
+              </span>
+            )}
+          </div>
         );
       },
     },
@@ -344,7 +401,11 @@ const Hospitals: React.FC = () => {
       'Phone Number',
       'Email',
       'Website',
-      'Status',
+      'Subscription Status',
+      'Plan Name',
+      'Plan Type',
+      'Monthly Cost',
+      'Next Billing Date',
       'Admin Name',
       'Admin Email',
       'Created Date',
@@ -361,7 +422,12 @@ const Hospitals: React.FC = () => {
       hospital.phoneNumber,
       hospital.email,
       hospital.website || '',
-      hospital.isActive ? 'Active' : 'Inactive',
+      hospital.subscriptionStatus === 'active' ? 'Active' : 
+      hospital.subscriptionStatus === 'inactive' ? 'Inactive' : 'Not Assigned',
+      hospital.subscription?.planName || 'N/A',
+      hospital.subscription?.planType || 'N/A',
+      hospital.subscription ? `${hospital.subscription.currency} ${hospital.subscription.monthlyCost}` : 'N/A',
+      hospital.subscription?.nextBillingDate ? new Date(hospital.subscription.nextBillingDate).toLocaleDateString() : 'N/A',
       `${hospital.adminId.firstName} ${hospital.adminId.lastName}`,
       hospital.adminId.email,
       new Date(hospital.createdAt).toLocaleDateString(),
@@ -409,7 +475,11 @@ const Hospitals: React.FC = () => {
       'Phone Number',
       'Email',
       'Website',
-      'Status',
+      'Subscription Status',
+      'Plan Name',
+      'Plan Type',
+      'Monthly Cost',
+      'Next Billing Date',
       'Admin Name',
       'Admin Email',
       'Created Date',
@@ -426,7 +496,12 @@ const Hospitals: React.FC = () => {
       hospital.phoneNumber,
       hospital.email,
       hospital.website || '',
-      hospital.isActive ? 'Active' : 'Inactive',
+      hospital.subscriptionStatus === 'active' ? 'Active' : 
+      hospital.subscriptionStatus === 'inactive' ? 'Inactive' : 'Not Assigned',
+      hospital.subscription?.planName || 'N/A',
+      hospital.subscription?.planType || 'N/A',
+      hospital.subscription ? `${hospital.subscription.currency} ${hospital.subscription.monthlyCost}` : 'N/A',
+      hospital.subscription?.nextBillingDate ? new Date(hospital.subscription.nextBillingDate).toLocaleDateString() : 'N/A',
       `${hospital.adminId.firstName} ${hospital.adminId.lastName}`,
       hospital.adminId.email,
       new Date(hospital.createdAt).toLocaleDateString(),
@@ -460,11 +535,12 @@ const Hospitals: React.FC = () => {
   const { data: hospitals, isLoading, error, refetch } = useQuery({
     queryKey: ['master-admin', 'hospitals'],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/hospitals`, {
+      const response = await fetch(`${API_URL}/api/master-admin/hospitals`, {
         headers: { 'Authorization': `Bearer ${authService.getToken()}` }
       });
       if (!response.ok) throw new Error('Failed to fetch hospitals');
-      return response.json();
+      const data = await response.json();
+      return data.hospitals || data; // Handle both response formats
     }
   });
 
@@ -504,8 +580,9 @@ const Hospitals: React.FC = () => {
                          hospital.address.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && hospital.isActive) ||
-                         (statusFilter === 'inactive' && !hospital.isActive);
+                         (statusFilter === 'active' && hospital.subscriptionStatus === 'active') ||
+                         (statusFilter === 'inactive' && hospital.subscriptionStatus === 'inactive') ||
+                         (statusFilter === 'not_assigned' && hospital.subscriptionStatus === 'not_assigned');
     
     return matchesSearch && matchesStatus;
   }) || [];
@@ -530,8 +607,9 @@ const Hospitals: React.FC = () => {
 
   // Calculate statistics
   const totalHospitals = hospitals?.length || 0;
-  const activeHospitals = hospitals?.filter((h: Hospital) => h.isActive).length || 0;
-  const inactiveHospitals = totalHospitals - activeHospitals;
+  const activeHospitals = hospitals?.filter((h: Hospital) => h.subscriptionStatus === 'active').length || 0;
+  const inactiveHospitals = hospitals?.filter((h: Hospital) => h.subscriptionStatus === 'inactive').length || 0;
+  const notAssignedHospitals = hospitals?.filter((h: Hospital) => h.subscriptionStatus === 'not_assigned').length || 0;
   const recentlyAdded = hospitals?.filter((h: Hospital) => {
     const createdDate = new Date(h.createdAt);
     const thirtyDaysAgo = new Date();
@@ -541,22 +619,23 @@ const Hospitals: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* Enhanced Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col space-y-4 py-6">
-            {/* Main Header */}
-            <div className="flex justify-between items-start">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Building2 className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-3xl font-bold text-gray-900">Client Hospitals</h1>
-                  <p className="text-gray-600 mt-1">Manage and monitor all client hospitals in Forefold's ecosystem</p>
-                </div>
+      {/* SaaS Dashboard Header & Stats */}
+      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6">
+          {/* Header Row - Always Visible */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Building2 className="w-7 h-7 text-white" />
               </div>
-              <div className="flex items-center space-x-3">
+              <div>
+                <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Client Hospitals</h1>
+                <p className="text-gray-500 mt-1 text-base">All organizations in your SaaS ecosystem</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 items-center justify-end">
+              {/* Secondary Actions */}
+              <div className="flex gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
@@ -571,8 +650,6 @@ const Hospitals: React.FC = () => {
                   )}
                   Refresh
                 </Button>
-                
-                {/* Export Dropdown */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="shadow-sm">
@@ -593,84 +670,67 @@ const Hospitals: React.FC = () => {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                
-                <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Onboard Hospital
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center space-x-2">
-                        <Building2 className="w-5 h-5 text-blue-600" />
-                        <span>Add New Client Hospital</span>
-                      </DialogTitle>
-                      <DialogDescription>
-                        Onboard a new hospital to Forefold's management system with comprehensive setup
-                      </DialogDescription>
-                    </DialogHeader>
-                    <HospitalForm 
-                      onSuccess={() => {
-                        setIsAddModalOpen(false);
-                        queryClient.invalidateQueries({ queryKey: ['master-admin', 'hospitals'] });
-                      }}
-                      onCancel={() => setIsAddModalOpen(false)}
-                    />
-                  </DialogContent>
-                </Dialog>
               </div>
+              {/* Primary Action */}
+              <Button
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg text-lg px-6 py-2 rounded-xl"
+                onClick={() => setIsAddModalOpen(true)}
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Onboard Hospital
+              </Button>
             </div>
-            
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-700">Total Hospitals</p>
-                    <p className="text-2xl font-bold text-blue-900">{totalHospitals}</p>
-                  </div>
-                  <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-white" />
-                  </div>
+          </div>
+          
+          {/* Stats Cards - Hidden on Scroll */}
+          <div className={`transition-all duration-300 overflow-hidden ${
+            isStatsVisible ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+          }`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+              <div className="rounded-2xl p-6 bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-200 shadow-sm flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
+                  <Building2 className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-blue-700">Total</p>
+                  <p className="text-3xl font-extrabold text-blue-900">{totalHospitals}</p>
                 </div>
               </div>
-              
-              <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-700">Active Hospitals</p>
-                    <p className="text-2xl font-bold text-green-900">{activeHospitals}</p>
-                  </div>
-                  <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 text-white" />
-                  </div>
+              <div className="rounded-2xl p-6 bg-gradient-to-br from-green-100 to-green-50 border border-green-200 shadow-sm flex items-center gap-4">
+                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-green-700">Active</p>
+                  <p className="text-3xl font-extrabold text-green-900">{activeHospitals}</p>
                 </div>
               </div>
-              
-              <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-lg p-4 border border-red-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-red-700">Inactive Hospitals</p>
-                    <p className="text-2xl font-bold text-red-900">{inactiveHospitals}</p>
-                  </div>
-                  <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center">
-                    <XCircle className="w-5 h-5 text-white" />
-                  </div>
+              <div className="rounded-2xl p-6 bg-gradient-to-br from-red-100 to-red-50 border border-red-200 shadow-sm flex items-center gap-4">
+                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
+                  <XCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-red-700">Inactive</p>
+                  <p className="text-3xl font-extrabold text-red-900">{inactiveHospitals}</p>
                 </div>
               </div>
-              
-              <div className="bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-purple-700">Recently Added</p>
-                    <p className="text-2xl font-bold text-purple-900">{recentlyAdded}</p>
-                    <p className="text-xs text-purple-600 mt-1">Last 30 days</p>
-                  </div>
-                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-white" />
-                  </div>
+              <div className="rounded-2xl p-6 bg-gradient-to-br from-orange-100 to-orange-50 border border-orange-200 shadow-sm flex items-center gap-4">
+                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-orange-700">Not Assigned</p>
+                  <p className="text-3xl font-extrabold text-orange-900">{notAssignedHospitals}</p>
+                </div>
+              </div>
+              <div className="rounded-2xl p-6 bg-gradient-to-br from-purple-100 to-purple-50 border border-purple-200 shadow-sm flex items-center gap-4">
+                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-purple-700">Recently Added</p>
+                  <p className="text-3xl font-extrabold text-purple-900">{recentlyAdded}</p>
+                  <p className="text-xs text-purple-600 mt-1">Last 30 days</p>
                 </div>
               </div>
             </div>
@@ -679,106 +739,99 @@ const Hospitals: React.FC = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters */}
-        <Card className="bg-white shadow-sm mb-6">
-          <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <div className="flex flex-col sm:flex-row gap-4 flex-1">
-                {/* Search - Only show in grid view */}
-                {viewMode === 'grid' && (
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <Input
-                      placeholder="Search hospitals..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                )}
+        {/* Modern SaaS Filter Bar */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-4 flex-1">
+              {/* Search Input - Modern Design */}
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  placeholder="Search hospitals by name, email, or address..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-12 h-12 rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
 
-                {/* Status Filter */}
-                <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-                  <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Hospitals</SelectItem>
-                    <SelectItem value="active">Active Only</SelectItem>
-                    <SelectItem value="inactive">Inactive Only</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* Status Filter - Pill Style */}
+              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+                <SelectTrigger className="w-full sm:w-48 h-12 rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Hospitals</SelectItem>
+                  <SelectItem value="active">Active Subscriptions</SelectItem>
+                  <SelectItem value="inactive">Inactive Subscriptions</SelectItem>
+                  <SelectItem value="not_assigned">Not Assigned</SelectItem>
+                </SelectContent>
+              </Select>
 
-                {/* View Mode Toggle - Always visible */}
-                <div className="flex border rounded-md">
-                  <Button
-                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode('grid')}
-                    className="rounded-r-none"
-                  >
-                    <LayoutGrid className="w-4 h-4 mr-2" />
-                    Grid
-                  </Button>
-                  <Button
-                    variant={viewMode === 'table' ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setViewMode('table')}
-                    className="rounded-l-none"
-                  >
-                    <TableIcon className="w-4 h-4 mr-2" />
-                    Table
-                  </Button>
-                </div>
+              {/* View Mode Toggle - Modern Icon Buttons */}
+              <div className="flex bg-gray-100 rounded-xl p-1">
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className={`rounded-lg ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+                >
+                  <LayoutGrid className="w-4 h-4 mr-2" />
+                  Grid
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className={`rounded-lg ${viewMode === 'table' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
+                >
+                  <TableIcon className="w-4 h-4 mr-2" />
+                  Table
+                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        {/* Content */}
+        {/* Content Area */}
         {isLoading ? (
-          <Card className="bg-white shadow-sm">
-            <CardContent className="p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading hospitals...</p>
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">Loading hospitals...</p>
+          </div>
         ) : filteredHospitals.length === 0 ? (
-          <Card className="bg-white shadow-sm">
-            <CardContent className="p-8 text-center">
-              <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No hospitals found</h3>
-              <p className="text-gray-600 mb-4">
-                {searchTerm || statusFilter !== 'all' 
-                  ? 'Try adjusting your search or filters'
-                  : 'Get started by onboarding your first client hospital'
-                }
-              </p>
-              {!searchTerm && statusFilter === 'all' && (
-                <Button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Onboard Hospital
-                </Button>
-              )}
-            </CardContent>
-          </Card>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
+            <Building2 className="w-20 h-20 text-gray-300 mx-auto mb-6" />
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">No hospitals found</h3>
+            <p className="text-gray-600 mb-6 text-lg">
+              {searchTerm || statusFilter !== 'all' 
+                ? 'Try adjusting your search or filters'
+                : 'Get started by onboarding your first client hospital'
+              }
+            </p>
+            {!searchTerm && statusFilter === 'all' && (
+              <Button 
+                onClick={() => setIsAddModalOpen(true)} 
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg text-lg px-8 py-3 rounded-xl"
+              >
+                <Plus className="w-5 h-5 mr-2" />
+                Onboard Hospital
+              </Button>
+            )}
+          </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredHospitals.map((hospital: Hospital) => (
-              <Card key={hospital._id} className="bg-white shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
+              <div key={hospital._id} className="bg-white rounded-2xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
+                {/* Card Header */}
+                <div className="p-6 border-b border-gray-100">
+                  <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
-                      <CardTitle className="text-lg font-semibold text-gray-900 mb-1">
-                        {hospital.name}
-                      </CardTitle>
-                      <CardDescription className="text-sm text-gray-600">
-                        {hospital.description || 'No description available'}
-                      </CardDescription>
+                      <h3 className="text-xl font-bold text-gray-900 mb-1">{hospital.name}</h3>
+                      <p className="text-gray-500 text-sm">{hospital.description || 'No description'}</p>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                           <MoreHorizontal className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -821,47 +874,70 @@ const Hospitals: React.FC = () => {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={hospital.isActive ? "default" : "secondary"}>
-                      {hospital.isActive ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </div>
                   
-                  <div className="space-y-2 text-sm">
+                  {/* Status Badges */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <Badge variant={
+                      hospital.subscriptionStatus === 'active' ? "default" : 
+                      hospital.subscriptionStatus === 'inactive' ? "destructive" : 
+                      "secondary"
+                    } className="text-sm px-3 py-1">
+                      {hospital.subscriptionStatus === 'active' ? 'Active' : 
+                       hospital.subscriptionStatus === 'inactive' ? 'Inactive' : 
+                       'Not Assigned'}
+                    </Badge>
+                    {hospital.subscription && (
+                      <Badge variant="outline" className="text-xs px-2 py-1">
+                        {hospital.subscription.planName}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Card Content */}
+                <div className="p-6 space-y-4">
+                  <div className="space-y-3">
                     <div className="flex items-center text-gray-600">
-                      <MapPin className="w-4 h-4 mr-2 flex-shrink-0" />
-                      <span className="truncate">{hospital.address}</span>
+                      <MapPin className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <span className="text-sm truncate">{hospital.address}</span>
                     </div>
                     <div className="flex items-center text-gray-600">
-                      <Phone className="w-4 h-4 mr-2 flex-shrink-0" />
-                      <span>{hospital.phoneNumber}</span>
+                      <Phone className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <span className="text-sm">{hospital.phoneNumber}</span>
                     </div>
                     <div className="flex items-center text-gray-600">
-                      <Mail className="w-4 h-4 mr-2 flex-shrink-0" />
-                      <span className="truncate">{hospital.email}</span>
+                      <Mail className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <span className="text-sm truncate">{hospital.email}</span>
                     </div>
                     {hospital.website && (
                       <div className="flex items-center text-gray-600">
-                        <Globe className="w-4 h-4 mr-2 flex-shrink-0" />
-                        <span className="truncate">{hospital.website}</span>
+                        <Globe className="w-4 h-4 mr-3 flex-shrink-0" />
+                        <span className="text-sm truncate">{hospital.website}</span>
                       </div>
                     )}
                   </div>
 
-                  <div className="pt-2 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-xs text-gray-500">
+                  {/* Admin Info */}
+                  <div className="pt-3 border-t border-gray-100">
+                    <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
                       <span>Admin: {hospital.adminId.firstName} {hospital.adminId.lastName}</span>
                       <span>Created: {new Date(hospital.createdAt).toLocaleDateString()}</span>
                     </div>
+                    {hospital.subscription && (
+                      <div className="flex items-center justify-between text-xs text-gray-500">
+                        <span>Plan: {hospital.subscription.planName}</span>
+                        <span>Next Billing: {new Date(hospital.subscription.nextBillingDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex justify-between items-center pt-2">
+                  {/* Action Buttons */}
+                  <div className="flex gap-2 pt-4">
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => setViewingHospital(hospital)}
+                      className="flex-1"
                     >
                       View Details
                     </Button>
@@ -873,13 +949,25 @@ const Hospitals: React.FC = () => {
                       <Edit className="w-4 h-4" />
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
           </div>
         ) : (
-          <Card className="bg-white shadow-sm">
-            <CardContent className="p-6">
+          /* Perfect Table View */
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Hospital Directory</h3>
+                  <p className="text-sm text-gray-600">Showing {filteredHospitals.length} of {totalHospitals} hospitals</p>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <span>Last updated: {new Date().toLocaleTimeString()}</span>
+                </div>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
               <EnhancedTable
                 columns={columns}
                 data={filteredHospitals}
@@ -892,10 +980,54 @@ const Hospitals: React.FC = () => {
                     `${from}-${to} of ${count} hospitals`
                 }}
               />
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
       </div>
+
+      {/* Edit Hospital Modal */}
+      {editingHospital && (
+        <Dialog open={!!editingHospital} onOpenChange={() => setEditingHospital(null)}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Hospital</DialogTitle>
+              <DialogDescription>
+                Update hospital information and settings
+              </DialogDescription>
+            </DialogHeader>
+            <HospitalForm 
+              hospital={transformHospitalForForm(editingHospital)}
+              onSuccess={() => {
+                setEditingHospital(null);
+                queryClient.invalidateQueries({ queryKey: ['master-admin', 'hospitals'] });
+              }}
+              onCancel={() => setEditingHospital(null)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Add Hospital Modal */}
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Building2 className="w-5 h-5 text-blue-600" />
+              <span>Add New Client Hospital</span>
+            </DialogTitle>
+            <DialogDescription>
+              Onboard a new hospital to Forefold's management system with comprehensive setup
+            </DialogDescription>
+          </DialogHeader>
+          <HospitalForm 
+            onSuccess={() => {
+              setIsAddModalOpen(false);
+              queryClient.invalidateQueries({ queryKey: ['master-admin', 'hospitals'] });
+            }}
+            onCancel={() => setIsAddModalOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Hospital Modal */}
       {editingHospital && (

@@ -121,6 +121,7 @@ interface User {
   hospitalId?: {
     _id: string;
     name: string;
+    logo?: string;
   };
   branchId?: {
     _id: string;
@@ -144,6 +145,7 @@ interface User {
 interface HospitalGroup {
   hospitalId: string;
   hospitalName: string;
+  hospitalLogo?: string;
   users: User[];
   stats: {
     total: number;
@@ -802,6 +804,7 @@ const Users: React.FC = () => {
         hospitalMap.set(hospitalId, {
           hospitalId,
           hospitalName,
+          hospitalLogo: user.hospitalId?.logo,
           users: [],
           stats: { 
           total: 0, 
@@ -862,6 +865,53 @@ const Users: React.FC = () => {
       if (b.hospitalId === 'unassigned') return -1;
       return a.hospitalName.localeCompare(b.hospitalName);
     });
+  };
+
+  // Helper function to group users by branch within a hospital
+  const groupUsersByBranch = (users: User[]) => {
+    const branchMap = new Map<string, { branchName: string; users: User[] }>();
+    
+    // Add unassigned users
+    const unassignedUsers = users.filter(user => !user.branchId?.name);
+    if (unassignedUsers.length > 0) {
+      branchMap.set('unassigned', {
+        branchName: 'Unassigned Branch',
+        users: unassignedUsers
+      });
+    }
+    
+    // Group by branch
+    users.forEach(user => {
+      if (user.branchId?.name) {
+        const branchName = user.branchId.name;
+        if (!branchMap.has(branchName)) {
+          branchMap.set(branchName, {
+            branchName,
+            users: []
+          });
+        }
+        branchMap.get(branchName)!.users.push(user);
+      }
+    });
+    
+    return Array.from(branchMap.values()).sort((a, b) => {
+      if (a.branchName === 'Unassigned Branch') return 1;
+      if (b.branchName === 'Unassigned Branch') return -1;
+      return a.branchName.localeCompare(b.branchName);
+    });
+  };
+
+  // Helper function to get branch stats
+  const getBranchStats = (users: User[]) => {
+    return {
+      total: users.length,
+      doctors: users.filter(u => u.role === 'doctor').length,
+      receptionists: users.filter(u => u.role === 'receptionist').length,
+      admins: users.filter(u => u.role === 'admin').length,
+      subAdmins: users.filter(u => u.role === 'sub_admin').length,
+      active: users.filter(u => u.isActive).length,
+      inactive: users.filter(u => !u.isActive).length
+    };
   };
 
   // Filter users
@@ -1939,48 +1989,76 @@ const Users: React.FC = () => {
         ) : (
           <>
             {viewMode === 'hierarchy' ? (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 {hospitalGroups.map((group) => (
-                  <Card key={group.hospitalId} className="bg-white shadow-sm">
-                    <CardHeader className="pb-4">
+                  <Card key={group.hospitalId} className="bg-white shadow-sm border-2 border-gray-100 hover:border-blue-200 transition-colors">
+                    <CardHeader className="pb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="p-2 bg-blue-100 rounded-lg">
-                            <Hospital className="w-6 h-6 text-blue-600" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-xl font-semibold text-gray-900">
-                              {group.hospitalName}
-                            </CardTitle>
-                            <CardDescription className="text-sm text-gray-600">
-                              {group.stats.total} users • {group.stats.activeUsers} active • {group.stats.inactiveUsers} inactive
-                            </CardDescription>
-                            <div className="flex items-center space-x-4 mt-2">
-                              <div className="flex items-center space-x-1 text-xs">
-                                <Shield className="w-3 h-3 text-blue-600" />
-                                <span className="text-gray-600">{group.stats.admins + group.stats.subAdmins} admins</span>
-                              </div>
-                              <div className="flex items-center space-x-1 text-xs">
-                                <Stethoscope className="w-3 h-3 text-green-600" />
-                                <span className="text-gray-600">{group.stats.doctors} doctors</span>
-                              </div>
-                              <div className="flex items-center space-x-1 text-xs">
-                                <UserCheck className="w-3 h-3 text-orange-600" />
-                                <span className="text-gray-600">{group.stats.receptionists} receptionists</span>
-                              </div>
+                        <div className="flex items-center space-x-4">
+                          {group.hospitalName !== 'System Administration' && group.hospitalLogo ? (
+                            <div className="p-3 rounded-xl shadow-sm">
+                              <img 
+                                src={group.hospitalLogo} 
+                                alt={`${group.hospitalName} logo`}
+                                className="w-8 h-8 object-contain"
+                                onError={(e) => {
+                                  // Fallback to icon if image fails to load
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
                             </div>
+                          ) : (
+                            <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-sm">
+                              <Hospital className="w-8 h-8 text-white" />
+                            </div>
+                          )}
+                          <div>
+                            <CardTitle className="text-lg font-bold text-gray-900 flex items-center space-x-2">
+                              <span>{group.hospitalName}</span>
+                              <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                                {Object.keys(group.branches).length} Branches
+                              </Badge>
+                            </CardTitle>
+                            <CardDescription className="text-sm text-gray-600 mt-1">
+                              <span className="font-semibold text-blue-600">{group.stats.total}</span> total users • 
+                              <span className="font-semibold text-green-600"> {group.stats.activeUsers}</span> active • 
+                              <span className="font-semibold text-gray-500"> {group.stats.inactiveUsers}</span> inactive
+                            </CardDescription>
+                                                         <div className="flex items-center space-x-6 mt-3">
+                               <div className="flex items-center space-x-2 text-xs">
+                                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                 <span className="text-gray-700 font-medium">{group.stats.admins + group.stats.subAdmins} Admins</span>
+                               </div>
+                               <div className="flex items-center space-x-2 text-xs">
+                                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                 <span className="text-gray-700 font-medium">{group.stats.doctors} Doctors</span>
+                               </div>
+                               <div className="flex items-center space-x-2 text-xs">
+                                 <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                 <span className="text-gray-700 font-medium">{group.stats.receptionists} Receptionists</span>
+                               </div>
+                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-3">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => toggleHospitalExpansion(group.hospitalId)}
+                            className="bg-white hover:bg-blue-50 border-blue-200 text-blue-700"
                           >
                             {expandedHospitals.has(group.hospitalId) ? (
-                              <ChevronDown className="w-4 h-4" />
+                              <>
+                                <ChevronDown className="w-4 h-4 mr-1" />
+                                Collapse
+                              </>
                             ) : (
-                              <ChevronRight className="w-4 h-4" />
+                              <>
+                                <ChevronRight className="w-4 h-4 mr-1" />
+                                Expand
+                              </>
                             )}
                           </Button>
                         </div>
@@ -1989,79 +2067,161 @@ const Users: React.FC = () => {
                     
                     <Collapsible open={expandedHospitals.has(group.hospitalId)}>
                       <CollapsibleContent>
-                        <CardContent className="pt-0">
-                          {/* Role-based sections */}
+                        <CardContent className="pt-6">
                           {group.hospitalId === 'system' ? (
                             // Special handling for System Administration group
-                            group.stats.admins > 0 && (
-                              <div className="mb-6">
-                                <div className="flex items-center space-x-2 mb-3">
-                                  <Shield className="w-5 h-5 text-red-600" />
-                                  <h3 className="text-lg font-medium text-gray-900">Master Administrators</h3>
-                                  <Badge variant="outline">{group.stats.admins}</Badge>
+                            <div className="space-y-6">
+                              {group.stats.admins > 0 && (
+                                <div className="bg-gradient-to-r from-red-50 to-pink-50 p-6 rounded-xl border border-red-200">
+                                                                     <div className="flex items-center space-x-3 mb-4">
+                                     <div className="p-2 bg-red-100 rounded-lg">
+                                       <Shield className="w-5 h-5 text-red-600" />
+                                     </div>
+                                     <div>
+                                       <h3 className="text-lg font-bold text-gray-900">Master Administrators</h3>
+                                       <p className="text-xs text-gray-600">System-wide administrators with full access</p>
+                                     </div>
+                                    <Badge variant="outline" className="bg-red-100 text-red-700 border-red-200">
+                                      {group.stats.admins}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {sortUsers(group.users.filter(user => user.role === 'master_admin'))
+                                      .map(renderUserCard)}
+                                  </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  {sortUsers(group.users.filter(user => user.role === 'master_admin'))
-                                    .map(renderUserCard)}
-                                </div>
-                              </div>
-                            )
+                              )}
+                            </div>
                           ) : (
-                            // Regular hospital groups
-                            group.stats.admins > 0 && (
-                              <div className="mb-6">
-                                <div className="flex items-center space-x-2 mb-3">
-                                  <Shield className="w-5 h-5 text-blue-600" />
-                                  <h3 className="text-lg font-medium text-gray-900">Administrators</h3>
-                                  <Badge variant="outline">{group.stats.admins}</Badge>
+                            // Regular hospital groups with branch hierarchy
+                            <div className="space-y-8">
+                              {/* Hospital-level administrators */}
+                              {group.stats.admins > 0 && (
+                                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-200">
+                                                                     <div className="flex items-center space-x-3 mb-4">
+                                     <div className="p-2 bg-blue-100 rounded-lg">
+                                       <Shield className="w-5 h-5 text-blue-600" />
+                                     </div>
+                                     <div>
+                                       <h3 className="text-lg font-bold text-gray-900">Hospital Administrators</h3>
+                                       <p className="text-xs text-gray-600">Hospital-level management and oversight</p>
+                                     </div>
+                                    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
+                                      {group.stats.admins}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {sortUsers(group.users.filter(user => user.role === 'admin'))
+                                      .map(renderUserCard)}
+                                  </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  {sortUsers(group.users.filter(user => user.role === 'admin'))
-                                    .map(renderUserCard)}
+                              )}
+
+                              {/* Branch-based organization for doctors and receptionists */}
+                              {group.stats.doctors > 0 || group.stats.receptionists > 0 ? (
+                                <div className="space-y-6">
+                                                                     <div className="flex items-center space-x-3 mb-4">
+                                     <div className="p-2 bg-green-100 rounded-lg">
+                                       <Building2 className="w-5 h-5 text-green-600" />
+                                     </div>
+                                     <h3 className="text-lg font-bold text-gray-900">Branch Organization</h3>
+                                   </div>
+                                  
+                                  {groupUsersByBranch(group.users).map((branchGroup) => {
+                                    const branchStats = getBranchStats(branchGroup.users);
+                                    const branchDoctors = branchGroup.users.filter(u => u.role === 'doctor');
+                                    const branchReceptionists = branchGroup.users.filter(u => u.role === 'receptionist');
+                                    
+                                    return (
+                                      <div key={branchGroup.branchName} className="bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-green-300 transition-colors">
+                                        <div className="flex items-center justify-between mb-4">
+                                                                                     <div className="flex items-center space-x-3">
+                                             <div className="p-2 bg-green-100 rounded-lg">
+                                               <MapPin className="w-4 h-4 text-green-600" />
+                                             </div>
+                                             <div>
+                                               <h4 className="text-base font-bold text-gray-900">{branchGroup.branchName}</h4>
+                                               <p className="text-xs text-gray-600">
+                                                 {branchStats.total} staff • {branchStats.active} active • {branchStats.inactive} inactive
+                                               </p>
+                                             </div>
+                                           </div>
+                                          <div className="flex items-center space-x-3">
+                                            {branchStats.doctors > 0 && (
+                                              <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                                                <Stethoscope className="w-3 h-3 mr-1" />
+                                                {branchStats.doctors} Doctors
+                                              </Badge>
+                                            )}
+                                            {branchStats.receptionists > 0 && (
+                                              <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">
+                                                <UserCheck className="w-3 h-3 mr-1" />
+                                                {branchStats.receptionists} Receptionists
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="space-y-4">
+                                          {/* Doctors in this branch */}
+                                          {branchDoctors.length > 0 && (
+                                            <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg border border-green-200">
+                                                                                             <div className="flex items-center space-x-2 mb-3">
+                                                 <Stethoscope className="w-4 h-4 text-green-600" />
+                                                 <h5 className="text-sm font-semibold text-gray-900">Doctors</h5>
+                                                 <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200">
+                                                   {branchDoctors.length}
+                                                 </Badge>
+                                               </div>
+                                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                {sortUsers(branchDoctors).map(renderUserCard)}
+                                              </div>
+                                            </div>
+                                          )}
+                                          
+                                          {/* Receptionists in this branch */}
+                                          {branchReceptionists.length > 0 && (
+                                            <div className="bg-gradient-to-r from-orange-50 to-amber-50 p-4 rounded-lg border border-orange-200">
+                                                                                             <div className="flex items-center space-x-2 mb-3">
+                                                 <UserCheck className="w-4 h-4 text-orange-600" />
+                                                 <h5 className="text-sm font-semibold text-gray-900">Receptionists</h5>
+                                                 <Badge variant="outline" className="bg-orange-100 text-orange-700 border-orange-200">
+                                                   {branchReceptionists.length}
+                                                 </Badge>
+                                               </div>
+                                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                {sortUsers(branchReceptionists).map(renderUserCard)}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              </div>
-                            )
-                          )}
+                              ) : null}
 
-                          {group.stats.subAdmins > 0 && (
-                            <div className="mb-6">
-                              <div className="flex items-center space-x-2 mb-3">
-                                <User className="w-5 h-5 text-purple-600" />
-                                <h3 className="text-lg font-medium text-gray-900">Sub Administrators</h3>
-                                <Badge variant="outline">{group.stats.subAdmins}</Badge>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {sortUsers(group.users.filter(user => user.role === 'sub_admin'))
-                                  .map(renderUserCard)}
-                              </div>
-                            </div>
-                          )}
-
-                          {group.stats.doctors > 0 && (
-                            <div className="mb-6">
-                              <div className="flex items-center space-x-2 mb-3">
-                                <Stethoscope className="w-5 h-5 text-green-600" />
-                                <h3 className="text-lg font-medium text-gray-900">Doctors</h3>
-                                <Badge variant="outline">{group.stats.doctors}</Badge>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {sortUsers(group.users.filter(user => user.role === 'doctor'))
-                                  .map(renderUserCard)}
-                              </div>
-                            </div>
-                          )}
-
-                          {group.stats.receptionists > 0 && (
-                            <div className="mb-6">
-                              <div className="flex items-center space-x-2 mb-3">
-                                <UserCheck className="w-5 h-5 text-orange-600" />
-                                <h3 className="text-lg font-medium text-gray-900">Receptionists</h3>
-                                <Badge variant="outline">{group.stats.receptionists}</Badge>
-                              </div>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {sortUsers(group.users.filter(user => user.role === 'receptionist'))
-                                  .map(renderUserCard)}
-                              </div>
+                              {/* Sub-administrators (if any) */}
+                              {group.stats.subAdmins > 0 && (
+                                <div className="bg-gradient-to-r from-purple-50 to-violet-50 p-6 rounded-xl border border-purple-200">
+                                                                     <div className="flex items-center space-x-3 mb-4">
+                                     <div className="p-2 bg-purple-100 rounded-lg">
+                                       <User className="w-5 h-5 text-purple-600" />
+                                     </div>
+                                     <div>
+                                       <h3 className="text-lg font-bold text-gray-900">Sub Administrators</h3>
+                                       <p className="text-xs text-gray-600">Department and branch-level administrators</p>
+                                     </div>
+                                    <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200">
+                                      {group.stats.subAdmins}
+                                    </Badge>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {sortUsers(group.users.filter(user => user.role === 'sub_admin'))
+                                      .map(renderUserCard)}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </CardContent>

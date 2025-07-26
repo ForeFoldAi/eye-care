@@ -37,7 +37,7 @@ router.get('/',
     
     // Return users based on tenant context
     const users = await User.find(filter)
-      .populate('hospitalId', 'name')
+      .populate('hospitalId', 'name logo')
       .populate('branchId', 'name')
       .populate('createdBy', 'firstName lastName email')
       .select('-password')
@@ -59,7 +59,7 @@ router.get('/hospital/:hospitalId', authenticateToken, authorizeRole(['admin']),
     }
 
     const users = await User.find({ hospitalId: req.params.hospitalId })
-      .populate('hospitalId', 'name')
+      .populate('hospitalId', 'name logo')
       .populate('branchId', 'name')
       .populate('createdBy', 'firstName lastName email')
       .select('-password')
@@ -81,7 +81,7 @@ router.get('/branch/:branchId', authenticateToken, authorizeRole(['sub_admin']),
     }
 
     const users = await User.find({ branchId: req.params.branchId })
-      .populate('hospitalId', 'name')
+      .populate('hospitalId', 'name logo')
       .populate('branchId', 'name')
       .populate('createdBy', 'firstName lastName email')
       .select('-password')
@@ -97,7 +97,7 @@ router.get('/branch/:branchId', authenticateToken, authorizeRole(['sub_admin']),
 router.get('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 'sub_admin']), async (req: AuthRequest, res) => {
   try {
     const user = await User.findById(req.params.id)
-      .populate('hospitalId', 'name')
+      .populate('hospitalId', 'name logo')
       .populate('branchId', 'name')
       .populate('createdBy', 'firstName lastName email')
       .select('-password');
@@ -253,7 +253,7 @@ router.put('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 's
       updateData,
       { new: true }
     )
-    .populate('hospitalId', 'name')
+    .populate('hospitalId', 'name logo')
     .populate('branchId', 'name')
     .populate('createdBy', 'firstName lastName email')
     .select('-password');

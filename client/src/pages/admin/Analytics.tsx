@@ -11,7 +11,7 @@ import {
   Filter,
   RefreshCw,
   Users,
-  DollarSign,
+  IndianRupee,
   Activity,
   Target,
   Clock,
@@ -615,7 +615,7 @@ const Analytics: React.FC = () => {
                 title="Total Revenue"
                 value={analyticsData?.overview?.totalRevenue}
                 change={analyticsData?.overview?.revenueGrowth}
-                icon={DollarSign}
+                icon={IndianRupee}
                 format="currency"
                 subtitle="Total revenue generated this period"
                 trend="Steady growth trend"

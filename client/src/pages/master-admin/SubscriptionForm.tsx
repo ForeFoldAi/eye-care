@@ -17,7 +17,7 @@ import {
   Shield,
   Zap,
   Star,
-  DollarSign,
+  IndianRupee,
   Calendar,
   Clock,
   Settings
@@ -378,7 +378,7 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ subscription, onSuc
               {/* Pricing */}
               <div>
                 <div className="flex items-center mb-6">
-                  <DollarSign className="w-6 h-6 text-green-600 mr-3" />
+                  <IndianRupee className="w-6 h-6 text-green-600 mr-3" />
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Pricing & Billing</h3>
                     <p className="text-sm text-gray-600">Set pricing and billing options</p>

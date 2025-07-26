@@ -17,7 +17,7 @@ import {
   ExternalLink,
   User,
   CalendarDays,
-  DollarSign,
+  IndianRupee,
   Stethoscope
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -60,6 +60,18 @@ interface Hospital {
     };
     workingDays: string[];
   };
+  subscriptionStatus?: 'active' | 'inactive' | 'not_assigned';
+  subscription?: {
+    _id: string;
+    planName: string;
+    planType: string;
+    status: string;
+    startDate: string;
+    endDate: string;
+    nextBillingDate: string;
+    monthlyCost: number;
+    currency: string;
+  };
 }
 
 interface HospitalStats {
@@ -95,6 +107,32 @@ const workingDaysMap: Record<string, string> = {
 
 const API_URL = import.meta.env.VITE_API_URL;
 
+// Helper for badge variant and text
+const getStatusVariant = (status?: string) => {
+  switch (status) {
+    case 'active':
+      return 'default';
+    case 'inactive':
+      return 'destructive';
+    case 'not_assigned':
+      return 'secondary';
+    default:
+      return 'secondary';
+  }
+};
+const getStatusText = (status?: string) => {
+  switch (status) {
+    case 'active':
+      return 'Active';
+    case 'inactive':
+      return 'Inactive';
+    case 'not_assigned':
+      return 'Not Assigned';
+    default:
+      return 'Unknown';
+  }
+};
+
 const HospitalDetails: React.FC<HospitalDetailsProps> = ({ hospital, onClose }) => {
   // Fetch hospital statistics
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -111,7 +149,7 @@ const HospitalDetails: React.FC<HospitalDetailsProps> = ({ hospital, onClose }) 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'INR'
     }).format(amount);
   };
 
@@ -142,9 +180,14 @@ const HospitalDetails: React.FC<HospitalDetailsProps> = ({ hospital, onClose }) 
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Badge variant={hospital.isActive ? "default" : "secondary"}>
-            {hospital.isActive ? 'Active' : 'Inactive'}
+          <Badge variant={getStatusVariant(hospital.subscriptionStatus)}>
+            {getStatusText(hospital.subscriptionStatus)}
           </Badge>
+          {hospital.subscription && (
+            <span className="text-xs text-gray-500 ml-2">
+              {hospital.subscription.planName} ({hospital.subscription.planType})
+            </span>
+          )}
           <Button variant="outline" size="sm" onClick={onClose}>
             <X className="w-4 h-4" />
           </Button>
@@ -204,7 +247,7 @@ const HospitalDetails: React.FC<HospitalDetailsProps> = ({ hospital, onClose }) 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-gray-600">Revenue</CardTitle>
-                <DollarSign className="h-4 w-4 text-emerald-600" />
+                <IndianRupee className="h-4 w-4 text-emerald-600" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-gray-900">
@@ -304,9 +347,16 @@ const HospitalDetails: React.FC<HospitalDetailsProps> = ({ hospital, onClose }) 
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Status:</span>
-                        <Badge variant={hospital.isActive ? "default" : "secondary"}>
-                          {hospital.isActive ? 'Active' : 'Inactive'}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={getStatusVariant(hospital.subscriptionStatus)}>
+                            {getStatusText(hospital.subscriptionStatus)}
+                          </Badge>
+                          {hospital.subscription && (
+                            <span className="text-xs text-gray-500">
+                              {hospital.subscription.planName} ({hospital.subscription.planType})
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Created:</span>
@@ -514,7 +564,7 @@ const HospitalDetails: React.FC<HospitalDetailsProps> = ({ hospital, onClose }) 
                     
                     <div className="p-4 bg-emerald-50 rounded-lg">
                       <div className="flex items-center">
-                        <DollarSign className="w-8 h-8 text-emerald-600 mr-3" />
+                        <IndianRupee className="w-8 h-8 text-emerald-600 mr-3" />
                         <div>
                           <p className="text-2xl font-bold text-emerald-900">
                             {formatCurrency(stats?.totalRevenue || 0)}
