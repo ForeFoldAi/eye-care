@@ -17,6 +17,12 @@ const timeSlotSchema = new mongoose.Schema({
     default: 1,
     min: 1
   },
+  tokenCount: {
+    type: Number,
+    required: true,
+    default: 10,
+    min: 1
+  },
   bookedTokens: {
     type: [Number],
     default: []
@@ -39,7 +45,27 @@ const doctorAvailabilitySchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // Track who added the availability
+  addedBy: {
+    userId: {
+      type: String,
+      required: true
+    },
+    role: {
+      type: String,
+      required: true,
+      enum: ['admin', 'sub_admin', 'doctor']
+    },
+    name: {
+      type: String,
+      required: true
+    }
+  },
   createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
     type: Date,
     default: Date.now
   }
@@ -54,5 +80,11 @@ doctorAvailabilitySchema.index(
   { doctorId: 1, dayOfWeek: 1 },
   { unique: true }
 );
+
+// Update the updatedAt field before saving
+doctorAvailabilitySchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
 
 export const DoctorAvailability = mongoose.models.DoctorAvailability || mongoose.model('DoctorAvailability', doctorAvailabilitySchema); 

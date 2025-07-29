@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Building2, 
@@ -59,8 +59,14 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { EnhancedTable } from '@/components/ui/enhanced-table';
-import { ColumnDef } from '@tanstack/react-table';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -181,199 +187,6 @@ const Hospitals: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'not_assigned'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
-  const [isStatsVisible, setIsStatsVisible] = useState(true);
-  
-  // Scroll handler to hide/show stats cards
-  useEffect(() => {
-    const handleScroll = () => {
-      const scrollTop = window.scrollY;
-      setIsStatsVisible(scrollTop < 100);
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Define columns for the enhanced table
-  const columns: ColumnDef<Hospital>[] = [
-    {
-      accessorKey: "name",
-      header: "Hospital",
-      cell: ({ row }) => {
-        const hospital = row.original;
-        return (
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
-              <Building2 className="w-4 h-4 text-blue-600" />
-            </div>
-            <div>
-              <div className="font-medium">{hospital.name}</div>
-              <div className="text-sm text-gray-500">{hospital.description || 'No description'}</div>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "address",
-      header: "Address",
-      cell: ({ row }) => {
-        const hospital = row.original;
-        return (
-          <div className="flex items-center space-x-2">
-            <MapPin className="w-4 h-4 text-gray-400" />
-            <span className="max-w-xs truncate" title={hospital.address}>
-              {hospital.address}
-            </span>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "phoneNumber",
-      header: "Contact",
-      cell: ({ row }) => {
-        const hospital = row.original;
-        return (
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Phone className="w-3 h-3 text-gray-400" />
-              <span className="text-sm">{hospital.phoneNumber}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Mail className="w-3 h-3 text-gray-400" />
-              <span className="text-sm text-gray-600 truncate">{hospital.email}</span>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "adminId",
-      header: "Admin",
-      cell: ({ row }) => {
-        const hospital = row.original;
-        return (
-          <div>
-            <div className="font-medium">
-              {hospital.adminId.firstName} {hospital.adminId.lastName}
-            </div>
-            <div className="text-sm text-gray-500">{hospital.adminId.email}</div>
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "subscriptionStatus",
-      header: "Status",
-      cell: ({ row }) => {
-        const hospital = row.original;
-        const getStatusVariant = (status: string) => {
-          switch (status) {
-            case 'active':
-              return "default";
-            case 'inactive':
-              return "destructive";
-            case 'not_assigned':
-              return "secondary";
-            default:
-              return "secondary";
-          }
-        };
-
-        const getStatusText = (status: string) => {
-          switch (status) {
-            case 'active':
-              return 'Active';
-            case 'inactive':
-              return 'Inactive';
-            case 'not_assigned':
-              return 'Not Assigned';
-            default:
-              return 'Unknown';
-          }
-        };
-
-        return (
-          <div className="flex flex-col space-y-1">
-            <Badge variant={getStatusVariant(hospital.subscriptionStatus)}>
-              {getStatusText(hospital.subscriptionStatus)}
-            </Badge>
-            {hospital.subscription && (
-              <span className="text-xs text-gray-500">
-                {hospital.subscription.planName}
-              </span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      accessorKey: "createdAt",
-      header: "Created",
-      cell: ({ row }) => {
-        const hospital = row.original;
-        return (
-          <span className="text-sm text-gray-600">
-            {new Date(hospital.createdAt).toLocaleDateString()}
-          </span>
-        );
-      },
-    },
-    {
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => {
-        const hospital = row.original;
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setViewingHospital(hospital)}>
-                <Eye className="w-4 h-4 mr-2" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setEditingHospital(hospital)}>
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Hospital</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to delete "{hospital.name}"? This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => deleteMutation.mutate(hospital._id)}
-                      className="bg-red-600 hover:bg-red-700"
-                    >
-                      Delete
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
-  ];
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingHospital, setEditingHospital] = useState<Hospital | null>(null);
   const [viewingHospital, setViewingHospital] = useState<Hospital | null>(null);
@@ -587,9 +400,36 @@ const Hospitals: React.FC = () => {
     return matchesSearch && matchesStatus;
   }) || [];
 
+  // Helper functions for status display
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'active':
+        return "default";
+      case 'inactive':
+        return "destructive";
+      case 'not_assigned':
+        return "secondary";
+      default:
+        return "secondary";
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'inactive':
+        return 'Inactive';
+      case 'not_assigned':
+        return 'Not Assigned';
+      default:
+        return 'Unknown';
+    }
+  };
+
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-8">
+      <div className="min-h-screen bg-gray-50 p-8">
         <Card className="max-w-2xl mx-auto">
           <CardContent className="p-8 text-center">
             <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
@@ -618,220 +458,229 @@ const Hospitals: React.FC = () => {
   }).length || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      {/* SaaS Dashboard Header & Stats */}
-      <div className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-10 transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-6">
-          {/* Header Row - Always Visible */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                <Building2 className="w-7 h-7 text-white" />
+              <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
+                <Building2 className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Client Hospitals</h1>
-                <p className="text-gray-500 mt-1 text-base">All organizations in your SaaS ecosystem</p>
+                <h1 className="text-3xl font-bold text-gray-900">Client Hospitals</h1>
+                <p className="text-gray-600">Manage all organizations in your ecosystem</p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 items-center justify-end">
-              {/* Secondary Actions */}
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => refetch()}
-                  disabled={isLoading}
-                  className="shadow-sm"
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                  )}
-                  Refresh
-                </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="shadow-sm">
-                      <Download className="w-4 h-4 mr-2" />
-                      Export
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Export Options</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={exportToCSV}>
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      Export as CSV
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={exportToExcel}>
-                      <FileSpreadsheet className="w-4 h-4 mr-2" />
-                      Export as Excel
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              {/* Primary Action */}
+            <div className="flex flex-wrap gap-3 items-center">
+              <Button 
+                variant="outline" 
+                onClick={() => refetch()}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                )}
+                Refresh
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Export Options</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={exportToCSV}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToExcel}>
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    Export as Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg text-lg px-6 py-2 rounded-xl"
+                className="bg-blue-600 hover:bg-blue-700"
                 onClick={() => setIsAddModalOpen(true)}
               >
-                <Plus className="w-5 h-5 mr-2" />
-                Onboard Hospital
+                <Plus className="w-4 h-4 mr-2" />
+                Add Hospital
               </Button>
-            </div>
-          </div>
-          
-          {/* Stats Cards - Hidden on Scroll */}
-          <div className={`transition-all duration-300 overflow-hidden ${
-            isStatsVisible ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
-          }`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-              <div className="rounded-2xl p-6 bg-gradient-to-br from-blue-100 to-blue-50 border border-blue-200 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center">
-                  <Building2 className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-blue-700">Total</p>
-                  <p className="text-3xl font-extrabold text-blue-900">{totalHospitals}</p>
-                </div>
-              </div>
-              <div className="rounded-2xl p-6 bg-gradient-to-br from-green-100 to-green-50 border border-green-200 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-green-700">Active</p>
-                  <p className="text-3xl font-extrabold text-green-900">{activeHospitals}</p>
-                </div>
-              </div>
-              <div className="rounded-2xl p-6 bg-gradient-to-br from-red-100 to-red-50 border border-red-200 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
-                  <XCircle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-red-700">Inactive</p>
-                  <p className="text-3xl font-extrabold text-red-900">{inactiveHospitals}</p>
-                </div>
-              </div>
-              <div className="rounded-2xl p-6 bg-gradient-to-br from-orange-100 to-orange-50 border border-orange-200 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 bg-orange-500 rounded-xl flex items-center justify-center">
-                  <AlertTriangle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-orange-700">Not Assigned</p>
-                  <p className="text-3xl font-extrabold text-orange-900">{notAssignedHospitals}</p>
-                </div>
-              </div>
-              <div className="rounded-2xl p-6 bg-gradient-to-br from-purple-100 to-purple-50 border border-purple-200 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-purple-700">Recently Added</p>
-                  <p className="text-3xl font-extrabold text-purple-900">{recentlyAdded}</p>
-                  <p className="text-xs text-purple-600 mt-1">Last 30 days</p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Modern SaaS Filter Bar */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-4 flex-1">
-              {/* Search Input - Modern Design */}
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <Input
-                  placeholder="Search hospitals by name, email, or address..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-12 h-12 rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                />
+      {/* Stats Cards */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalHospitals}</p>
+                </div>
               </div>
-
-              {/* Status Filter - Pill Style */}
-              <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
-                <SelectTrigger className="w-full sm:w-48 h-12 rounded-xl border-gray-200 focus:border-blue-500 focus:ring-blue-500">
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Hospitals</SelectItem>
-                  <SelectItem value="active">Active Subscriptions</SelectItem>
-                  <SelectItem value="inactive">Inactive Subscriptions</SelectItem>
-                  <SelectItem value="not_assigned">Not Assigned</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {/* View Mode Toggle - Modern Icon Buttons */}
-              <div className="flex bg-gray-100 rounded-xl p-1">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className={`rounded-lg ${viewMode === 'grid' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-                >
-                  <LayoutGrid className="w-4 h-4 mr-2" />
-                  Grid
-                </Button>
-                <Button
-                  variant={viewMode === 'table' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('table')}
-                  className={`rounded-lg ${viewMode === 'table' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-                >
-                  <TableIcon className="w-4 h-4 mr-2" />
-                  Table
-                </Button>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Active</p>
+                  <p className="text-2xl font-bold text-gray-900">{activeHospitals}</p>
+                </div>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                  <XCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Inactive</p>
+                  <p className="text-2xl font-bold text-gray-900">{inactiveHospitals}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Not Assigned</p>
+                  <p className="text-2xl font-bold text-gray-900">{notAssignedHospitals}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Recent</p>
+                  <p className="text-2xl font-bold text-gray-900">{recentlyAdded}</p>
+                  <p className="text-xs text-gray-500">Last 30 days</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Content Area */}
+        {/* Filters */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Search hospitals..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Hospitals</SelectItem>
+                    <SelectItem value="active">Active Subscriptions</SelectItem>
+                    <SelectItem value="inactive">Inactive Subscriptions</SelectItem>
+                    <SelectItem value="not_assigned">Not Assigned</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="flex bg-gray-100 rounded-lg p-1">
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('grid')}
+                    className="rounded-md"
+                  >
+                    <LayoutGrid className="w-4 h-4 mr-2" />
+                    Grid
+                  </Button>
+                  <Button
+                    variant={viewMode === 'table' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewMode('table')}
+                    className="rounded-md"
+                  >
+                    <TableIcon className="w-4 h-4 mr-2" />
+                    Table
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Content */}
         {isLoading ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 text-lg">Loading hospitals...</p>
-          </div>
+          <Card>
+            <CardContent className="p-12 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading hospitals...</p>
+            </CardContent>
+          </Card>
         ) : filteredHospitals.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
-            <Building2 className="w-20 h-20 text-gray-300 mx-auto mb-6" />
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No hospitals found</h3>
-            <p className="text-gray-600 mb-6 text-lg">
-              {searchTerm || statusFilter !== 'all' 
-                ? 'Try adjusting your search or filters'
-                : 'Get started by onboarding your first client hospital'
-              }
-            </p>
-            {!searchTerm && statusFilter === 'all' && (
-              <Button 
-                onClick={() => setIsAddModalOpen(true)} 
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg text-lg px-8 py-3 rounded-xl"
-              >
-                <Plus className="w-5 h-5 mr-2" />
-                Onboard Hospital
-              </Button>
-            )}
-          </div>
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Building2 className="w-20 h-20 text-gray-300 mx-auto mb-6" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">No hospitals found</h3>
+              <p className="text-gray-600 mb-6">
+                {searchTerm || statusFilter !== 'all' 
+                  ? 'Try adjusting your search or filters'
+                  : 'Get started by adding your first hospital'
+                }
+              </p>
+              {!searchTerm && statusFilter === 'all' && (
+                <Button 
+                  onClick={() => setIsAddModalOpen(true)} 
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Hospital
+                </Button>
+              )}
+            </CardContent>
+          </Card>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredHospitals.map((hospital: Hospital) => (
-              <div key={hospital._id} className="bg-white rounded-2xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
-                {/* Card Header */}
-                <div className="p-6 border-b border-gray-100">
-                  <div className="flex justify-between items-start mb-4">
+              <Card key={hospital._id} className="hover:shadow-lg transition-shadow">
+                <CardHeader className="pb-4">
+                  <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className="text-xl font-bold text-gray-900 mb-1">{hospital.name}</h3>
-                      <p className="text-gray-500 text-sm">{hospital.description || 'No description'}</p>
+                      <CardTitle className="text-lg">{hospital.name}</CardTitle>
+                      <CardDescription>{hospital.description || 'No description'}</CardDescription>
                     </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Button variant="ghost" size="sm">
                           <MoreHorizontal className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -875,64 +724,52 @@ const Hospitals: React.FC = () => {
                     </DropdownMenu>
                   </div>
                   
-                  {/* Status Badges */}
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2">
                     <Badge variant={
                       hospital.subscriptionStatus === 'active' ? "default" : 
                       hospital.subscriptionStatus === 'inactive' ? "destructive" : 
                       "secondary"
-                    } className="text-sm px-3 py-1">
+                    }>
                       {hospital.subscriptionStatus === 'active' ? 'Active' : 
                        hospital.subscriptionStatus === 'inactive' ? 'Inactive' : 
                        'Not Assigned'}
                     </Badge>
                     {hospital.subscription && (
-                      <Badge variant="outline" className="text-xs px-2 py-1">
+                      <Badge variant="outline">
                         {hospital.subscription.planName}
                       </Badge>
                     )}
                   </div>
-                </div>
+                </CardHeader>
 
-                {/* Card Content */}
-                <div className="p-6 space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex items-center text-gray-600">
-                      <MapPin className="w-4 h-4 mr-3 flex-shrink-0" />
-                      <span className="text-sm truncate">{hospital.address}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <Phone className="w-4 h-4 mr-3 flex-shrink-0" />
-                      <span className="text-sm">{hospital.phoneNumber}</span>
-                    </div>
-                    <div className="flex items-center text-gray-600">
-                      <Mail className="w-4 h-4 mr-3 flex-shrink-0" />
-                      <span className="text-sm truncate">{hospital.email}</span>
-                    </div>
-                    {hospital.website && (
-                      <div className="flex items-center text-gray-600">
-                        <Globe className="w-4 h-4 mr-3 flex-shrink-0" />
-                        <span className="text-sm truncate">{hospital.website}</span>
-                      </div>
-                    )}
+                <CardContent className="space-y-3">
+                  <div className="flex items-center text-gray-600">
+                    <MapPin className="w-4 h-4 mr-3" />
+                    <span className="text-sm truncate">{hospital.address}</span>
                   </div>
+                  <div className="flex items-center text-gray-600">
+                    <Phone className="w-4 h-4 mr-3" />
+                    <span className="text-sm">{hospital.phoneNumber}</span>
+                  </div>
+                  <div className="flex items-center text-gray-600">
+                    <Mail className="w-4 h-4 mr-3" />
+                    <span className="text-sm truncate">{hospital.email}</span>
+                  </div>
+                  {hospital.website && (
+                    <div className="flex items-center text-gray-600">
+                      <Globe className="w-4 h-4 mr-3" />
+                      <span className="text-sm truncate">{hospital.website}</span>
+                    </div>
+                  )}
 
-                  {/* Admin Info */}
                   <div className="pt-3 border-t border-gray-100">
-                    <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                    <div className="flex items-center justify-between text-xs text-gray-500">
                       <span>Admin: {hospital.adminId.firstName} {hospital.adminId.lastName}</span>
                       <span>Created: {new Date(hospital.createdAt).toLocaleDateString()}</span>
                     </div>
-                    {hospital.subscription && (
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>Plan: {hospital.subscription.planName}</span>
-                        <span>Next Billing: {new Date(hospital.subscription.nextBillingDate).toLocaleDateString()}</span>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-4">
+                  <div className="flex gap-2 pt-2">
                     <Button 
                       variant="outline" 
                       size="sm"
@@ -949,63 +786,140 @@ const Hospitals: React.FC = () => {
                       <Edit className="w-4 h-4" />
                     </Button>
                   </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         ) : (
-          /* Perfect Table View */
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Hospital Directory</h3>
-                  <p className="text-sm text-gray-600">Showing {filteredHospitals.length} of {totalHospitals} hospitals</p>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <span>Last updated: {new Date().toLocaleTimeString()}</span>
-                </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Hospital</TableHead>
+                      <TableHead>Address</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Admin</TableHead>
+                      <TableHead>Subscription Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="w-12">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredHospitals.map((hospital: Hospital) => (
+                      <TableRow key={hospital._id}>
+                        <TableCell>
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center">
+                              <Building2 className="w-4 h-4 text-blue-600" />
+                            </div>
+                            <div>
+                              <div className="font-medium">{hospital.name}</div>
+                              <div className="text-sm text-gray-500">{hospital.description || 'No description'}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center space-x-2">
+                            <MapPin className="w-4 h-4 text-gray-400" />
+                            <span className="max-w-xs truncate" title={hospital.address}>
+                              {hospital.address}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <Phone className="w-3 h-3 text-gray-400" />
+                              <span className="text-sm">{hospital.phoneNumber}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Mail className="w-3 h-3 text-gray-400" />
+                              <span className="text-sm text-gray-600 truncate">{hospital.email}</span>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">
+                              {hospital.adminId.firstName} {hospital.adminId.lastName}
+                            </div>
+                            <div className="text-sm text-gray-500">{hospital.adminId.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col space-y-1">
+                            <Badge variant={getStatusVariant(hospital.subscriptionStatus)}>
+                              {getStatusText(hospital.subscriptionStatus)}
+                            </Badge>
+                            {hospital.subscription && (
+                              <span className="text-xs text-gray-500">
+                                {hospital.subscription.planName}
+                              </span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-gray-600">
+                            {new Date(hospital.createdAt).toLocaleDateString()}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => setViewingHospital(hospital)}>
+                                <Eye className="w-4 h-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setEditingHospital(hospital)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Hospital</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete "{hospital.name}"? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteMutation.mutate(hospital._id)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            </div>
-            <div className="overflow-x-auto">
-              <EnhancedTable
-                columns={columns}
-                data={filteredHospitals}
-                searchPlaceholder="Search hospitals..."
-                showFooter={true}
-                footerProps={{
-                  showFirstLastButtons: true,
-                  labelRowsPerPage: "Hospitals per page:",
-                  labelDisplayedRows: ({ from, to, count }) => 
-                    `${from}-${to} of ${count} hospitals`
-                }}
-              />
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
       </div>
-
-      {/* Edit Hospital Modal */}
-      {editingHospital && (
-        <Dialog open={!!editingHospital} onOpenChange={() => setEditingHospital(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Edit Hospital</DialogTitle>
-              <DialogDescription>
-                Update hospital information and settings
-              </DialogDescription>
-            </DialogHeader>
-            <HospitalForm 
-              hospital={transformHospitalForForm(editingHospital)}
-              onSuccess={() => {
-                setEditingHospital(null);
-                queryClient.invalidateQueries({ queryKey: ['master-admin', 'hospitals'] });
-              }}
-              onCancel={() => setEditingHospital(null)}
-            />
-          </DialogContent>
-        </Dialog>
-      )}
 
       {/* Add Hospital Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
@@ -1013,10 +927,10 @@ const Hospitals: React.FC = () => {
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Building2 className="w-5 h-5 text-blue-600" />
-              <span>Add New Client Hospital</span>
+              <span>Add New Hospital</span>
             </DialogTitle>
             <DialogDescription>
-              Onboard a new hospital to Forefold's management system with comprehensive setup
+              Add a new hospital to the system
             </DialogDescription>
           </DialogHeader>
           <HospitalForm 

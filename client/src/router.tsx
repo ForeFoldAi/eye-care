@@ -30,6 +30,7 @@ import AdminAnalytics from '@/pages/admin/Analytics'
 import AdminStaffManagement from '@/pages/admin/StaffManagement'
 import AdminFinancialManagement from '@/pages/admin/FinancialManagement'
 import AdminSystemConfiguration from '@/pages/admin/SystemConfiguration'
+import AdminDepartmentManagement from '@/pages/admin/DepartmentManagement'
 import AdminAuditCompliance from '@/pages/admin/AuditCompliance'
 import AdminBranchForm from '@/pages/admin/BranchForm'
 import AdminDoctorAvailability from '@/pages/admin/DoctorAvailability'
@@ -314,7 +315,7 @@ const adminBranchFormRoute = createRoute({
 const adminDepartmentManagementRoute = createRoute({
   getParentRoute: () => adminLayoutRoute,
   path: '/department-management',
-  component: DepartmentManagement,
+  component: AdminDepartmentManagement,
 })
 
 const adminDoctorAvailabilityRoute = createRoute({

@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EnhancedTable } from '@/components/ui/enhanced-table';
 import { ColumnDef } from '@tanstack/react-table';
 import { 
-  DollarSign, 
+  
   CreditCard, 
   FileText, 
   Download, 

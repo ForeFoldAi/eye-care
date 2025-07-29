@@ -24,7 +24,11 @@ import {
   AlertTriangle,
   Star,
   Award,
-  TrendingUp
+  TrendingUp,
+  Building2,
+  Plus,
+  Save,
+  X
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -67,38 +71,81 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/auth';
+import { useForm } from 'react-hook-form';
 
 interface StaffMember {
   _id: string;
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
-  role: 'doctor' | 'receptionist' | 'nurse' | 'admin' | 'sub_admin';
-  department: string;
+  username: string;
+  phoneNumber?: string;
+  role: 'master_admin' | 'admin' | 'sub_admin' | 'doctor' | 'receptionist' | 'nurse';
+  department?: string;
   specialization?: string;
   isActive: boolean;
-  joinDate: string;
+  createdAt: string;
   lastLogin?: string;
   profilePhotoUrl?: string;
+  branchId?: {
+    _id: string;
+    branchName: string;
+  };
+  hospitalId?: {
+    _id: string;
+    name: string;
+  };
+  createdBy?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  permissions?: string[];
+  gender?: 'male' | 'female' | 'other';
+  dateOfBirth?: string;
+  emergencyContact?: string;
+  employeeId?: string;
+  joiningDate?: string;
+  shiftTiming?: 'morning' | 'evening' | 'night' | 'other';
+  highestQualification?: string;
+  medicalLicenseNumber?: string;
+  yearsOfExperience?: number;
+  certifications?: string;
+  previousHospitals?: string;
+  currentAddress?: string;
+  permanentAddress?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+}
+
+interface StaffFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  username: string;
+  phoneNumber: string;
+  role: string;
+  department: string;
+  specialization: string;
   branchId: string;
-  performance: {
-    rating: number;
-    patientsServed: number;
-    satisfaction: number;
-    revenue: number;
-  };
-  permissions: string[];
-  workSchedule: {
-    monday: { start: string; end: string; };
-    tuesday: { start: string; end: string; };
-    wednesday: { start: string; end: string; };
-    thursday: { start: string; end: string; };
-    friday: { start: string; end: string; };
-    saturday: { start: string; end: string; };
-    sunday: { start: string; end: string; };
-  };
+  isActive: boolean;
+  gender: string;
+  emergencyContact: string;
+  employeeId: string;
+  joiningDate: string;
+  shiftTiming: string;
+  highestQualification: string;
+  medicalLicenseNumber: string;
+  yearsOfExperience: number;
+  certifications: string;
+  currentAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
 }
 
 const StaffManagement: React.FC = () => {
@@ -109,18 +156,50 @@ const StaffManagement: React.FC = () => {
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
   const [showPermissionsDialog, setShowPermissionsDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   const user = authService.getStoredUser();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const API_URL = import.meta.env.VITE_API_URL;
 
-  const { data: staffMembers, isLoading } = useQuery({
+  // Form for adding/editing staff
+  const form = useForm<StaffFormData>({
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      email: '',
+      username: '',
+      phoneNumber: '',
+      role: 'doctor',
+      department: '',
+      specialization: '',
+      branchId: '',
+      isActive: true,
+      gender: 'male',
+      emergencyContact: '',
+      employeeId: '',
+      joiningDate: '',
+      shiftTiming: 'morning',
+      highestQualification: '',
+      medicalLicenseNumber: '',
+      yearsOfExperience: 0,
+      certifications: '',
+      currentAddress: '',
+      city: '',
+      state: '',
+      zipCode: ''
+    }
+  });
+
+  // Fetch staff members
+  const { data: staffMembers, isLoading: staffLoading } = useQuery({
     queryKey: ['admin', 'staff', user?.hospitalId, searchTerm, selectedRole, selectedDepartment, selectedBranch],
     queryFn: async () => {
       const params = new URLSearchParams({
-        hospitalId: user?.hospitalId || '',
         ...(searchTerm && { search: searchTerm }),
         ...(selectedRole !== 'all' && { role: selectedRole }),
         ...(selectedDepartment !== 'all' && { department: selectedDepartment }),
@@ -140,7 +219,8 @@ const StaffManagement: React.FC = () => {
     enabled: !!user?.hospitalId
   });
 
-  const { data: branches } = useQuery({
+  // Fetch branches
+  const { data: branches, isLoading: branchesLoading } = useQuery({
     queryKey: ['admin', 'branches', user?.hospitalId],
     queryFn: async () => {
       const response = await fetch(`${API_URL}/api/branches/hospital/${user?.hospitalId}`, {
@@ -154,7 +234,8 @@ const StaffManagement: React.FC = () => {
     enabled: !!user?.hospitalId
   });
 
-  const { data: departments } = useQuery({
+  // Fetch departments
+  const { data: departments, isLoading: departmentsLoading } = useQuery({
     queryKey: ['admin', 'departments', user?.hospitalId],
     queryFn: async () => {
       const response = await fetch(`${API_URL}/api/departments/hospital/${user?.hospitalId}`, {
@@ -168,8 +249,51 @@ const StaffManagement: React.FC = () => {
     enabled: !!user?.hospitalId
   });
 
+  // Add staff mutation
+  const addStaffMutation = useMutation({
+    mutationFn: async (data: StaffFormData) => {
+      const response = await fetch(`${API_URL}/api/users`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${authService.getToken()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...data,
+          hospitalId: user?.hospitalId,
+          password: 'defaultPassword123', // This should be changed by user on first login
+          createdBy: user?.id
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to add staff member');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'staff'] });
+      setShowAddDialog(false);
+      form.reset();
+      toast({
+        title: 'Success',
+        description: 'Staff member added successfully',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+
+  // Update staff mutation
   const updateStaffMutation = useMutation({
-    mutationFn: async (data: { id: string; updates: Partial<StaffMember> }) => {
+    mutationFn: async (data: { id: string; updates: Partial<StaffFormData> }) => {
       const response = await fetch(`${API_URL}/api/users/${data.id}`, {
         method: 'PUT',
         headers: { 
@@ -180,7 +304,8 @@ const StaffManagement: React.FC = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to update staff member');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update staff member');
       }
       
       return response.json();
@@ -189,9 +314,22 @@ const StaffManagement: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'staff'] });
       setShowEditDialog(false);
       setSelectedStaff(null);
+      form.reset();
+      toast({
+        title: 'Success',
+        description: 'Staff member updated successfully',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   });
 
+  // Delete staff mutation
   const deleteStaffMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await fetch(`${API_URL}/api/users/${id}`, {
@@ -200,20 +338,88 @@ const StaffManagement: React.FC = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to delete staff member');
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to delete staff member');
       }
       
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'staff'] });
+      setShowDeleteConfirm(false);
+      setSelectedStaff(null);
+      toast({
+        title: 'Success',
+        description: 'Staff member deleted successfully',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   });
 
+  // Toggle staff status
   const toggleStaffStatus = (id: string, isActive: boolean) => {
     updateStaffMutation.mutate({ id, updates: { isActive } });
   };
 
+  // Handle form submission
+  const handleSubmit = (data: StaffFormData) => {
+    if (showAddDialog) {
+      addStaffMutation.mutate(data);
+    } else if (showEditDialog && selectedStaff) {
+      updateStaffMutation.mutate({ id: selectedStaff._id, updates: data });
+    }
+  };
+
+  // Handle edit
+  const handleEdit = (staff: StaffMember) => {
+    setSelectedStaff(staff);
+    form.reset({
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      email: staff.email,
+      username: staff.username,
+      phoneNumber: staff.phoneNumber || '',
+      role: staff.role,
+      department: staff.department || '',
+      specialization: staff.specialization || '',
+      branchId: staff.branchId?._id || '',
+      isActive: staff.isActive,
+      gender: staff.gender || 'male',
+      emergencyContact: staff.emergencyContact || '',
+      employeeId: staff.employeeId || '',
+      joiningDate: staff.joiningDate || '',
+      shiftTiming: staff.shiftTiming || 'morning',
+      highestQualification: staff.highestQualification || '',
+      medicalLicenseNumber: staff.medicalLicenseNumber || '',
+      yearsOfExperience: staff.yearsOfExperience || 0,
+      certifications: staff.certifications || '',
+      currentAddress: staff.currentAddress || '',
+      city: staff.city || '',
+      state: staff.state || '',
+      zipCode: staff.zipCode || ''
+    });
+    setShowEditDialog(true);
+  };
+
+  // Handle delete
+  const handleDelete = (staff: StaffMember) => {
+    setSelectedStaff(staff);
+    setShowDeleteConfirm(true);
+  };
+
+  // Handle view details
+  const handleViewDetails = (staff: StaffMember) => {
+    setSelectedStaff(staff);
+    setShowViewDialog(true);
+  };
+
+  // Get role color
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'doctor': return 'bg-blue-100 text-blue-800';
@@ -221,25 +427,38 @@ const StaffManagement: React.FC = () => {
       case 'receptionist': return 'bg-purple-100 text-purple-800';
       case 'admin': return 'bg-red-100 text-red-800';
       case 'sub_admin': return 'bg-orange-100 text-orange-800';
+      case 'master_admin': return 'bg-gray-100 text-gray-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
+  // Get status color
   const getStatusColor = (isActive: boolean) => {
     return isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
   };
 
+  // Filter staff members
   const filteredStaff = staffMembers?.filter((staff: StaffMember) => {
-    const matchesSearch = staff.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         staff.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         staff.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = 
+      staff.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      staff.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      staff.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      staff.username.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesRole = selectedRole === 'all' || staff.role === selectedRole;
     const matchesDepartment = selectedDepartment === 'all' || staff.department === selectedDepartment;
-    const matchesBranch = selectedBranch === 'all' || staff.branchId === selectedBranch;
+    const matchesBranch = selectedBranch === 'all' || staff.branchId?._id === selectedBranch;
     
     return matchesSearch && matchesRole && matchesDepartment && matchesBranch;
   });
 
+  // Calculate stats
+  const totalStaff = staffMembers?.length || 0;
+  const activeStaff = staffMembers?.filter((s: StaffMember) => s.isActive).length || 0;
+  const doctors = staffMembers?.filter((s: StaffMember) => s.role === 'doctor').length || 0;
+  const nurses = staffMembers?.filter((s: StaffMember) => s.role === 'nurse').length || 0;
+  const receptionists = staffMembers?.filter((s: StaffMember) => s.role === 'receptionist').length || 0;
+
+  // Staff Card Component
   const StaffCard = ({ staff }: { staff: StaffMember }) => (
     <Card className="bg-white shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-6">
@@ -277,19 +496,13 @@ const StaffManagement: React.FC = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => {
-                setSelectedStaff(staff);
-                setShowEditDialog(true);
-              }}>
+              <DropdownMenuItem onClick={() => handleViewDetails(staff)}>
+                <Eye className="h-4 w-4 mr-2" />
+                View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleEdit(staff)}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => {
-                setSelectedStaff(staff);
-                setShowPermissionsDialog(true);
-              }}>
-                <Shield className="h-4 w-4 mr-2" />
-                Permissions
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => toggleStaffStatus(staff._id, !staff.isActive)}>
                 {staff.isActive ? (
@@ -306,7 +519,7 @@ const StaffManagement: React.FC = () => {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
-                onClick={() => deleteStaffMutation.mutate(staff._id)}
+                onClick={() => handleDelete(staff)}
                 className="text-red-600"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -319,16 +532,16 @@ const StaffManagement: React.FC = () => {
         <div className="mt-4 grid grid-cols-2 gap-4">
           <div className="flex items-center space-x-2">
             <Phone className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-600">{staff.phone}</span>
+            <span className="text-sm text-gray-600">{staff.phoneNumber || 'No phone'}</span>
           </div>
           <div className="flex items-center space-x-2">
             <MapPin className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-600">{staff.department}</span>
+            <span className="text-sm text-gray-600">{staff.department || 'No department'}</span>
           </div>
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-gray-400" />
             <span className="text-sm text-gray-600">
-              Joined {new Date(staff.joinDate).toLocaleDateString()}
+              Joined {new Date(staff.createdAt).toLocaleDateString()}
             </span>
           </div>
           <div className="flex items-center space-x-2">
@@ -339,25 +552,28 @@ const StaffManagement: React.FC = () => {
           </div>
         </div>
         
-        {staff.performance && (
+        {staff.branchId && (
           <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Star className="h-4 w-4 text-yellow-400" />
-                <span className="text-sm font-medium">Performance</span>
-              </div>
-              <span className="text-sm text-gray-600">{staff.performance.rating}/5</span>
-            </div>
-            <Progress value={staff.performance.rating * 20} className="mt-2" />
-            <div className="flex justify-between mt-2 text-xs text-gray-600">
-              <span>{staff.performance.patientsServed} patients</span>
-              <span>{staff.performance.satisfaction}% satisfaction</span>
+            <div className="flex items-center space-x-2">
+              <Building2 className="h-4 w-4 text-blue-400" />
+              <span className="text-sm font-medium">Branch: {staff.branchId.branchName}</span>
             </div>
           </div>
         )}
       </CardContent>
     </Card>
   );
+
+  if (staffLoading || branchesLoading || departmentsLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading staff data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -406,7 +622,7 @@ const StaffManagement: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600">Total Staff</p>
-                      <p className="text-2xl font-bold text-gray-900">{staffMembers?.length || 0}</p>
+                      <p className="text-2xl font-bold text-gray-900">{totalStaff}</p>
                     </div>
                     <Users className="h-8 w-8 text-blue-500" />
                   </div>
@@ -418,9 +634,7 @@ const StaffManagement: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600">Active Staff</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {staffMembers?.filter((s: StaffMember) => s.isActive).length || 0}
-                      </p>
+                      <p className="text-2xl font-bold text-gray-900">{activeStaff}</p>
                     </div>
                     <CheckCircle className="h-8 w-8 text-green-500" />
                   </div>
@@ -432,9 +646,7 @@ const StaffManagement: React.FC = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600">Doctors</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {staffMembers?.filter((s: StaffMember) => s.role === 'doctor').length || 0}
-                      </p>
+                      <p className="text-2xl font-bold text-gray-900">{doctors}</p>
                     </div>
                     <Award className="h-8 w-8 text-purple-500" />
                   </div>
@@ -445,8 +657,8 @@ const StaffManagement: React.FC = () => {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Avg. Performance</p>
-                      <p className="text-2xl font-bold text-gray-900">4.2/5</p>
+                      <p className="text-sm text-gray-600">Nurses</p>
+                      <p className="text-2xl font-bold text-gray-900">{nurses}</p>
                     </div>
                     <TrendingUp className="h-8 w-8 text-orange-500" />
                   </div>
@@ -533,7 +745,7 @@ const StaffManagement: React.FC = () => {
                       <SelectItem value="all">All Branches</SelectItem>
                       {branches?.map((branch: any) => (
                         <SelectItem key={branch._id} value={branch._id}>
-                          {branch.name}
+                          {branch.branchName}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -557,51 +769,9 @@ const StaffManagement: React.FC = () => {
                 <CardDescription>Staff performance and productivity analysis</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {staffMembers?.filter((s: StaffMember) => s.performance)
-                    .sort((a: StaffMember, b: StaffMember) => b.performance.rating - a.performance.rating)
-                    .map((staff: StaffMember) => (
-                      <div key={staff._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-4">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage 
-                              src={staff.profilePhotoUrl} 
-                              alt={`${staff.firstName} ${staff.lastName}`}
-                            />
-                            <AvatarFallback className="bg-blue-500 text-white">
-                              {staff.firstName[0]}{staff.lastName[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h4 className="font-medium text-gray-900">
-                              {staff.firstName} {staff.lastName}
-                            </h4>
-                            <p className="text-sm text-gray-600">{staff.role}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center space-x-6">
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900">
-                              {staff.performance.patientsServed} patients
-                            </p>
-                            <p className="text-xs text-gray-600">
-                              {staff.performance.satisfaction}% satisfaction
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium text-gray-900">
-                              ${staff.performance.revenue?.toLocaleString()}
-                            </p>
-                            <p className="text-xs text-gray-600">revenue</p>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                            <span className="text-sm font-medium">{staff.performance.rating}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
+                <p className="text-gray-500 text-center py-8">
+                  Performance metrics will be available soon...
+                </p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -628,9 +798,10 @@ const StaffManagement: React.FC = () => {
           setShowAddDialog(false);
           setShowEditDialog(false);
           setSelectedStaff(null);
+          form.reset();
         }
       }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {showAddDialog ? 'Add New Staff Member' : 'Edit Staff Member'}
@@ -639,29 +810,77 @@ const StaffManagement: React.FC = () => {
               {showAddDialog ? 'Add a new staff member to your hospital' : 'Update staff member information'}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="firstName">First Name</Label>
-                <Input id="firstName" placeholder="John" />
+                <Label htmlFor="firstName">First Name *</Label>
+                <Input 
+                  id="firstName" 
+                  {...form.register('firstName', { required: 'First name is required' })}
+                  placeholder="John"
+                />
+                {form.formState.errors.firstName && (
+                  <p className="text-red-500 text-sm mt-1">{form.formState.errors.firstName.message}</p>
+                )}
               </div>
               <div>
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input id="lastName" placeholder="Doe" />
+                <Label htmlFor="lastName">Last Name *</Label>
+                <Input 
+                  id="lastName" 
+                  {...form.register('lastName', { required: 'Last name is required' })}
+                  placeholder="Doe"
+                />
+                {form.formState.errors.lastName && (
+                  <p className="text-red-500 text-sm mt-1">{form.formState.errors.lastName.message}</p>
+                )}
               </div>
             </div>
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="john.doe@hospital.com" />
-            </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="phone">Phone</Label>
-                <Input id="phone" placeholder="+1 (555) 123-4567" />
+                <Label htmlFor="email">Email *</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  {...form.register('email', { 
+                    required: 'Email is required',
+                    pattern: {
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: 'Invalid email address'
+                    }
+                  })}
+                  placeholder="john.doe@hospital.com"
+                />
+                {form.formState.errors.email && (
+                  <p className="text-red-500 text-sm mt-1">{form.formState.errors.email.message}</p>
+                )}
               </div>
               <div>
-                <Label htmlFor="role">Role</Label>
-                <Select>
+                <Label htmlFor="username">Username *</Label>
+                <Input 
+                  id="username" 
+                  {...form.register('username', { required: 'Username is required' })}
+                  placeholder="johndoe"
+                />
+                {form.formState.errors.username && (
+                  <p className="text-red-500 text-sm mt-1">{form.formState.errors.username.message}</p>
+                )}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Input 
+                  id="phoneNumber" 
+                  {...form.register('phoneNumber')}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+              <div>
+                <Label htmlFor="role">Role *</Label>
+                <Select value={form.watch('role')} onValueChange={(value) => form.setValue('role', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
@@ -675,10 +894,11 @@ const StaffManagement: React.FC = () => {
                 </Select>
               </div>
             </div>
+            
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="department">Department</Label>
-                <Select>
+                <Select value={form.watch('department')} onValueChange={(value) => form.setValue('department', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
@@ -692,81 +912,275 @@ const StaffManagement: React.FC = () => {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="branch">Branch</Label>
-                <Select>
+                <Label htmlFor="branchId">Branch *</Label>
+                <Select value={form.watch('branchId')} onValueChange={(value) => form.setValue('branchId', value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select branch" />
                   </SelectTrigger>
                   <SelectContent>
                     {branches?.map((branch: any) => (
                       <SelectItem key={branch._id} value={branch._id}>
-                        {branch.name}
+                        {branch.branchName}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="specialization">Specialization</Label>
+                <Input 
+                  id="specialization" 
+                  {...form.register('specialization')}
+                  placeholder="Cardiology, Neurology, etc."
+                />
+              </div>
+              <div>
+                <Label htmlFor="employeeId">Employee ID</Label>
+                <Input 
+                  id="employeeId" 
+                  {...form.register('employeeId')}
+                  placeholder="EMP001"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="joiningDate">Joining Date</Label>
+                <Input 
+                  id="joiningDate" 
+                  type="date"
+                  {...form.register('joiningDate')}
+                />
+              </div>
+              <div>
+                <Label htmlFor="shiftTiming">Shift Timing</Label>
+                <Select value={form.watch('shiftTiming')} onValueChange={(value) => form.setValue('shiftTiming', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shift" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="morning">Morning</SelectItem>
+                    <SelectItem value="evening">Evening</SelectItem>
+                    <SelectItem value="night">Night</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="highestQualification">Highest Qualification</Label>
+                <Input 
+                  id="highestQualification" 
+                  {...form.register('highestQualification')}
+                  placeholder="MBBS, MD, PhD, etc."
+                />
+              </div>
+              <div>
+                <Label htmlFor="yearsOfExperience">Years of Experience</Label>
+                <Input 
+                  id="yearsOfExperience" 
+                  type="number"
+                  {...form.register('yearsOfExperience', { valueAsNumber: true })}
+                  placeholder="5"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="currentAddress">Current Address</Label>
+              <Textarea 
+                id="currentAddress" 
+                {...form.register('currentAddress')}
+                placeholder="Enter current address"
+                rows={3}
+              />
+            </div>
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="city">City</Label>
+                <Input 
+                  id="city" 
+                  {...form.register('city')}
+                  placeholder="City"
+                />
+              </div>
+              <div>
+                <Label htmlFor="state">State</Label>
+                <Input 
+                  id="state" 
+                  {...form.register('state')}
+                  placeholder="State"
+                />
+              </div>
+              <div>
+                <Label htmlFor="zipCode">ZIP Code</Label>
+                <Input 
+                  id="zipCode" 
+                  {...form.register('zipCode')}
+                  placeholder="12345"
+                />
+              </div>
+            </div>
+            
             <div className="flex items-center space-x-2">
-              <Switch id="isActive" />
+              <Switch 
+                id="isActive" 
+                checked={form.watch('isActive')}
+                onCheckedChange={(checked) => form.setValue('isActive', checked)}
+              />
               <Label htmlFor="isActive">Active</Label>
             </div>
+            
             <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => {
-                setShowAddDialog(false);
-                setShowEditDialog(false);
-                setSelectedStaff(null);
-              }}>
+              <Button 
+                type="button"
+                variant="outline" 
+                onClick={() => {
+                  setShowAddDialog(false);
+                  setShowEditDialog(false);
+                  setSelectedStaff(null);
+                  form.reset();
+                }}
+              >
+                <X className="w-4 h-4 mr-2" />
                 Cancel
               </Button>
-              <Button>
+              <Button type="submit" disabled={addStaffMutation.isPending || updateStaffMutation.isPending}>
+                <Save className="w-4 h-4 mr-2" />
                 {showAddDialog ? 'Add Staff' : 'Update Staff'}
               </Button>
             </div>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
 
-      {/* Permissions Dialog */}
-      <Dialog open={showPermissionsDialog} onOpenChange={setShowPermissionsDialog}>
-        <DialogContent>
+      {/* View Staff Details Dialog */}
+      <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Manage Permissions</DialogTitle>
+            <DialogTitle>Staff Details</DialogTitle>
             <DialogDescription>
-              Set permissions for {selectedStaff?.firstName} {selectedStaff?.lastName}
+              Comprehensive information about {selectedStaff?.firstName} {selectedStaff?.lastName}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Switch id="viewPatients" />
-                <Label htmlFor="viewPatients">View Patients</Label>
+          
+          {selectedStaff && (
+            <div className="space-y-6">
+              <div className="flex items-center space-x-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarImage src={selectedStaff.profilePhotoUrl} />
+                  <AvatarFallback className="bg-blue-500 text-white text-lg">
+                    {selectedStaff.firstName[0]}{selectedStaff.lastName[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900">
+                    {selectedStaff.firstName} {selectedStaff.lastName}
+                  </h3>
+                  <p className="text-gray-600">{selectedStaff.email}</p>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Badge className={getRoleColor(selectedStaff.role)}>
+                      {selectedStaff.role.replace('_', ' ')}
+                    </Badge>
+                    <Badge className={getStatusColor(selectedStaff.isActive)}>
+                      {selectedStaff.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch id="editPatients" />
-                <Label htmlFor="editPatients">Edit Patients</Label>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Username</Label>
+                  <p className="text-gray-900">{selectedStaff.username}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Phone</Label>
+                  <p className="text-gray-900">{selectedStaff.phoneNumber || 'No phone'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Department</Label>
+                  <p className="text-gray-900">{selectedStaff.department || 'No department'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Branch</Label>
+                  <p className="text-gray-900">{selectedStaff.branchId?.branchName || 'No branch'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Specialization</Label>
+                  <p className="text-gray-900">{selectedStaff.specialization || 'No specialization'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Employee ID</Label>
+                  <p className="text-gray-900">{selectedStaff.employeeId || 'No ID'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Joining Date</Label>
+                  <p className="text-gray-900">
+                    {selectedStaff.joiningDate ? new Date(selectedStaff.joiningDate).toLocaleDateString() : 'Not specified'}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Created Date</Label>
+                  <p className="text-gray-900">{new Date(selectedStaff.createdAt).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Last Login</Label>
+                  <p className="text-gray-900">
+                    {selectedStaff.lastLogin ? new Date(selectedStaff.lastLogin).toLocaleDateString() : 'Never logged in'}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Created By</Label>
+                  <p className="text-gray-900">
+                    {selectedStaff.createdBy ? `${selectedStaff.createdBy.firstName} ${selectedStaff.createdBy.lastName}` : 'System'}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch id="viewAppointments" />
-                <Label htmlFor="viewAppointments">View Appointments</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch id="manageAppointments" />
-                <Label htmlFor="manageAppointments">Manage Appointments</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Switch id="accessReports" />
-                <Label htmlFor="accessReports">Access Reports</Label>
-              </div>
+
+              {selectedStaff.currentAddress && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Address</Label>
+                  <p className="text-gray-900">{selectedStaff.currentAddress}</p>
+                  {selectedStaff.city && (
+                    <p className="text-gray-600 text-sm">
+                      {selectedStaff.city}, {selectedStaff.state} {selectedStaff.zipCode}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowPermissionsDialog(false)}>
-                Cancel
-              </Button>
-              <Button>
-                Save Permissions
-              </Button>
-            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedStaff?.firstName} {selectedStaff?.lastName}? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => selectedStaff && deleteStaffMutation.mutate(selectedStaff._id)}
+              disabled={deleteStaffMutation.isPending}
+            >
+              {deleteStaffMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -19,7 +19,16 @@ export interface Department {
     role: string;
     specialization: string;
   }>;
-  branchId: string; // Added for branch-level filtering
+  branchId: string | {
+    _id: string;
+    branchName: string;
+  };
+  createdBy: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
 }
 
 export interface DepartmentFormData {
@@ -88,13 +97,22 @@ export const DepartmentProvider: React.FC<DepartmentProviderProps> = ({ children
     error, 
     refetch: refetchDepartments 
   } = useQuery({
-    queryKey: ['departments', user?.branchId],
+    queryKey: ['departments', user?.role, user?.branchId, user?.hospitalId],
     queryFn: async () => {
-      if (!user?.branchId) {
+      if (!user) {
         return defaultDepartments;
       }
 
-      const response = await fetch(`${API_URL}/api/departments/branch/${user.branchId}`, {
+      let endpoint = '';
+      if (user.role === 'admin') {
+        // Admin users can see all departments in the hospital
+        endpoint = `${API_URL}/api/departments/hospital/${user.hospitalId}`;
+      } else {
+        // Other users see only their branch departments
+        endpoint = `${API_URL}/api/departments/branch/${user.branchId}`;
+      }
+
+      const response = await fetch(endpoint, {
         headers: { 
           'Authorization': `Bearer ${authService.getToken()}`,
           'Content-Type': 'application/json'
@@ -107,7 +125,7 @@ export const DepartmentProvider: React.FC<DepartmentProviderProps> = ({ children
 
       return response.json();
     },
-    enabled: !!user?.branchId,
+    enabled: !!user,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 

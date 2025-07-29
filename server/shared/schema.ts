@@ -121,6 +121,7 @@ export const insertBranchSchema = z.object({
   // Basic Information
   branchName: z.string().min(1, 'Branch name is required'),
   hospitalId: z.string().min(1, 'Hospital ID is required'),
+  branchType: z.enum(['main', 'sub']).default('sub'),
   branchCode: z.string().optional(),
   email: z.string().email('Invalid email'),
   phoneNumber: z.string().min(1, 'Phone number is required'),

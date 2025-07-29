@@ -4,6 +4,7 @@ export interface IBranchDocument extends Document {
   // Basic Information
   branchName: string;
   hospitalId: mongoose.Types.ObjectId;
+  branchType: 'main' | 'sub'; // New field for branch type
   branchCode?: string;
   email: string;
   phoneNumber: string;
@@ -55,6 +56,7 @@ const branchSchema = new mongoose.Schema({
   // Basic Information
   branchName: { type: String, required: true },
   hospitalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Hospital', required: true },
+  branchType: { type: String, enum: ['main', 'sub'], required: true, default: 'sub' },
   branchCode: { type: String, unique: true, sparse: true },
   email: { type: String, required: true },
   phoneNumber: { type: String, required: true },
@@ -112,7 +114,7 @@ const branchSchema = new mongoose.Schema({
 });
 
 // Generate branch code automatically if not provided
-branchSchema.pre('save', function(next) {
+branchSchema.pre('save', async function(next) {
   this.updatedAt = new Date();
   
   // Generate branch code if not provided
@@ -121,6 +123,19 @@ branchSchema.pre('save', function(next) {
     const nameCode = this.branchName.substring(0, 3).toUpperCase();
     const timestampCode = Date.now().toString().slice(-4);
     this.branchCode = `${nameCode}${timestampCode}`;
+  }
+  
+  // Validate that only one main branch exists per hospital
+  if (this.branchType === 'main') {
+    const existingMainBranch = await Branch.findOne({
+      hospitalId: this.hospitalId,
+      branchType: 'main',
+      _id: { $ne: this._id } // Exclude current document if updating
+    });
+    
+    if (existingMainBranch) {
+      return next(new Error('Only one main branch is allowed per hospital'));
+    }
   }
   
   next();

@@ -1,6 +1,8 @@
 import express from 'express';
 import { Department } from '../models/department';
 import { User } from '../models/user';
+import { Patient } from '../models/patient';
+import { Appointment } from '../models/appointment';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
@@ -21,22 +23,43 @@ router.get('/branch/:branchId', authenticateToken, async (req: AuthRequest, res)
     }
 
     const departments = await Department.find({ branchId })
-      .populate('staff', 'firstName lastName role specialization')
+      .populate('createdBy', 'firstName lastName email')
+      .populate('branchId', 'branchName')
       .sort({ createdAt: -1 });
 
-    // Add calculated fields
-    const departmentsWithStats = departments.map((dept) => {
-      const staffCount = dept.staff.length;
-      const activePatients = Math.floor(Math.random() * 50) + 10; // Mock data
-      const totalAppointments = Math.floor(Math.random() * 100) + 20; // Mock data
+    // Add calculated fields with real data
+    const departmentsWithStats = await Promise.all(departments.map(async (dept) => {
+      // Get all staff members assigned to this department (from User model)
+      const staffInDepartment = await User.find({
+        department: dept.name,
+        isActive: true,
+        hospitalId: user.hospitalId
+      }).select('firstName lastName role specialization');
+      
+      const staffCount = staffInDepartment.length;
+      
+      // Get doctors in this department for patient calculations
+      const doctorsInDepartment = staffInDepartment.filter(staff => staff.role === 'doctor');
+      
+      // Get unique patients who have appointments with doctors in this department
+      const doctorIds = doctorsInDepartment.map(doctor => doctor._id);
+      const uniquePatients = await Appointment.distinct('patientId', {
+        doctorId: { $in: doctorIds }
+      });
+      
+      // Get total appointments for doctors in this department
+      const totalAppointments = await Appointment.countDocuments({
+        doctorId: { $in: doctorIds }
+      });
 
       return {
         ...dept.toObject(),
+        staff: staffInDepartment, // Use the actual staff data from User model
         staffCount,
-        activePatients,
+        activePatients: uniquePatients.length,
         totalAppointments
       };
-    });
+    }));
 
     res.json(departmentsWithStats);
   } catch (error) {
@@ -71,7 +94,8 @@ router.post('/', authenticateToken, async (req: AuthRequest, res) => {
       description,
       branchId,
       hospitalId: user.hospitalId,
-      headOfDepartment
+      headOfDepartment,
+      createdBy: user.id
     });
 
     await department.save();
@@ -149,7 +173,13 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
     }
 
     // Check if department has staff assigned
-    if (department.staff.length > 0) {
+    const staffInDepartment = await User.find({
+      department: department.name,
+      isActive: true,
+      hospitalId: user.hospitalId
+    });
+
+    if (staffInDepartment.length > 0) {
       return res.status(400).json({ 
         message: 'Cannot delete department with assigned staff. Please reassign staff first.' 
       });
@@ -160,6 +190,98 @@ router.delete('/:id', authenticateToken, async (req: AuthRequest, res) => {
     res.json({ message: 'Department deleted successfully' });
   } catch (error) {
     console.error('Error deleting department:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get all departments for a hospital (admin only)
+router.get('/hospital/:hospitalId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { hospitalId } = req.params;
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    // Check if user is admin and has access to this hospital
+    if (user.role !== 'admin' || user.hospitalId !== hospitalId) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const departments = await Department.find({ hospitalId })
+      .populate('createdBy', 'firstName lastName email')
+      .populate('branchId', 'branchName')
+      .sort({ createdAt: -1 });
+
+    // Add calculated fields with real data
+    const departmentsWithStats = await Promise.all(departments.map(async (dept) => {
+      // Get all staff members assigned to this department (from User model)
+      const staffInDepartment = await User.find({
+        department: dept.name,
+        isActive: true,
+        hospitalId: user.hospitalId
+      }).select('firstName lastName role specialization');
+      
+      const staffCount = staffInDepartment.length;
+      
+      // Get doctors in this department for patient calculations
+      const doctorsInDepartment = staffInDepartment.filter(staff => staff.role === 'doctor');
+      
+      // Get unique patients who have appointments with doctors in this department
+      const doctorIds = doctorsInDepartment.map(doctor => doctor._id);
+      const uniquePatients = await Appointment.distinct('patientId', {
+        doctorId: { $in: doctorIds }
+      });
+      
+      // Get total appointments for doctors in this department
+      const totalAppointments = await Appointment.countDocuments({
+        doctorId: { $in: doctorIds }
+      });
+
+      return {
+        ...dept.toObject(),
+        staff: staffInDepartment, // Use the actual staff data from User model
+        staffCount,
+        activePatients: uniquePatients.length,
+        totalAppointments
+      };
+    }));
+
+    res.json(departmentsWithStats);
+  } catch (error) {
+    console.error('Error fetching hospital departments:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Debug endpoint to check staff department assignments
+router.get('/debug/staff', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const allStaff = await User.find({
+      hospitalId: user.hospitalId,
+      isActive: true
+    }).select('firstName lastName role department');
+
+    const departments = await Department.find({ hospitalId: user.hospitalId }).select('name');
+
+    res.json({
+      staff: allStaff.map(s => ({
+        name: `${s.firstName} ${s.lastName}`,
+        role: s.role,
+        department: s.department || 'None'
+      })),
+      departments: departments.map(d => d.name),
+      totalStaff: allStaff.length,
+      staffWithDepartments: allStaff.filter(s => s.department).length
+    });
+  } catch (error) {
+    console.error('Error in debug endpoint:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

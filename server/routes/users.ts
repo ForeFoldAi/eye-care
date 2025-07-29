@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
+import mongoose from 'mongoose';
 import { User, Hospital, Branch } from '../models';
 import { insertUserSchema } from '../shared/schema';
 import { authenticateToken, authorizeRole, AuthRequest } from '../middleware/auth';
@@ -38,7 +39,7 @@ router.get('/',
     // Return users based on tenant context
     const users = await User.find(filter)
       .populate('hospitalId', 'name logo')
-      .populate('branchId', 'name')
+      .populate('branchId', '_id branchName')
       .populate('createdBy', 'firstName lastName email')
       .select('-password')
       .sort({ createdAt: -1 });
@@ -58,9 +59,13 @@ router.get('/hospital/:hospitalId', authenticateToken, authorizeRole(['admin']),
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    const users = await User.find({ hospitalId: req.params.hospitalId })
+    // Ensure hospitalId is treated as an ObjectId
+    const hospitalId = new mongoose.Types.ObjectId(req.params.hospitalId);
+
+    // Fetch users with populated branch and hospital info
+    const users = await User.find({ hospitalId })
       .populate('hospitalId', 'name logo')
-      .populate('branchId', 'name')
+      .populate('branchId', '_id branchName location') // assuming branch location exists
       .populate('createdBy', 'firstName lastName email')
       .select('-password')
       .sort({ createdAt: -1 });
@@ -82,7 +87,7 @@ router.get('/branch/:branchId', authenticateToken, authorizeRole(['sub_admin']),
 
     const users = await User.find({ branchId: req.params.branchId })
       .populate('hospitalId', 'name logo')
-      .populate('branchId', 'name')
+      .populate('branchId', '_id branchName')
       .populate('createdBy', 'firstName lastName email')
       .select('-password')
       .sort({ createdAt: -1 });
@@ -98,7 +103,7 @@ router.get('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 's
   try {
     const user = await User.findById(req.params.id)
       .populate('hospitalId', 'name logo')
-      .populate('branchId', 'name')
+      .populate('branchId', '_id branchName')
       .populate('createdBy', 'firstName lastName email')
       .select('-password');
     
@@ -198,7 +203,7 @@ router.post('/',
 
     // Populate references
     await user.populate('hospitalId', 'name');
-    await user.populate('branchId', 'name');
+    await user.populate('branchId', '_id branchName');
     await user.populate('createdBy', 'firstName lastName email');
 
     const { password, ...userWithoutPassword } = user.toObject();
@@ -254,7 +259,7 @@ router.put('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 's
       { new: true }
     )
     .populate('hospitalId', 'name logo')
-    .populate('branchId', 'name')
+    .populate('branchId', '_id branchName')
     .populate('createdBy', 'firstName lastName email')
     .select('-password');
 
@@ -407,6 +412,61 @@ router.get('/stats/overview', authenticateToken, authorizeRole(['master_admin', 
     }
   } catch (error) {
     res.status(500).json({ message: 'Error fetching user statistics' });
+  }
+});
+
+// Get staff members with filters
+router.get('/staff', authenticateToken, authorizeRole(['master_admin', 'admin', 'sub_admin']), async (req: AuthRequest, res) => {
+  try {
+    const { search, role, department, branch } = req.query;
+    
+    // Build filter based on user role and query parameters
+    let filter: any = {};
+    
+    // Role-based filtering
+    if (req.user?.role === 'admin') {
+      filter.hospitalId = req.user.hospitalId;
+    } else if (req.user?.role === 'sub_admin') {
+      filter.branchId = req.user.branchId;
+    }
+    
+    // Apply search filter
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Apply role filter
+    if (role && role !== 'all') {
+      filter.role = role;
+    }
+    
+    // Apply department filter
+    if (department && department !== 'all') {
+      filter.department = department;
+    }
+    
+    // Apply branch filter
+    if (branch && branch !== 'all') {
+      filter.branchId = branch;
+    }
+    
+    // Fetch staff members with populated data
+    const staffMembers = await User.find(filter)
+      .populate('hospitalId', 'name logo')
+      .populate('branchId', '_id branchName')
+      .populate('createdBy', 'firstName lastName email')
+      .select('-password')
+      .sort({ createdAt: -1 });
+    
+    res.json(staffMembers);
+  } catch (error) {
+    console.error('Error fetching staff members:', error);
+    res.status(500).json({ message: 'Error fetching staff members' });
   }
 });
 

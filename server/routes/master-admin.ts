@@ -1076,7 +1076,7 @@ router.get('/support-tickets', async (req: AuthRequest, res) => {
     const [tickets, total] = await Promise.all([
       SupportTicket.find(query)
         .populate('hospitalId', 'name')
-        .populate('branchId', 'name')
+        .populate('branchId', '_id branchName')
         .populate('createdBy', 'firstName lastName email')
         .populate('assignedTo', 'firstName lastName email')
         .sort({ createdAt: -1 })

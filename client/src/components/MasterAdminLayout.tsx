@@ -85,6 +85,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/auth';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -339,7 +340,7 @@ const MasterAdminLayout: React.FC<MasterAdminLayoutProps> = ({ children }) => {
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
-              return (
+              const linkContent = (
                 <Link
                   key={item.name}
                   to={item.href}
@@ -380,6 +381,35 @@ const MasterAdminLayout: React.FC<MasterAdminLayoutProps> = ({ children }) => {
                   )}
                 </Link>
               );
+
+              // Show tooltip only when sidebar is closed
+              if (!sidebarOpen) {
+                return (
+                  <TooltipProvider key={item.name}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        {linkContent}
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="flex flex-col items-start">
+                        <span className="font-medium">{item.name}</span>
+                        <span className="text-xs text-gray-400">{item.description}</span>
+                        {item.badge && (
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs mt-1 ${
+                              item.badgeColor || 'bg-blue-100 text-blue-700'
+                            }`}
+                          >
+                            {item.badge}
+                          </Badge>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              }
+
+              return linkContent;
             })}
           </nav>
 

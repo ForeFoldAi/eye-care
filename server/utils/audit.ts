@@ -235,7 +235,7 @@ export class AuditQueryHelper {
       .skip(skip)
       .populate('userId', 'firstName lastName email')
       .populate('hospitalId', 'name')
-      .populate('branchId', 'name');
+      .populate('branchId', '_id branchName');
   }
 
   static async getSecurityEvents(
@@ -275,6 +275,6 @@ export class AuditQueryHelper {
     })
     .sort({ timestamp: -1 })
     .populate('hospitalId', 'name')
-    .populate('branchId', 'name');
+    .populate('branchId', '_id branchName');
   }
 } 

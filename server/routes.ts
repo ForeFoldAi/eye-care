@@ -38,6 +38,7 @@ import { seedDatabase } from './db/seed';
 import masterAdminRoutes from './routes/master-admin';
 import billingRoutes from './routes/billing';
 import analyticsRoutes from './routes/analytics';
+import doctorAvailabilityRoutes from './routes/doctor-availability';
 
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -210,6 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/master-admin/subscription-plans', subscriptionPlanRoutes);
   app.use('/api/billing', billingRoutes);
   app.use('/api/analytics', analyticsRoutes);
+  app.use('/api/doctor-availability', doctorAvailabilityRoutes);
 
 
 
