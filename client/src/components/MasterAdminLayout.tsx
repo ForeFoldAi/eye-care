@@ -167,9 +167,9 @@ const MasterAdminLayout: React.FC<MasterAdminLayoutProps> = ({ children }) => {
       }
     };
 
-    fetchCount('/api/hospitals/count', setHospitalCount);
-    fetchCount('/api/subscriptions/count', setSubscriptionCount);
-    fetchCount('/api/support/count', setSupportCount);
+    fetchCount('/api/master-admin/hospitals/count', setHospitalCount);
+    fetchCount('/api/master-admin/subscriptions/count', setSubscriptionCount);
+    fetchCount('/api/master-admin/support/count', setSupportCount);
   }, []);
 
   const navigation = [

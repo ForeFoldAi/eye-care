@@ -247,8 +247,8 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <div className={`${
-        sidebarOpen ? 'w-72' : 'w-0 lg:w-16'
-      } transition-all duration-300 ease-in-out bg-white shadow-lg z-50 fixed lg:fixed inset-y-0 left-0 overflow-hidden border-r border-gray-200`}>
+        mobileSidebarOpen ? 'w-72' : 'w-0'
+      } lg:${sidebarOpen ? 'w-72' : 'w-16'} transition-all duration-300 ease-in-out bg-white shadow-lg z-50 fixed lg:fixed inset-y-0 left-0 overflow-hidden border-r border-gray-200`}>
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b bg-gradient-to-r from-blue-600 to-indigo-600">
@@ -268,7 +268,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                 ) : null}
                 <Hospital className="w-5 h-5 text-blue-600 hidden" />
               </div>
-              {sidebarOpen && (
+              {(sidebarOpen || mobileSidebarOpen) && (
                 <div className="text-white min-w-0 flex-1">
                   <h1 className="text-sm font-bold truncate">
                     {hospitalData?.name || 'Admin Panel'}
@@ -310,7 +310,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                   }`}>
                     <item.icon className="w-4 h-4" />
                   </div>
-                  {sidebarOpen && (
+                  {(sidebarOpen || mobileSidebarOpen) && (
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{item.name}</div>
                       <div className="text-xs text-gray-500 mt-0.5 truncate">{item.description}</div>
@@ -319,8 +319,8 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                 </Link>
               );
 
-              // Show tooltip only when sidebar is closed
-              if (!sidebarOpen) {
+              // Show tooltip only when sidebar is closed on desktop
+              if (!sidebarOpen && !mobileSidebarOpen) {
                 return (
                   <TooltipProvider key={item.name}>
                     <Tooltip>
@@ -355,8 +355,16 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
         </div>
       </div>
 
+      {/* Mobile sidebar overlay */}
+      {mobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden" 
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       {/* Main content */}
-      <div className={`flex-1 flex flex-col transition-all duration-300 ease-in-out ${
+      <div className={`flex-1 transition-all duration-300 ease-in-out ${
         sidebarOpen ? 'lg:ml-72' : 'lg:ml-16'
       }`}>
         {/* Desktop Header */}
@@ -414,7 +422,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
         </div>
 
         {/* Mobile Header */}
-        <div className="sticky top-0 z-30 bg-white border-b border-gray-200 lg:hidden flex-shrink-0">
+        <div className="sticky top-0 z-30 bg-white border-b border-gray-200 lg:hidden">
           <div className="flex items-center justify-between h-16 px-4">
             <Button
               variant="ghost"
@@ -457,7 +465,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
           </div>
         </div>
 
-        <main className="flex-1 overflow-y-auto min-h-0">
+        <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
         
@@ -466,14 +474,6 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
           <ChatWidget />
         </div>
       </div>
-
-      {/* Mobile sidebar overlay */}
-      {mobileSidebarOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
-          onClick={() => setMobileSidebarOpen(false)}
-        />
-      )}
 
       {/* Profile Settings Modal */}
       <Dialog open={showProfileModal} onOpenChange={setShowProfileModal}>

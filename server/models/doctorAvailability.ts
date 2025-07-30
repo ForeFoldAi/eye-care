@@ -45,6 +45,10 @@ const doctorAvailabilitySchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
   // Track who added the availability
   addedBy: {
     userId: {

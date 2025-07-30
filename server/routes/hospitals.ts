@@ -6,6 +6,8 @@ import { authenticateToken, authorizeRole, AuthRequest } from '../middleware/aut
 
 const router = Router();
 
+
+
 // Get all hospitals (master admin only)
 router.get('/', authenticateToken, authorizeRole(['master_admin']), async (req: AuthRequest, res) => {
   try {

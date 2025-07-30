@@ -44,7 +44,6 @@ interface BranchFormData {
   // Basic Information
   branchName: string;
   hospitalId: string;
-  branchType: 'main' | 'sub';
   branchCode?: string;
   email: string;
   phoneNumber: string;
@@ -88,12 +87,9 @@ const BranchForm: React.FC = () => {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
-  const [hasMainBranch, setHasMainBranch] = useState(false);
-  const [mainBranchInfo, setMainBranchInfo] = useState<{ id: string; name: string; email: string } | null>(null);
   const [formData, setFormData] = useState<BranchFormData>({
     branchName: '',
     hospitalId: user?.hospitalId || '',
-    branchType: 'sub',
     branchCode: '',
     email: '',
     phoneNumber: '',
@@ -127,7 +123,7 @@ const BranchForm: React.FC = () => {
       title: 'Basic Information',
       description: 'Essential branch details',
       icon: Building2,
-      fields: ['branchName', 'hospitalId', 'branchType', 'branchCode', 'email', 'phoneNumber', 'alternatePhone']
+      fields: ['branchName', 'hospitalId', 'branchCode', 'email', 'phoneNumber', 'alternatePhone']
     },
     {
       title: 'Location Details',
@@ -173,33 +169,7 @@ const BranchForm: React.FC = () => {
     }
   });
 
-  // Check if main branch exists for the selected hospital
-  const { data: mainBranchData } = useQuery({
-    queryKey: ['main-branch', formData.hospitalId],
-    queryFn: async () => {
-      if (!formData.hospitalId) return null;
-      
-      const token = authService.getToken();
-      const response = await fetch(`${API_URL}/api/branches/check-main-branch/${formData.hospitalId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to check main branch status');
-      }
-      
-      return response.json();
-    },
-    enabled: !!formData.hospitalId
-  });
 
-  // Update main branch status when data changes
-  React.useEffect(() => {
-    if (mainBranchData) {
-      setHasMainBranch(mainBranchData.hasMainBranch);
-      setMainBranchInfo(mainBranchData.mainBranch);
-    }
-  }, [mainBranchData]);
 
   const createBranchMutation = useMutation({
     mutationFn: async (data: BranchFormData) => {
@@ -299,9 +269,7 @@ const BranchForm: React.FC = () => {
         case 'hospitalId':
           if (!value) newErrors.hospitalId = 'Hospital selection is required';
           break;
-        case 'branchType':
-          if (!value) newErrors.branchType = 'Branch type is required';
-          break;
+
         case 'email':
         case 'adminEmail':
           if (!value || (value as string).trim() === '') {
@@ -498,34 +466,6 @@ const BranchForm: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField label="Branch Type" required error={errors.branchType}>
-                <Select 
-                  value={formData.branchType} 
-                  onValueChange={(value) => handleInputChange('branchType', value)}
-                  disabled={hasMainBranch}
-                >
-                  <SelectTrigger className="h-12 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
-                    <SelectValue placeholder="Select branch type" />
-                  </SelectTrigger>
-                  <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
-                    <SelectItem value="main" disabled={hasMainBranch}>
-                      Main Branch {hasMainBranch && `(Already exists: ${mainBranchInfo?.name})`}
-                    </SelectItem>
-                    <SelectItem value="sub">Sub Branch</SelectItem>
-                  </SelectContent>
-                </Select>
-                {hasMainBranch && (
-                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <AlertCircle className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm text-blue-800">
-                        Main branch already exists: <strong>{mainBranchInfo?.name}</strong> ({mainBranchInfo?.email})
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </FormField>
-              
               <FormField label="Branch Code / ID" error={errors.branchCode}>
                 <EnhancedInput
                   value={formData.branchCode}
@@ -848,7 +788,6 @@ const BranchForm: React.FC = () => {
                   <h4 className="font-medium text-gray-900 mb-2">Basic Information</h4>
                   <div className="space-y-1 text-sm">
                     <p><span className="text-gray-600">Branch Name:</span> {formData.branchName}</p>
-                    <p><span className="text-gray-600">Branch Type:</span> <span className="capitalize font-medium">{formData.branchType}</span></p>
                     <p><span className="text-gray-600">Email:</span> {formData.email}</p>
                     <p><span className="text-gray-600">Phone:</span> {formData.phoneNumber}</p>
                   </div>

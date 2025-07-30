@@ -274,4 +274,36 @@ router.delete('/:id', authenticateToken, enforceTenantIsolation, authorizeRole([
   }
 });
 
+// Get patients by hospital ID (for financial management)
+router.get('/hospital/:hospitalId', authenticateToken, authorizeRole(['admin', 'master-admin', 'sub-admin']), async (req: AuthRequest, res) => {
+  try {
+    const { hospitalId } = req.params;
+    const { search, page = 1, limit = 50 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    let query = Patient.find({ hospitalId });
+    
+    // Add search functionality
+    if (search) {
+      query = query.or([
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ]);
+    }
+    
+    const patients = await query
+      .select('_id firstName lastName phone email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit));
+
+    res.json(patients);
+  } catch (error) {
+    console.error('Error fetching patients by hospital:', error);
+    res.status(500).json({ error: 'Failed to fetch patients' });
+  }
+});
+
 export default router; 

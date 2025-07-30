@@ -59,12 +59,12 @@ interface BillingStats {
 interface Invoice {
   _id: string;
   invoiceId: string;
-  hospitalId: {
+  hospitalId?: {
     _id: string;
     name: string;
     email: string;
   };
-  subscriptionId: {
+  subscriptionId?: {
     _id: string;
     planName: string;
     planType: string;
@@ -84,12 +84,12 @@ interface Invoice {
 
 interface Payment {
   _id: string;
-  hospitalId: {
+  hospitalId?: {
     _id: string;
     name: string;
     email: string;
   };
-  subscriptionId: {
+  subscriptionId?: {
     _id: string;
     planName: string;
     planType: string;
@@ -103,7 +103,7 @@ interface Payment {
   status: 'pending' | 'completed' | 'refunded' | 'failed';
   receiptNumber: string;
   transactionId?: string;
-  processedBy: {
+  processedBy?: {
     firstName: string;
     lastName: string;
   };
@@ -224,8 +224,8 @@ const BillingPage: React.FC = () => {
       // Transform billing data to payment format
       return billingData.invoices?.map((invoice: any) => ({
         _id: invoice._id,
-        hospitalId: invoice.hospitalId,
-        subscriptionId: invoice.subscriptionId,
+        hospitalId: invoice.hospitalId || { _id: '', name: 'N/A', email: 'N/A' },
+        subscriptionId: invoice.subscriptionId || { _id: '', planName: 'N/A', planType: 'N/A' },
         invoiceId: {
           _id: invoice._id,
           invoiceId: invoice.invoiceId
@@ -412,7 +412,7 @@ const BillingPage: React.FC = () => {
   const handleSendInvoice = (invoice: Invoice) => {
     toast({
       title: "Send Invoice",
-      description: `Sending invoice ${invoice.invoiceId} to ${invoice.hospitalId.email}`,
+      description: `Sending invoice ${invoice.invoiceId} to ${invoice.hospitalId?.email || 'N/A'}`,
     });
     // Here you would implement actual send logic
   };
@@ -474,10 +474,10 @@ const BillingPage: React.FC = () => {
   const handleExportInvoices = () => {
     const exportData = invoicesData?.invoices.map(invoice => ({
       'Invoice ID': invoice.invoiceId,
-      'Hospital Name': invoice.hospitalId.name,
-      'Hospital Email': invoice.hospitalId.email,
-      'Plan Name': invoice.subscriptionId.planName,
-      'Plan Type': invoice.subscriptionId.planType,
+      'Hospital Name': invoice.hospitalId?.name || 'N/A',
+      'Hospital Email': invoice.hospitalId?.email || 'N/A',
+      'Plan Name': invoice.subscriptionId?.planName || 'N/A',
+      'Plan Type': invoice.subscriptionId?.planType || 'N/A',
       'Amount': invoice.totalAmount,
       'Currency': invoice.currency,
       'Status': invoice.status,
@@ -491,16 +491,16 @@ const BillingPage: React.FC = () => {
   const handleExportPayments = () => {
     const exportData = (paymentsData ?? []).map(payment => ({
       'Receipt Number': payment.receiptNumber,
-      'Hospital Name': payment.hospitalId.name,
-      'Hospital Email': payment.hospitalId.email,
-      'Subscription Plan': payment.subscriptionId.planName,
-      'Plan Type': payment.subscriptionId.planType,
+      'Hospital Name': payment.hospitalId?.name || 'N/A',
+      'Hospital Email': payment.hospitalId?.email || 'N/A',
+      'Subscription Plan': payment.subscriptionId?.planName || 'N/A',
+      'Plan Type': payment.subscriptionId?.planType || 'N/A',
       'Invoice ID': payment.invoiceId ? payment.invoiceId.invoiceId : 'N/A',
       'Amount': payment.amount,
       'Payment Method': payment.method.replace('_', ' '),
       'Status': payment.status,
       'Transaction ID': payment.transactionId || 'N/A',
-      'Processed By': `${payment.processedBy.firstName} ${payment.processedBy.lastName}`,
+      'Processed By': `${payment.processedBy?.firstName || 'N/A'} ${payment.processedBy?.lastName || 'N/A'}`,
       'Payment Date': new Date(payment.createdAt).toLocaleDateString(),
       'Payment Time': new Date(payment.createdAt).toLocaleTimeString()
     }));
@@ -635,8 +635,8 @@ const BillingPage: React.FC = () => {
       header: "Hospital",
       cell: ({ row }) => (
         <div>
-          <p className="font-medium">{row.original.hospitalId.name}</p>
-          <p className="text-sm text-gray-500">{row.original.hospitalId.email}</p>
+          <p className="font-medium">{row.original.hospitalId?.name || 'N/A'}</p>
+          <p className="text-sm text-gray-500">{row.original.hospitalId?.email || 'N/A'}</p>
         </div>
       ),
     },
@@ -645,8 +645,8 @@ const BillingPage: React.FC = () => {
       header: "Subscription",
       cell: ({ row }) => (
         <div>
-          <p className="font-medium">{row.original.subscriptionId.planName}</p>
-          <p className="text-sm text-gray-500">{row.original.subscriptionId.planType}</p>
+          <p className="font-medium">{row.original.subscriptionId?.planName || 'N/A'}</p>
+          <p className="text-sm text-gray-500">{row.original.subscriptionId?.planType || 'N/A'}</p>
         </div>
       ),
     },

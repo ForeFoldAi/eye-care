@@ -103,6 +103,17 @@ export const DepartmentProvider: React.FC<DepartmentProviderProps> = ({ children
         return defaultDepartments;
       }
 
+      // Check if user has required context
+      if (user.role === 'admin' && !user.hospitalId) {
+        console.warn('Admin user has no hospitalId');
+        return defaultDepartments;
+      }
+      
+      if (user.role !== 'admin' && !user.branchId) {
+        console.warn('Non-admin user has no branchId');
+        return defaultDepartments;
+      }
+
       let endpoint = '';
       if (user.role === 'admin') {
         // Admin users can see all departments in the hospital
@@ -125,7 +136,7 @@ export const DepartmentProvider: React.FC<DepartmentProviderProps> = ({ children
 
       return response.json();
     },
-    enabled: !!user,
+    enabled: !!user && ((user.role === 'admin' && !!user.hospitalId) || (user.role !== 'admin' && !!user.branchId)),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 

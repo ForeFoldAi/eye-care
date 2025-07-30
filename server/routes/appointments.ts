@@ -313,4 +313,41 @@ router.delete('/:id', authenticateToken, enforceTenantIsolation, authorizeRole([
   }
 });
 
+// Get appointments by hospital ID (for financial management)
+router.get('/hospital/:hospitalId', authenticateToken, authorizeRole(['admin', 'master-admin', 'sub-admin']), async (req: AuthRequest, res) => {
+  try {
+    const { hospitalId } = req.params;
+    const { from, to, status, type } = req.query;
+    
+    let query: any = { hospitalId };
+    
+    // Add date filter
+    if (from || to) {
+      query.datetime = {};
+      if (from) query.datetime.$gte = new Date(from as string);
+      if (to) query.datetime.$lte = new Date(to as string);
+    }
+    
+    // Add status filter
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    
+    // Add type filter
+    if (type && type !== 'all') {
+      query.type = type;
+    }
+    
+    const appointments = await Appointment.find(query)
+      .populate('patientId', 'firstName lastName phone email')
+      .populate('doctorId', 'firstName lastName specialization')
+      .sort({ datetime: -1 });
+
+    res.json(appointments);
+  } catch (error) {
+    console.error('Error fetching appointments by hospital:', error);
+    res.status(500).json({ error: 'Failed to fetch appointments' });
+  }
+});
+
 export default router; 

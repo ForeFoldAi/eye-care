@@ -83,7 +83,7 @@ router.post('/:doctorId', authenticateToken, authorizeRole(['admin', 'sub_admin'
   
   try {
     const { doctorId } = req.params;
-    const { dayOfWeek, slots } = req.body;
+    const { dayOfWeek, slots, isActive } = req.body;
     const tenantFilter = buildTenantFilter(req);
     
     // Verify doctor exists and belongs to tenant
@@ -131,6 +131,7 @@ router.post('/:doctorId', authenticateToken, authorizeRole(['admin', 'sub_admin'
         doctorId,
         dayOfWeek,
         slots,
+        isActive: isActive !== undefined ? isActive : true,
         addedBy: {
           userId: req.user.id,
           role: req.user.role,
@@ -144,12 +145,95 @@ router.post('/:doctorId', authenticateToken, authorizeRole(['admin', 'sub_admin'
       doctorId,
       dayOfWeek,
       slotsCount: slots.length,
+      isActive,
       addedBy: req.user.id
     });
     
     res.json(availability);
   } catch (error) {
     console.error('Error setting doctor availability:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Update doctor availability (for admin/sub-admin)
+router.put('/:doctorId/:dayOfWeek', authenticateToken, authorizeRole(['admin', 'sub_admin']), enforceTenantIsolation, async (req: TenantRequest, res) => {
+  const auditLogger = createAuditLogger(req);
+  
+  try {
+    const { doctorId, dayOfWeek } = req.params;
+    const { slots, isActive } = req.body;
+    const tenantFilter = buildTenantFilter(req);
+    
+    // Verify doctor exists and belongs to tenant
+    const doctor = await User.findOne({
+      _id: doctorId,
+      role: 'doctor',
+      ...tenantFilter
+    });
+    
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+    
+    // Validate slots
+    if (!Array.isArray(slots) || slots.length === 0) {
+      return res.status(400).json({ message: 'At least one time slot is required' });
+    }
+    
+    // Validate each slot
+    for (const slot of slots) {
+      if (!slot.startTime || !slot.endTime || !slot.hoursAvailable || !slot.tokenCount) {
+        return res.status(400).json({ message: 'Invalid slot data' });
+      }
+    }
+    
+    // Prevent editing Sunday slots
+    if (parseInt(dayOfWeek) === 0) {
+      return res.status(400).json({ message: 'Cannot update availability for Sunday' });
+    }
+    
+    // Get current user details for tracking
+    if (!req.user) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+    
+    const currentUser = await User.findById(req.user.id).select('firstName lastName');
+    if (!currentUser) {
+      return res.status(404).json({ message: 'Current user not found' });
+    }
+    
+    // Update availability
+    const availability = await DoctorAvailability.findOneAndUpdate(
+      { doctorId, dayOfWeek: parseInt(dayOfWeek) },
+      {
+        slots,
+        isActive: isActive !== undefined ? isActive : true,
+        addedBy: {
+          userId: req.user.id,
+          role: req.user.role,
+          name: `${currentUser.firstName} ${currentUser.lastName}`
+        },
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
+    
+    if (!availability) {
+      return res.status(404).json({ message: 'Availability not found' });
+    }
+    
+    await auditLogger.logUpdate('doctor_availability', {
+      doctorId,
+      dayOfWeek: parseInt(dayOfWeek),
+      slotsCount: slots.length,
+      isActive,
+      updatedBy: req.user.id
+    });
+    
+    res.json(availability);
+  } catch (error) {
+    console.error('Error updating doctor availability:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

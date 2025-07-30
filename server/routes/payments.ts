@@ -267,4 +267,41 @@ router.get('/search', authenticateToken, async (req: AuthRequest, res) => {
   }
 });
 
+// Get payments by hospital ID (for financial management)
+router.get('/hospital/:hospitalId', authenticateToken, authorizeRole(['admin', 'master-admin', 'sub-admin']), async (req: AuthRequest, res) => {
+  try {
+    const { hospitalId } = req.params;
+    const { from, to, status, method } = req.query;
+    
+    let query: any = { hospitalId };
+    
+    // Add date filter
+    if (from || to) {
+      query.createdAt = {};
+      if (from) query.createdAt.$gte = new Date(from as string);
+      if (to) query.createdAt.$lte = new Date(to as string);
+    }
+    
+    // Add status filter
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    
+    // Add method filter
+    if (method && method !== 'all') {
+      query.method = method;
+    }
+    
+    const payments = await Payment.find(query)
+      .populate('patient', 'firstName lastName phone email')
+      .populate('appointmentId')
+      .sort({ createdAt: -1 });
+
+    res.json(payments);
+  } catch (error) {
+    console.error('Error fetching payments by hospital:', error);
+    res.status(500).json({ error: 'Failed to fetch payments' });
+  }
+});
+
 export default router; 

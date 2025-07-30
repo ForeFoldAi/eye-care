@@ -22,13 +22,15 @@ import {
   Download,
   Upload,
   AlertTriangle,
+  AlertCircle,
   Star,
   Award,
   TrendingUp,
   Building2,
   Plus,
   Save,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -195,10 +197,18 @@ const StaffManagement: React.FC = () => {
     }
   });
 
-  // Fetch staff members
-  const { data: staffMembers, isLoading: staffLoading } = useQuery({
+  // Fetch staff members - ALL BRANCHES
+  const { data: staffMembers = [], isLoading: staffLoading, error: staffError } = useQuery({
     queryKey: ['admin', 'staff', user?.hospitalId, searchTerm, selectedRole, selectedDepartment, selectedBranch],
     queryFn: async () => {
+      console.log('Fetching staff for hospital:', user?.hospitalId);
+      console.log('User role:', user?.role);
+      console.log('User branch:', user?.branchId);
+      
+      // Use hospital-level staff endpoint to get staff from all branches
+      const endpoint = `${API_URL}/api/users/staff/${user?.hospitalId}`;
+      console.log('Using hospital-level endpoint:', endpoint);
+      
       const params = new URLSearchParams({
         ...(searchTerm && { search: searchTerm }),
         ...(selectedRole !== 'all' && { role: selectedRole }),
@@ -206,15 +216,32 @@ const StaffManagement: React.FC = () => {
         ...(selectedBranch !== 'all' && { branch: selectedBranch }),
       });
       
-      const response = await fetch(`${API_URL}/api/users/staff?${params}`, {
+      const response = await fetch(`${endpoint}?${params}`, {
         headers: { 'Authorization': `Bearer ${authService.getToken()}` }
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch staff members');
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`Failed to fetch staff members: ${response.status} ${errorText}`);
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log('Staff API Response (All branches):', data);
+      console.log('Total staff fetched across all branches:', data.length);
+      
+      // Log each staff member with their details
+      data.forEach((staff: any, index: number) => {
+        console.log(`Staff ${index + 1}:`, {
+          name: `${staff.firstName} ${staff.lastName}`,
+          role: staff.role,
+          branch: staff.branchId?.branchName || 'No branch',
+          department: staff.department || 'No department',
+          isActive: staff.isActive
+        });
+      });
+      
+      return data;
     },
     enabled: !!user?.hospitalId
   });
@@ -575,6 +602,41 @@ const StaffManagement: React.FC = () => {
     );
   }
 
+  // Error Display
+  if (staffError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-6">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="w-6 h-6 text-red-600 mt-0.5" />
+                <div>
+                  <h3 className="text-lg font-medium text-red-800">Error Loading Staff Data</h3>
+                  <p className="text-sm text-red-700 mt-1">{staffError.message}</p>
+                  <div className="mt-4 space-y-2 text-xs text-red-600">
+                    <p>User Role: {user?.role}</p>
+                    <p>User Hospital ID: {user?.hospitalId}</p>
+                    <p>User Branch ID: {user?.branchId}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.location.reload()}
+                    className="mt-3 border-red-300 text-red-700 hover:bg-red-100"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       {/* Header */}
@@ -763,15 +825,77 @@ const StaffManagement: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="performance" className="space-y-6">
+            {/* Performance Metrics Summary */}
             <Card className="bg-white shadow-sm">
               <CardHeader>
                 <CardTitle>Performance Metrics</CardTitle>
-                <CardDescription>Staff performance and productivity analysis</CardDescription>
+                <CardDescription>Staff productivity & recognition summary</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500 text-center py-8">
-                  Performance metrics will be available soon...
-                </p>
+                <div className="grid md:grid-cols-3 gap-6 my-6">
+                  <Card className="border">
+                    <CardContent className="p-5">
+                      <h4 className="text-sm text-gray-600">Average Attendance Rate</h4>
+                      <div className="flex items-end">
+                        <span className="text-3xl font-bold text-blue-900 mr-2">97%</span>
+                        <TrendingUp className="text-green-500 w-6 h-6" />
+                      </div>
+                      <Progress value={97} className="mt-2" />
+                    </CardContent>
+                  </Card>
+                  <Card className="border">
+                    <CardContent className="p-5">
+                      <h4 className="text-sm text-gray-600">Avg. Task Completion Rate</h4>
+                      <div className="flex items-end">
+                        <span className="text-3xl font-bold text-blue-900 mr-2">88%</span>
+                        <TrendingUp className="text-green-500 w-6 h-6" />
+                      </div>
+                      <Progress value={88} className="mt-2 bg-green-100" />
+                    </CardContent>
+                  </Card>
+                  <Card className="border">
+                    <CardContent className="p-5">
+                      <h4 className="text-sm text-gray-600">Monthly Recognitions</h4>
+                      <div className="flex items-center">
+                        <Star className="text-yellow-400 w-6 h-6 mr-2" />
+                        <span className="text-2xl font-bold text-gray-700">14</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                {/* Top performer list (mock) */}
+                <div>
+                  <h4 className="text-lg font-semibold mb-4 ml-2">Top Performers</h4>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {filteredStaff?.slice(0, 3)?.map((s: StaffMember) => (
+                      <Card key={s._id} className="border bg-indigo-50">
+                        <CardContent className="p-4 flex items-center space-x-4">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={s.profilePhotoUrl} alt={s.firstName} />
+                            <AvatarFallback>{s.firstName[0]}{s.lastName[0]}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <div className="font-semibold text-gray-900">{s.firstName} {s.lastName}</div>
+                            <div className="text-xs text-gray-600 mb-1">{s.role.replace('_',' ')}</div>
+                            <div className="flex space-x-2">
+                              <Badge variant="outline" className="bg-green-100 text-green-600">Attendance: 99%</Badge>
+                              <Badge variant="outline" className="bg-blue-100 text-blue-600">Tasks: 96%</Badge>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+                {/* Quick Activity Feed (demo) */}
+                <div className="mt-6">
+                  <h4 className="font-semibold mb-2 ml-2">Latest Staff Activity</h4>
+                  <ul className="divide-y">
+                    <li className="py-2 text-sm flex items-center"><CheckCircle className="text-green-500 w-4 h-4 mr-1" />Dr. Varma completed rounds - 2 hours ago.</li>
+                    <li className="py-2 text-sm flex items-center"><Activity className="text-blue-500 w-4 h-4 mr-1" />Nurse Sharon clocked in on time.</li>
+                    <li className="py-2 text-sm flex items-center"><Award className="text-yellow-500 w-4 h-4 mr-1" />Receptionist Preeti awarded for perfect attendance.</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -783,9 +907,66 @@ const StaffManagement: React.FC = () => {
                 <CardDescription>Manage work schedules and availability</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-gray-500 text-center py-8">
-                  Schedule management interface coming soon...
-                </p>
+                <div className="mb-6 flex justify-between flex-wrap gap-4">
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white" size="sm">
+                    <Calendar className="w-4 h-4 mr-1" />
+                    Export Schedule
+                  </Button>
+                  <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm">
+                    <Plus className="w-4 h-4 mr-1" />
+                    Assign Shift
+                  </Button>
+                </div>
+                {/* Schedules Table Mock */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Name</th>
+                        <th className="px-3 py-2 text-left">Role</th>
+                        <th className="px-3 py-2 text-left">Department</th>
+                        <th className="px-3 py-2 text-left">Shift</th>
+                        <th className="px-3 py-2 text-left">Day</th>
+                        <th className="px-3 py-2 text-left">Timing</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredStaff?.slice(0,9)?.map((s: StaffMember, idx:number)=> (
+                        <tr key={s._id} className="border-b bg-white hover:bg-gray-50">
+                          <td className="px-3 py-2">{s.firstName} {s.lastName}</td>
+                          <td className="px-3 py-2 capitalize">{s.role.replace('_',' ')}</td>
+                          <td className="px-3 py-2">{s.department || '-'}</td>
+                          <td className="px-3 py-2 capitalize">{s.shiftTiming || ['morning','evening','night'][idx%3]}</td>
+                          <td className="px-3 py-2">{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][idx%7]}</td>
+                          <td className="px-3 py-2">{['7am - 3pm','3pm - 11pm','11pm - 7am'][idx%3]}</td>
+                          <td className={"px-3 py-2 " + (s.isActive ? 'text-green-600':'text-gray-400')}>{s.isActive?'Active':'Inactive'}</td>
+                          <td className="px-3 py-2 ">
+                            <Button size="icon" variant="ghost"><Edit className="w-4 h-4" /></Button>
+                            <Button size="icon" variant="ghost"><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {/* Department Coverage Mock Overview */}
+                  <div className="mt-8">
+                    <h3 className="font-bold mb-4">Coverage by Department</h3>
+                    <div className="grid md:grid-cols-3 gap-4">
+                      {departments?.map((dept: any) => (
+                        <Card key={dept._id} className="p-4 border bg-blue-50">
+                          <div className="font-semibold text-blue-900">{dept.name}</div>
+                          <div className="text-sm text-gray-600">{dept.description}</div>
+                          <div className="font-bold text-2xl text-blue-800 mt-2">
+                            {filteredStaff?.filter((s:StaffMember)=>s.department === dept.name).length || 0} scheduled
+                          </div>
+                          <div className="text-xs text-gray-600 mt-1">Mostly {['Day','Evening','Night'][Math.floor(Math.random()*3)]} shift</div>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
-  Shield, 
-  FileText, 
   Eye, 
   AlertTriangle, 
   CheckCircle, 
@@ -17,14 +15,14 @@ import {
   Lock,
   Settings,
   Users,
-  ChevronRight,
   Info,
   XCircle,
   Zap,
   Globe,
   Smartphone,
   Mail,
-  IndianRupee
+  IndianRupee,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -75,25 +73,12 @@ interface AuditLog {
   // Add more fields as needed
 }
 
-interface ComplianceItem {
-  id: string;
-  title: string;
-  description: string;
-  category: 'HIPAA' | 'GDPR' | 'SOX' | 'PCI' | 'Internal';
-  status: 'compliant' | 'non_compliant' | 'partial' | 'pending';
-  lastReview: string;
-  nextReview: string;
-  assignedTo: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
-}
-
 const AuditCompliance: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedAction, setSelectedAction] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<string>('all');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
-  const [selectedCompliance, setSelectedCompliance] = useState<string>('all');
   const [logDetailDialogOpen, setLogDetailDialogOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [userTimelineDialogOpen, setUserTimelineDialogOpen] = useState(false);
@@ -102,7 +87,9 @@ const AuditCompliance: React.FC = () => {
   const user = authService.getStoredUser();
   const API_URL = import.meta.env.VITE_API_URL;
 
-  const { data: auditLogs, isLoading: logsLoading } = useQuery({
+
+
+  const { data: auditLogs, isLoading: logsLoading, error: logsError } = useQuery({
     queryKey: ['admin', 'audit-logs', user?.hospitalId, searchTerm, selectedAction, selectedUser, selectedSeverity, dateRange],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -120,36 +107,30 @@ const AuditCompliance: React.FC = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch audit logs');
+        throw new Error(`Failed to fetch audit logs: ${response.status}`);
       }
       
-      return response.json();
+      const data = await response.json();
+      console.log('Audit Logs API Response:', data);
+      console.log('Audit logs type:', typeof data);
+      console.log('Is array:', Array.isArray(data));
+      
+      // Ensure we return an array
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && typeof data === 'object' && data.data && Array.isArray(data.data)) {
+        return data.data;
+      } else {
+        console.warn('Unexpected audit logs response format:', data);
+        return [];
+      }
     },
     enabled: !!user?.hospitalId
   });
 
-  const { data: complianceItems, isLoading: complianceLoading } = useQuery({
-    queryKey: ['admin', 'compliance', user?.hospitalId, selectedCompliance],
-    queryFn: async () => {
-      const params = new URLSearchParams({
-        hospitalId: user?.hospitalId || '',
-        ...(selectedCompliance !== 'all' && { category: selectedCompliance }),
-      });
-      
-      const response = await fetch(`${API_URL}/api/compliance/items?${params}`, {
-        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch compliance items');
-      }
-      
-      return response.json();
-    },
-    enabled: !!user?.hospitalId
-  });
 
-  const { data: auditStats } = useQuery({
+
+  const { data: auditStats, isLoading: statsLoading, error: statsError } = useQuery({
     queryKey: ['admin', 'audit-stats', user?.hospitalId],
     queryFn: async () => {
       const response = await fetch(`${API_URL}/api/audit/stats/${user?.hospitalId}`, {
@@ -157,7 +138,7 @@ const AuditCompliance: React.FC = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch audit statistics');
+        throw new Error(`Failed to fetch audit stats: ${response.status}`);
       }
       
       return response.json();
@@ -218,16 +199,6 @@ const AuditCompliance: React.FC = () => {
     }
   };
 
-  const getComplianceStatusColor = (status: string) => {
-    switch (status) {
-      case 'compliant': return 'bg-green-100 text-green-800';
-      case 'non_compliant': return 'bg-red-100 text-red-800';
-      case 'partial': return 'bg-yellow-100 text-yellow-800';
-      case 'pending': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const getActionIcon = (action: string) => {
     switch (action.toLowerCase()) {
       case 'login': return User;
@@ -265,8 +236,8 @@ const AuditCompliance: React.FC = () => {
 
   // Filtering/sorting logic
   const sortedLogs = React.useMemo(() => {
-    if (!auditLogs) return [];
-    let logs = [...auditLogs];
+    const logs = auditLogs && Array.isArray(auditLogs) ? [...auditLogs] : [];
+    if (logs.length === 0) return [];
     if (sortField) {
       logs.sort((a, b) => {
         let aVal = a[sortField];
@@ -286,6 +257,54 @@ const AuditCompliance: React.FC = () => {
     }
     return logs;
   }, [auditLogs, sortField, sortDirection]);
+
+  // Show loading state
+  if (logsLoading || statsLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading audit and compliance data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (logsError || statsError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 p-6">
+        <div className="max-w-4xl mx-auto">
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-6">
+              <div className="flex items-start space-x-3">
+                <AlertTriangle className="w-6 h-6 text-red-600 mt-0.5" />
+                <div>
+                  <h3 className="text-lg font-medium text-red-800">Error Loading Data</h3>
+                  <p className="text-sm text-red-700 mt-1">
+                    {logsError?.message || statsError?.message || 'Failed to load audit and compliance data'}
+                  </p>
+                  <div className="mt-4 space-y-2 text-xs text-red-600">
+                    <p>User Role: {user?.role}</p>
+                    <p>User Hospital ID: {user?.hospitalId}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.location.reload()}
+                    className="mt-3 border-red-300 text-red-700 hover:bg-red-100"
+                  >
+                    <Activity className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
@@ -315,11 +334,9 @@ const AuditCompliance: React.FC = () => {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="audit" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white shadow-sm">
+          <TabsList className="grid w-full grid-cols-2 bg-white shadow-sm">
             <TabsTrigger value="audit">Audit Logs</TabsTrigger>
-            <TabsTrigger value="compliance">Compliance</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
           </TabsList>
 
           <TabsContent value="audit" className="space-y-6">
@@ -412,219 +429,136 @@ const AuditCompliance: React.FC = () => {
                 <CardDescription>System activity and user actions</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead onClick={() => {setSortField('timestamp'); setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}} className="cursor-pointer">Timestamp</TableHead>
-                      <TableHead>User</TableHead>
-                      <TableHead>Action</TableHead>
-                      <TableHead>Resource</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Severity</TableHead>
-                      <TableHead onClick={() => {setSortField('loginTime'); setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}} className="cursor-pointer">Login Time</TableHead>
-                      <TableHead onClick={() => {setSortField('logoutTime'); setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}} className="cursor-pointer">Logout Time</TableHead>
-                      <TableHead onClick={() => {setSortField('screenTimeMinutes'); setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}} className="cursor-pointer">Screen Time</TableHead>
-                      <TableHead>Device</TableHead>
-                      <TableHead>Location/IP</TableHead>
-                      <TableHead>Password Changed</TableHead>
-                      <TableHead>Failed Login</TableHead>
-                      <TableHead>Account Locked</TableHead>
-                      <TableHead>Penalty</TableHead>
-                      <TableHead>Details</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sortedLogs?.map((log: AuditLog) => {
-                      const ActionIcon = getActionIcon(log.action);
-                      let screenTime = log.screenTimeMinutes;
-                      if (!screenTime && log.loginTime && log.logoutTime) {
-                        const login = new Date(log.loginTime).getTime();
-                        const logout = new Date(log.logoutTime).getTime();
-                        if (!isNaN(login) && !isNaN(logout) && logout > login) {
-                          screenTime = Math.round((logout - login) / 60000);
+                {sortedLogs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Activity className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Audit Logs Found</h3>
+                    <p className="text-gray-600 mb-4">
+                      No audit logs are available for the selected filters. 
+                      Audit logs are automatically generated when users perform actions in the system.
+                    </p>
+                    <div className="text-sm text-gray-500">
+                      <p>• Try adjusting your search filters</p>
+                      <p>• Check if users have performed any actions recently</p>
+                      <p>• Verify that audit logging is enabled</p>
+                    </div>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead onClick={() => {setSortField('timestamp'); setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}} className="cursor-pointer">Timestamp</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Action</TableHead>
+                        <TableHead>Resource</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Severity</TableHead>
+                        <TableHead onClick={() => {setSortField('loginTime'); setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}} className="cursor-pointer">Login Time</TableHead>
+                        <TableHead onClick={() => {setSortField('logoutTime'); setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}} className="cursor-pointer">Logout Time</TableHead>
+                        <TableHead onClick={() => {setSortField('screenTimeMinutes'); setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')}} className="cursor-pointer">Screen Time</TableHead>
+                        <TableHead>Device</TableHead>
+                        <TableHead>Location/IP</TableHead>
+                        <TableHead>Password Changed</TableHead>
+                        <TableHead>Failed Login</TableHead>
+                        <TableHead>Account Locked</TableHead>
+                        <TableHead>Penalty</TableHead>
+                        <TableHead>Details</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sortedLogs?.map((log: AuditLog) => {
+                        const ActionIcon = getActionIcon(log.action);
+                        let screenTime = log.screenTimeMinutes;
+                        if (!screenTime && log.loginTime && log.logoutTime) {
+                          const login = new Date(log.loginTime).getTime();
+                          const logout = new Date(log.logoutTime).getTime();
+                          if (!isNaN(login) && !isNaN(logout) && logout > login) {
+                            screenTime = Math.round((logout - login) / 60000);
+                          }
                         }
-                      }
-                      // Suspicious activity highlight
-                      const suspicious = (screenTime && (screenTime < 1 || screenTime > 480)) || (log.failedLogin && log.status === 'failure');
-                      return (
-                        <TableRow key={log.id} className={suspicious ? 'bg-red-50' : ''}>
-                          <TableCell className="font-medium">
-                            {new Date(log.timestamp).toLocaleString()}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2 cursor-pointer" onClick={() => {setTimelineUserId(log.userId); setUserTimelineDialogOpen(true);}}>
-                              <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs">
-                                  {log.userName.slice(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm underline">{log.userName}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <ActionIcon className="h-4 w-4 text-gray-500" />
-                              <span className="capitalize">{log.action}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>{log.resource}</TableCell>
-                          <TableCell>
-                            <Badge className={getStatusColor(log.status)}>
-                              {log.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getSeverityColor(log.severity)}>
-                              {log.severity}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {log.loginTime ? new Date(log.loginTime).toLocaleString() : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {log.logoutTime ? new Date(log.logoutTime).toLocaleString() : '-'}
-                          </TableCell>
-                          <TableCell>
-                            {screenTime !== undefined ? `${screenTime} min` : '-'}
-                          </TableCell>
-                          <TableCell>{log.device || '-'}</TableCell>
-                          <TableCell>{log.location || log.ipAddress || '-'}</TableCell>
-                          <TableCell>{log.passwordChanged ? <CheckCircle className="w-4 h-4 text-green-600" /> : '-'}</TableCell>
-                          <TableCell>{log.failedLogin ? <XCircle className="w-4 h-4 text-red-600" /> : '-'}</TableCell>
-                          <TableCell>{log.accountLocked ? <Lock className="w-4 h-4 text-orange-600" /> : '-'}</TableCell>
-                          <TableCell>{typeof log.penaltyAmount === 'number' ? (<span className="flex items-center"><IndianRupee className="w-4 h-4 mr-1 text-green-600" />{log.penaltyAmount}</span>) : '-'}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm" onClick={() => {setSelectedLog(log); setLogDetailDialogOpen(true);}}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="compliance" className="space-y-6">
-            {/* Compliance Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card className="bg-white shadow-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Compliant</p>
-                      <p className="text-2xl font-bold text-green-600">
-                        {complianceItems?.filter((item: ComplianceItem) => item.status === 'compliant').length || 0}
-                      </p>
-                    </div>
-                    <CheckCircle className="h-8 w-8 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white shadow-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Non-Compliant</p>
-                      <p className="text-2xl font-bold text-red-600">
-                        {complianceItems?.filter((item: ComplianceItem) => item.status === 'non_compliant').length || 0}
-                      </p>
-                    </div>
-                    <XCircle className="h-8 w-8 text-red-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white shadow-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Partial</p>
-                      <p className="text-2xl font-bold text-yellow-600">
-                        {complianceItems?.filter((item: ComplianceItem) => item.status === 'partial').length || 0}
-                      </p>
-                    </div>
-                    <AlertTriangle className="h-8 w-8 text-yellow-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white shadow-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Pending Review</p>
-                      <p className="text-2xl font-bold text-gray-600">
-                        {complianceItems?.filter((item: ComplianceItem) => item.status === 'pending').length || 0}
-                      </p>
-                    </div>
-                    <Clock className="h-8 w-8 text-gray-500" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Compliance Items */}
-            <Card className="bg-white shadow-sm">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle>Compliance Items</CardTitle>
-                    <CardDescription>Track compliance with various regulations</CardDescription>
-                  </div>
-                  <Select value={selectedCompliance} onValueChange={setSelectedCompliance}>
-                    <SelectTrigger className="w-48">
-                      <SelectValue placeholder="Filter by category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
-                      <SelectItem value="HIPAA">HIPAA</SelectItem>
-                      <SelectItem value="GDPR">GDPR</SelectItem>
-                      <SelectItem value="SOX">SOX</SelectItem>
-                      <SelectItem value="PCI">PCI</SelectItem>
-                      <SelectItem value="Internal">Internal</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {complianceItems?.map((item: ComplianceItem) => (
-                    <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-4">
-                        <div className="flex-shrink-0">
-                          <Shield className="h-8 w-8 text-blue-500" />
-                        </div>
-                        <div>
-                          <h4 className="font-medium text-gray-900">{item.title}</h4>
-                          <p className="text-sm text-gray-600">{item.description}</p>
-                          <div className="flex items-center space-x-2 mt-2">
-                            <Badge variant="outline">{item.category}</Badge>
-                            <span className="text-xs text-gray-500">
-                              Last review: {new Date(item.lastReview).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-4">
-                        <div className="text-right">
-                          <Badge className={getComplianceStatusColor(item.status)}>
-                            {item.status.replace('_', ' ')}
-                          </Badge>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Next review: {new Date(item.nextReview).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Button variant="ghost" size="sm">
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                        
+                        // Format screen time display
+                        const formatScreenTime = (minutes: number | undefined) => {
+                          if (minutes === undefined || minutes === null) return '-';
+                          if (minutes < 60) return `${minutes} min`;
+                          const hours = Math.floor(minutes / 60);
+                          const remainingMinutes = minutes % 60;
+                          return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+                        };
+                        
+                        // Suspicious activity highlight
+                        const suspicious = (screenTime && (screenTime < 1 || screenTime > 480)) || (log.failedLogin && log.status === 'failure');
+                        return (
+                          <TableRow key={log.id} className={suspicious ? 'bg-red-50' : ''}>
+                            <TableCell className="font-medium">
+                              {new Date(log.timestamp).toLocaleString()}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2 cursor-pointer" onClick={() => {setTimelineUserId(log.userId); setUserTimelineDialogOpen(true);}}>
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-xs">
+                                    {log.userName.slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm underline">{log.userName}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <ActionIcon className="h-4 w-4 text-gray-500" />
+                                <span className="capitalize">{log.action}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{log.resource}</TableCell>
+                            <TableCell>
+                              <Badge className={getStatusColor(log.status)}>
+                                {log.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getSeverityColor(log.severity)}>
+                                {log.severity}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {log.loginTime ? new Date(log.loginTime).toLocaleString() : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {log.logoutTime ? new Date(log.logoutTime).toLocaleString() : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {formatScreenTime(screenTime)}
+                            </TableCell>
+                            <TableCell>{log.device || '-'}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div className="font-medium text-gray-900">
+                                  {log.location && log.location !== 'Unknown' ? 
+                                    log.location.split(' (')[0] : 'Unknown Location'
+                                  }
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {log.ipAddress && log.ipAddress !== 'Unknown' ? 
+                                    log.ipAddress : 'No IP'
+                                  }
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{log.passwordChanged ? <CheckCircle className="w-4 h-4 text-green-600" /> : '-'}</TableCell>
+                            <TableCell>{log.failedLogin ? <XCircle className="w-4 h-4 text-red-600" /> : '-'}</TableCell>
+                            <TableCell>{log.accountLocked ? <Lock className="w-4 h-4 text-orange-600" /> : '-'}</TableCell>
+                            <TableCell>{typeof log.penaltyAmount === 'number' ? (<span className="flex items-center"><IndianRupee className="w-4 h-4 mr-1 text-green-600" />{log.penaltyAmount}</span>) : '-'}</TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="sm" onClick={() => {setSelectedLog(log); setLogDetailDialogOpen(true);}}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -639,29 +573,35 @@ const AuditCompliance: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3 p-3 bg-red-50 rounded-lg">
-                      <AlertTriangle className="h-5 w-5 text-red-500" />
-                      <div>
-                        <p className="text-sm font-medium">Multiple failed login attempts</p>
-                        <p className="text-xs text-gray-600">5 minutes ago</p>
-                      </div>
+                  {auditStats?.securityAlerts && auditStats.securityAlerts.length > 0 ? (
+                    <div className="space-y-3">
+                      {auditStats.securityAlerts.map((alert: any) => (
+                        <div key={alert.id} className={`flex items-center space-x-3 p-3 rounded-lg ${
+                          alert.severity === 'high' ? 'bg-red-50' : 
+                          alert.severity === 'medium' ? 'bg-yellow-50' : 'bg-green-50'
+                        }`}>
+                          {alert.severity === 'high' ? (
+                            <AlertTriangle className="h-5 w-5 text-red-500" />
+                          ) : alert.severity === 'medium' ? (
+                            <Info className="h-5 w-5 text-yellow-500" />
+                          ) : (
+                            <CheckCircle className="h-5 w-5 text-green-500" />
+                          )}
+                          <div>
+                            <p className="text-sm font-medium">{alert.message}</p>
+                            <p className="text-xs text-gray-600">
+                              {new Date(alert.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex items-center space-x-3 p-3 bg-yellow-50 rounded-lg">
-                      <Info className="h-5 w-5 text-yellow-500" />
-                      <div>
-                        <p className="text-sm font-medium">Unusual access pattern detected</p>
-                        <p className="text-xs text-gray-600">2 hours ago</p>
-                      </div>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      <Info className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                      <p className="text-sm">No security alerts at this time</p>
                     </div>
-                    <div className="flex items-center space-x-3 p-3 bg-green-50 rounded-lg">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      <div>
-                        <p className="text-sm font-medium">Security scan completed</p>
-                        <p className="text-xs text-gray-600">1 day ago</p>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -676,19 +616,19 @@ const AuditCompliance: React.FC = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Active Users</span>
-                      <span className="text-sm font-medium">24</span>
+                      <span className="text-sm font-medium">{auditStats?.activeUsers || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">New Logins (24h)</span>
-                      <span className="text-sm font-medium">156</span>
+                      <span className="text-sm font-medium">{auditStats?.newLogins24h || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Failed Logins</span>
-                      <span className="text-sm font-medium text-red-600">8</span>
+                      <span className="text-sm font-medium text-red-600">{auditStats?.failedLogins || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Password Changes</span>
-                      <span className="text-sm font-medium">3</span>
+                      <span className="text-sm font-medium">{auditStats?.passwordChanges || 0}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -702,112 +642,55 @@ const AuditCompliance: React.FC = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Database Status</span>
-                      <Badge className="bg-green-100 text-green-800">Online</Badge>
+                  {auditStats?.systemHealth ? (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Database Status</span>
+                        <Badge className={`${
+                          auditStats.systemHealth.database === 'online' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {auditStats.systemHealth.database || 'Unknown'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">API Status</span>
+                        <Badge className={`${
+                          auditStats.systemHealth.api === 'healthy' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {auditStats.systemHealth.api || 'Unknown'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Backup Status</span>
+                        <Badge className={`${
+                          auditStats.systemHealth.backup === 'current' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {auditStats.systemHealth.backup || 'Unknown'}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">SSL Certificate</span>
+                        <Badge className={`${
+                          auditStats.systemHealth.ssl === 'valid' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {auditStats.systemHealth.ssl || 'Unknown'}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">API Status</span>
-                      <Badge className="bg-green-100 text-green-800">Healthy</Badge>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      <Globe className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                      <p className="text-sm">System health data not available</p>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">Backup Status</span>
-                      <Badge className="bg-green-100 text-green-800">Current</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-gray-600">SSL Certificate</span>
-                      <Badge className="bg-green-100 text-green-800">Valid</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="reports" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Audit Report</h3>
-                      <p className="text-sm text-gray-600">Complete audit trail</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <Shield className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Compliance Report</h3>
-                      <p className="text-sm text-gray-600">Regulatory compliance status</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                      <AlertTriangle className="w-6 h-6 text-red-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Security Report</h3>
-                      <p className="text-sm text-gray-600">Security incidents and alerts</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Users className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">User Activity Report</h3>
-                      <p className="text-sm text-gray-600">User behavior analysis</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                      <Database className="w-6 h-6 text-orange-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">Data Access Report</h3>
-                      <p className="text-sm text-gray-600">Data access patterns</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white shadow-sm hover:shadow-md transition-shadow cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                      <Activity className="w-6 h-6 text-indigo-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">System Performance</h3>
-                      <p className="text-sm text-gray-600">System health metrics</p>
-                    </div>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

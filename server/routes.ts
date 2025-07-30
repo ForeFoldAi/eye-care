@@ -39,6 +39,8 @@ import masterAdminRoutes from './routes/master-admin';
 import billingRoutes from './routes/billing';
 import analyticsRoutes from './routes/analytics';
 import doctorAvailabilityRoutes from './routes/doctor-availability';
+import auditRoutes from './routes/audit';
+import complianceRoutes from './routes/compliance';
 
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -212,6 +214,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/billing', billingRoutes);
   app.use('/api/analytics', analyticsRoutes);
   app.use('/api/doctor-availability', doctorAvailabilityRoutes);
+  app.use('/api/audit', auditRoutes);
+  app.use('/api/compliance', complianceRoutes);
 
 
 

@@ -12,6 +12,26 @@ import {
   requireHospitalAccess,
   requireBranchAccess
 } from '../middleware/tenant';
+import { createAuditLogger } from '../utils/audit';
+
+// Helper function to get real IP address
+const getRealIP = (req: any): string => {
+  // Check for forwarded headers (common with proxies/load balancers)
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (forwardedFor) {
+    // x-forwarded-for can contain multiple IPs, take the first one
+    return forwardedFor.split(',')[0].trim();
+  }
+  
+  // Check for real IP header
+  const realIP = req.headers['x-real-ip'];
+  if (realIP) {
+    return realIP;
+  }
+  
+  // Fallback to connection remote address
+  return req.ip || req.connection.remoteAddress || 'Unknown';
+};
 
 const router = Router();
 
@@ -201,6 +221,17 @@ router.post('/',
     const user = new User(userToCreate);
     await user.save();
 
+    // Log user creation
+    const auditLogger = createAuditLogger(req);
+    await auditLogger.logCreate('user', {
+      action: 'User creation',
+      newUserEmail: userData.email,
+      newUserRole: userData.role,
+      newUserId: user._id,
+      createdBy: req.user?.id,
+      creatorRole: req.user?.role
+    }, user._id.toString());
+
     // Populate references
     await user.populate('hospitalId', 'name');
     await user.populate('branchId', '_id branchName');
@@ -263,6 +294,16 @@ router.put('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 's
     .populate('createdBy', 'firstName lastName email')
     .select('-password');
 
+    // Log user update
+    const auditLogger = createAuditLogger(req);
+    await auditLogger.logUpdate('user', {
+      action: 'User update',
+      updatedUserId: req.params.id,
+      updatedFields: Object.keys(updateData),
+      updatedBy: req.user?.id,
+      updaterRole: req.user?.role
+    }, req.params.id);
+
     res.json(updatedUser);
   } catch (error) {
     if (error instanceof Error) {
@@ -299,6 +340,17 @@ router.delete('/:id', authenticateToken, authorizeRole(['master_admin', 'admin',
     } else if (creatorRole === 'sub_admin' && ['master_admin', 'admin', 'sub_admin'].includes(user.role)) {
       return res.status(403).json({ message: 'Cannot delete users with admin, sub-admin, or master admin roles' });
     }
+
+    // Log user deletion before deleting
+    const auditLogger = createAuditLogger(req);
+    await auditLogger.logDelete('user', {
+      action: 'User deletion',
+      deletedUserId: req.params.id,
+      deletedUserEmail: user.email,
+      deletedUserRole: user.role,
+      deletedBy: req.user?.id,
+      deleterRole: req.user?.role
+    }, req.params.id);
 
     await User.findByIdAndDelete(req.params.id);
     res.json({ message: 'User deleted successfully' });
@@ -415,9 +467,40 @@ router.get('/stats/overview', authenticateToken, authorizeRole(['master_admin', 
   }
 });
 
-// Get staff members with filters
-router.get('/staff', authenticateToken, authorizeRole(['master_admin', 'admin', 'sub_admin']), async (req: AuthRequest, res) => {
+// Test endpoint to check authentication
+router.get('/staff/test', authenticateToken, async (req: AuthRequest, res) => {
   try {
+    console.log('Test endpoint called by user:', req.user?.id, 'with role:', req.user?.role);
+    res.json({ 
+      message: 'Authentication successful',
+      user: {
+        id: req.user?.id,
+        role: req.user?.role,
+        hospitalId: req.user?.hospitalId,
+        branchId: req.user?.branchId
+      }
+    });
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    res.status(500).json({ message: 'Test endpoint error' });
+  }
+});
+
+// Get staff members with filters
+router.get('/staff', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    console.log('Staff endpoint called by user:', req.user?.id, 'with role:', req.user?.role);
+    
+    // Check if user has required role
+    if (!['master_admin', 'admin', 'sub_admin'].includes(req.user?.role || '')) {
+      console.log('User does not have required role:', req.user?.role);
+      return res.status(403).json({ 
+        message: 'Insufficient permissions to access staff data',
+        userRole: req.user?.role,
+        userId: req.user?.id
+      });
+    }
+    
     const { search, role, department, branch } = req.query;
     
     // Build filter based on user role and query parameters
@@ -425,9 +508,30 @@ router.get('/staff', authenticateToken, authorizeRole(['master_admin', 'admin', 
     
     // Role-based filtering
     if (req.user?.role === 'admin') {
+      if (!req.user.hospitalId) {
+        console.log('Admin user has no hospitalId');
+        return res.status(400).json({ 
+          message: 'Admin user must be associated with a hospital',
+          userRole: req.user.role,
+          userId: req.user.id
+        });
+      }
       filter.hospitalId = req.user.hospitalId;
+      console.log('Admin filter - hospitalId:', req.user.hospitalId);
     } else if (req.user?.role === 'sub_admin') {
+      if (!req.user.branchId) {
+        console.log('Sub-admin user has no branchId');
+        return res.status(400).json({ 
+          message: 'Sub-admin user must be associated with a branch',
+          userRole: req.user.role,
+          userId: req.user.id
+        });
+      }
       filter.branchId = req.user.branchId;
+      console.log('Sub-admin filter - branchId:', req.user.branchId);
+    } else if (req.user?.role === 'master_admin') {
+      // Master admin can see all staff
+      console.log('Master admin - no hospital/branch filter');
     }
     
     // Apply search filter
@@ -455,6 +559,8 @@ router.get('/staff', authenticateToken, authorizeRole(['master_admin', 'admin', 
       filter.branchId = branch;
     }
     
+    console.log('Final filter:', JSON.stringify(filter, null, 2));
+    
     // Fetch staff members with populated data
     const staffMembers = await User.find(filter)
       .populate('hospitalId', 'name logo')
@@ -463,10 +569,145 @@ router.get('/staff', authenticateToken, authorizeRole(['master_admin', 'admin', 
       .select('-password')
       .sort({ createdAt: -1 });
     
-    res.json(staffMembers);
+    console.log(`Found ${staffMembers.length} staff members`);
+    res.json(staffMembers || []);
   } catch (error) {
     console.error('Error fetching staff members:', error);
-    res.status(500).json({ message: 'Error fetching staff members' });
+    res.status(500).json({ 
+      message: 'Error fetching staff members',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      userRole: req.user?.role,
+      userId: req.user?.id
+    });
+  }
+});
+
+// Get staff members for a specific hospital
+router.get('/staff/:hospitalId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    console.log('Hospital staff endpoint called by user:', req.user?.id, 'with role:', req.user?.role);
+    
+    // Check if user has required role
+    if (!['master_admin', 'admin', 'sub_admin'].includes(req.user?.role || '')) {
+      console.log('User does not have required role:', req.user?.role);
+      return res.status(403).json({ 
+        message: 'Insufficient permissions to access staff data',
+        userRole: req.user?.role,
+        userId: req.user?.id
+      });
+    }
+    
+    const { hospitalId } = req.params;
+    const { search, role, department, branch } = req.query;
+    
+    // Build filter
+    let filter: any = { hospitalId };
+    
+    // Apply search filter
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Apply role filter
+    if (role && role !== 'all') {
+      filter.role = role;
+    }
+    
+    // Apply department filter
+    if (department && department !== 'all') {
+      filter.department = department;
+    }
+    
+    // Apply branch filter
+    if (branch && branch !== 'all') {
+      filter.branchId = branch;
+    }
+    
+    // Fetch staff members for the specific hospital
+    const staffMembers = await User.find(filter)
+      .populate('hospitalId', 'name logo')
+      .populate('branchId', '_id branchName')
+      .populate('createdBy', 'firstName lastName email')
+      .select('-password')
+      .sort({ createdAt: -1 });
+    
+    console.log(`Found ${staffMembers.length} staff members for hospital ${hospitalId}`);
+    res.json(staffMembers || []);
+  } catch (error) {
+    console.error('Error fetching staff members for hospital:', error);
+    res.status(500).json({ 
+      message: 'Error fetching staff members',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      userRole: req.user?.role,
+      userId: req.user?.id
+    });
+  }
+});
+
+// Get staff members for a specific branch
+router.get('/staff/branch/:branchId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    console.log('Branch staff endpoint called by user:', req.user?.id, 'with role:', req.user?.role);
+    
+    // Check if user has required role
+    if (!['master_admin', 'admin', 'sub_admin'].includes(req.user?.role || '')) {
+      console.log('User does not have required role:', req.user?.role);
+      return res.status(403).json({ 
+        message: 'Insufficient permissions to access staff data',
+        userRole: req.user?.role,
+        userId: req.user?.id
+      });
+    }
+    
+    const { branchId } = req.params;
+    const { search, role, department } = req.query;
+    
+    // Build filter - BRANCH SPECIFIC ONLY
+    let filter: any = { branchId };
+    
+    // Apply search filter
+    if (search) {
+      filter.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Apply role filter
+    if (role && role !== 'all') {
+      filter.role = role;
+    }
+    
+    // Apply department filter
+    if (department && department !== 'all') {
+      filter.department = department;
+    }
+    
+    // Fetch staff members for the specific branch only
+    const staffMembers = await User.find(filter)
+      .populate('hospitalId', 'name logo')
+      .populate('branchId', '_id branchName')
+      .populate('createdBy', 'firstName lastName email')
+      .select('-password')
+      .sort({ createdAt: -1 });
+    
+    console.log(`Found ${staffMembers.length} staff members for branch ${branchId}`);
+    res.json(staffMembers || []);
+  } catch (error) {
+    console.error('Error fetching staff members for branch:', error);
+    res.status(500).json({ 
+      message: 'Error fetching staff members',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      userRole: req.user?.role,
+      userId: req.user?.id
+    });
   }
 });
 

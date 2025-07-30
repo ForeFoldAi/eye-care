@@ -9,6 +9,25 @@ import { createAuditLogger, createAuditLoggerFromUser, SecurityEvents } from '..
 
 const router = Router();
 
+// Helper function to get real IP address
+const getRealIP = (req: any): string => {
+  // Check for forwarded headers (common with proxies/load balancers)
+  const forwardedFor = req.headers['x-forwarded-for'];
+  if (forwardedFor) {
+    // x-forwarded-for can contain multiple IPs, take the first one
+    return forwardedFor.split(',')[0].trim();
+  }
+  
+  // Check for real IP header
+  const realIP = req.headers['x-real-ip'];
+  if (realIP) {
+    return realIP;
+  }
+  
+  // Fallback to connection remote address
+  return req.ip || req.connection.remoteAddress || 'Unknown';
+};
+
 // Login route
 router.post('/login', async (req, res) => {
   try {
@@ -25,7 +44,7 @@ router.post('/login', async (req, res) => {
         userEmail: email,
         userRole: role,
         hospitalId: null,
-        ipAddress: req.ip || req.connection.remoteAddress,
+        ipAddress: getRealIP(req),
         userAgent: req.get('User-Agent')
       });
       
@@ -48,7 +67,7 @@ router.post('/login', async (req, res) => {
         userRole: user.role,
         hospitalId: user.hospitalId,
         branchId: user.branchId,
-        ipAddress: req.ip || req.connection.remoteAddress,
+        ipAddress: getRealIP(req),
         userAgent: req.get('User-Agent')
       });
       
@@ -70,7 +89,7 @@ router.post('/login', async (req, res) => {
         userRole: user.role,
         hospitalId: user.hospitalId,
         branchId: user.branchId,
-        ipAddress: req.ip || req.connection.remoteAddress,
+        ipAddress: getRealIP(req),
         userAgent: req.get('User-Agent')
       });
       
@@ -104,7 +123,7 @@ router.post('/login', async (req, res) => {
       userRole: user.role,
       hospitalId: user.hospitalId,
       branchId: user.branchId,
-      ipAddress: req.ip || req.connection.remoteAddress,
+      ipAddress: getRealIP(req),
       userAgent: req.get('User-Agent')
     });
     
@@ -157,6 +176,16 @@ router.post('/register', authenticateToken, authorizeRole(['receptionist']), asy
     });
 
     await user.save();
+    
+    // Log user creation
+    const auditLogger = createAuditLogger(req);
+    await auditLogger.logCreate('user', {
+      action: 'User registration',
+      newUserEmail: userData.email,
+      newUserRole: userData.role,
+      createdBy: req.user?.id
+    }, user._id.toString());
+    
     res.status(201).json({ message: 'User registered successfully' });
   } catch (error) {
     res.status(400).json({ message: 'Invalid request data' });
@@ -203,6 +232,39 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('/me endpoint: Error:', error);
     res.status(500).json({ message: 'Error fetching user info' });
+  }
+});
+
+// Logout route
+router.post('/logout', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    // Get full user data for audit logging
+    const user = await User.findById(req.user!.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Log successful logout
+    const auditLogger = createAuditLoggerFromUser({
+      userId: user._id,
+      userEmail: user.email,
+      userRole: user.role,
+      hospitalId: user.hospitalId,
+      branchId: user.branchId,
+      ipAddress: getRealIP(req),
+      userAgent: req.get('User-Agent')
+    });
+    
+    await auditLogger.logLogout({
+      action: 'User logout',
+      logoutTime: new Date().toISOString(),
+      sessionDuration: '24h' // Default session duration
+    });
+
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: 'Error during logout' });
   }
 });
 

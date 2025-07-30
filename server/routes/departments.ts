@@ -7,6 +7,85 @@ import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
+// Get all departments for a hospital (admin only)
+router.get('/hospital/:hospitalId', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { hospitalId } = req.params;
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    // Check if user has access to this hospital
+    if (user.role !== 'admin' || user.hospitalId !== hospitalId) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const departments = await Department.find({ hospitalId })
+      .populate('createdBy', 'firstName lastName email')
+      .populate('branchId', 'branchName')
+      .sort({ createdAt: -1 });
+
+    // Add calculated fields with real data
+    const departmentsWithStats = await Promise.all(departments.map(async (dept) => {
+      // Get all staff members assigned to this department (from User model)
+      // Try multiple ways to find staff for this department
+      let staffInDepartment = await User.find({
+        department: dept.name,
+        isActive: true,
+        hospitalId: user.hospitalId
+      }).select('firstName lastName role specialization');
+      
+      // If no staff found with exact department name, try case-insensitive search
+      if (staffInDepartment.length === 0) {
+        staffInDepartment = await User.find({
+          department: { $regex: new RegExp(dept.name, 'i') },
+          isActive: true,
+          hospitalId: user.hospitalId
+        }).select('firstName lastName role specialization');
+      }
+      
+      // If still no staff found, try to find any active staff in this hospital
+      // This is a fallback for departments that might not have staff assigned yet
+      if (staffInDepartment.length === 0) {
+        console.log(`No staff found for department: ${dept.name}`);
+        // For now, we'll keep staffCount as 0 but you might want to assign some staff
+        // or create a default staff member for demonstration purposes
+      }
+      
+      const staffCount = staffInDepartment.length;
+      
+      // Get doctors in this department for patient calculations
+      const doctorsInDepartment = staffInDepartment.filter(staff => staff.role === 'doctor');
+      
+      // Get unique patients who have appointments with doctors in this department
+      const doctorIds = doctorsInDepartment.map(doctor => doctor._id);
+      const uniquePatients = await Appointment.distinct('patientId', {
+        doctorId: { $in: doctorIds }
+      });
+      
+      // Get total appointments for doctors in this department
+      const totalAppointments = await Appointment.countDocuments({
+        doctorId: { $in: doctorIds }
+      });
+
+      return {
+        ...dept.toObject(),
+        staff: staffInDepartment, // Use the actual staff data from User model
+        staffCount,
+        activePatients: uniquePatients.length,
+        totalAppointments
+      };
+    }));
+
+    res.json(departmentsWithStats);
+  } catch (error) {
+    console.error('Error fetching hospital departments:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Get all departments for a branch
 router.get('/branch/:branchId', authenticateToken, async (req: AuthRequest, res) => {
   try {
@@ -27,13 +106,13 @@ router.get('/branch/:branchId', authenticateToken, async (req: AuthRequest, res)
       .populate('branchId', 'branchName')
       .sort({ createdAt: -1 });
 
-    // Add calculated fields with real data
+    // Add calculated fields with real data - BRANCH SPECIFIC ONLY
     const departmentsWithStats = await Promise.all(departments.map(async (dept) => {
-      // Get all staff members assigned to this department (from User model)
+      // Get all staff members assigned to this department (from User model) - BRANCH SPECIFIC
       const staffInDepartment = await User.find({
         department: dept.name,
         isActive: true,
-        hospitalId: user.hospitalId
+        branchId: branchId // Use branchId instead of hospitalId for branch-specific filtering
       }).select('firstName lastName role specialization');
       
       const staffCount = staffInDepartment.length;
@@ -204,7 +283,7 @@ router.get('/hospital/:hospitalId', authenticateToken, async (req: AuthRequest, 
       return res.status(401).json({ message: 'Not authenticated' });
     }
 
-    // Check if user is admin and has access to this hospital
+    // Check if user has access to this hospital
     if (user.role !== 'admin' || user.hospitalId !== hospitalId) {
       return res.status(403).json({ message: 'Access denied' });
     }
@@ -214,14 +293,16 @@ router.get('/hospital/:hospitalId', authenticateToken, async (req: AuthRequest, 
       .populate('branchId', 'branchName')
       .sort({ createdAt: -1 });
 
-    // Add calculated fields with real data
+    // Add calculated fields with real data - BRANCH SPECIFIC STAFF
     const departmentsWithStats = await Promise.all(departments.map(async (dept) => {
-      // Get all staff members assigned to this department (from User model)
+      // Get all staff members assigned to this department (from User model) - BRANCH SPECIFIC
       const staffInDepartment = await User.find({
         department: dept.name,
         isActive: true,
-        hospitalId: user.hospitalId
+        branchId: dept.branchId // Use branchId to get staff from the same branch as the department
       }).select('firstName lastName role specialization');
+      
+      console.log(`Department ${dept.name} (Branch: ${dept.branchId}): Found ${staffInDepartment.length} staff members`);
       
       const staffCount = staffInDepartment.length;
       
