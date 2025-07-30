@@ -248,7 +248,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       {/* Sidebar */}
       <div className={`${
         mobileSidebarOpen ? 'w-72' : 'w-0'
-      } lg:${sidebarOpen ? 'w-72' : 'w-16'} transition-all duration-300 ease-in-out bg-white shadow-lg z-50 fixed lg:fixed inset-y-0 left-0 overflow-hidden border-r border-gray-200`}>
+      } lg:${sidebarOpen ? 'w-72' : 'w-16'} transition-all duration-300 ease-in-out bg-white shadow-lg z-50 fixed inset-y-0 left-0 overflow-hidden border-r border-gray-200 ${mobileSidebarOpen ? 'block' : 'hidden lg:block'}`}>
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b bg-gradient-to-r from-blue-600 to-indigo-600">
@@ -366,7 +366,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       {/* Main content */}
       <div className={`flex-1 transition-all duration-300 ease-in-out ${
         sidebarOpen ? 'lg:ml-72' : 'lg:ml-16'
-      }`}>
+      } ${mobileSidebarOpen ? 'ml-0' : ''}`}>
         {/* Desktop Header */}
         <div className="hidden lg:block bg-white border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between h-16 px-6">
