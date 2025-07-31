@@ -161,6 +161,17 @@ const StaffManagement: React.FC = () => {
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showPermissionsDialog, setShowPermissionsDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [selectedScheduleStaff, setSelectedScheduleStaff] = useState<StaffMember | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    shift: 'morning',
+    day: 'monday',
+    startTime: '09:00',
+    endTime: '17:00',
+    isActive: true
+  });
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState('overview');
   
   const user = authService.getStoredUser();
   const queryClient = useQueryClient();
@@ -446,6 +457,86 @@ const StaffManagement: React.FC = () => {
     setShowViewDialog(true);
   };
 
+  // Handle schedule edit
+  const handleScheduleEdit = (staff: StaffMember) => {
+    setSelectedScheduleStaff(staff);
+    setScheduleForm({
+      shift: staff.shiftTiming || 'morning',
+      day: 'monday',
+      startTime: '09:00',
+      endTime: '17:00',
+      isActive: staff.isActive
+    });
+    setShowScheduleDialog(true);
+  };
+
+  // Handle schedule delete
+  const handleScheduleDelete = (staff: StaffMember) => {
+    setSelectedScheduleStaff(staff);
+    // You can add a confirmation dialog here if needed
+    toast({
+      title: 'Schedule Removed',
+      description: `Schedule removed for ${staff.firstName} ${staff.lastName}`,
+    });
+  };
+
+  // Handle schedule save
+  const handleScheduleSave = () => {
+    if (selectedScheduleStaff) {
+      // Here you would typically make an API call to save the schedule
+      toast({
+        title: 'Schedule Updated',
+        description: `Schedule updated for ${selectedScheduleStaff.firstName} ${selectedScheduleStaff.lastName}`,
+      });
+      setShowScheduleDialog(false);
+      setSelectedScheduleStaff(null);
+    }
+  };
+
+  const handleExportData = () => {
+    try {
+      // Create CSV data
+      const csvData = [
+        ['Name', 'Email', 'Role', 'Department', 'Branch', 'Status', 'Phone', 'Created Date'],
+        ...staffMembers.map((staff: StaffMember) => [
+          `${staff.firstName} ${staff.lastName}`,
+          staff.email,
+          staff.role.replace('_', ' '),
+          staff.department || 'N/A',
+          staff.branchId?.branchName || 'N/A',
+          staff.isActive ? 'Active' : 'Inactive',
+          staff.phoneNumber || 'N/A',
+          new Date(staff.createdAt).toLocaleDateString()
+        ])
+      ];
+
+      // Convert to CSV string
+      const csvString = csvData.map(row => row.map((cell: string) => `"${cell}"`).join(',')).join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `staff_data_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Export Successful',
+        description: 'Staff data has been exported to CSV file',
+      });
+    } catch (error) {
+      toast({
+        title: 'Export Failed',
+        description: 'Failed to export staff data',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Get role color
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -677,81 +768,288 @@ const StaffManagement: React.FC = () => {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              <Card className="bg-white shadow-sm">
+            {/* Enhanced Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Total Staff</p>
-                      <p className="text-2xl font-bold text-gray-900">{totalStaff}</p>
+                      <p className="text-sm font-medium text-blue-700 mb-1">Total Staff</p>
+                      <p className="text-3xl font-bold text-blue-800">{totalStaff}</p>
+                      <p className="text-xs text-blue-600 mt-1">Across all branches</p>
                     </div>
-                    <Users className="h-8 w-8 text-blue-500" />
+                    <div className="w-12 h-12 bg-blue-200 rounded-xl flex items-center justify-center">
+                      <Users className="w-6 h-6 text-blue-700" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-white shadow-sm">
+              <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Active Staff</p>
-                      <p className="text-2xl font-bold text-gray-900">{activeStaff}</p>
+                      <p className="text-sm font-medium text-green-700 mb-1">Active Staff</p>
+                      <p className="text-3xl font-bold text-green-800">{activeStaff}</p>
+                      <p className="text-xs text-green-600 mt-1">
+                        {totalStaff > 0 ? ((activeStaff / totalStaff) * 100).toFixed(1) : '0'}% active rate
+                      </p>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-green-500" />
+                    <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center">
+                      <CheckCircle className="w-6 h-6 text-green-700" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-white shadow-sm">
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Doctors</p>
-                      <p className="text-2xl font-bold text-gray-900">{doctors}</p>
+                      <p className="text-sm font-medium text-purple-700 mb-1">Medical Staff</p>
+                      <p className="text-3xl font-bold text-purple-800">{doctors + nurses}</p>
+                      <p className="text-xs text-purple-600 mt-1">{doctors} doctors, {nurses} nurses</p>
                     </div>
-                    <Award className="h-8 w-8 text-purple-500" />
+                    <div className="w-12 h-12 bg-purple-200 rounded-xl flex items-center justify-center">
+                      <Award className="w-6 h-6 text-purple-700" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-white shadow-sm">
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-lg transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Nurses</p>
-                      <p className="text-2xl font-bold text-gray-900">{nurses}</p>
+                      <p className="text-sm font-medium text-orange-700 mb-1">Support Staff</p>
+                      <p className="text-3xl font-bold text-orange-800">{receptionists}</p>
+                      <p className="text-xs text-orange-600 mt-1">Receptionists & admins</p>
                     </div>
-                    <TrendingUp className="h-8 w-8 text-orange-500" />
+                    <div className="w-12 h-12 bg-orange-200 rounded-xl flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6 text-orange-700" />
+                    </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Department Breakdown */}
+                        {/* Role Distribution Chart */}
             <Card className="bg-white shadow-sm">
               <CardHeader>
-                <CardTitle>Department Breakdown</CardTitle>
-                <CardDescription>Staff distribution across departments</CardDescription>
+                <CardTitle className="flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <span>Role Distribution</span>
+                </CardTitle>
+                <CardDescription>Staff breakdown by roles and departments</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {departments?.map((dept: any) => (
-                    <div key={dept._id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <h4 className="font-medium text-gray-900">{dept.name}</h4>
-                        <p className="text-sm text-gray-600">{dept.description}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { role: 'Doctors', count: doctors, color: 'bg-blue-500', bgColor: 'bg-blue-50', textColor: 'text-blue-700', borderColor: 'border-blue-200', percentage: totalStaff > 0 ? ((doctors / totalStaff) * 100).toFixed(1) : '0' },
+                    { role: 'Nurses', count: nurses, color: 'bg-green-500', bgColor: 'bg-green-50', textColor: 'text-green-700', borderColor: 'border-green-200', percentage: totalStaff > 0 ? ((nurses / totalStaff) * 100).toFixed(1) : '0' },
+                    { role: 'Receptionists', count: receptionists, color: 'bg-purple-500', bgColor: 'bg-purple-50', textColor: 'text-purple-700', borderColor: 'border-purple-200', percentage: totalStaff > 0 ? ((receptionists / totalStaff) * 100).toFixed(1) : '0' },
+                    { role: 'Admins', count: staffMembers?.filter((s: StaffMember) => s.role === 'admin' || s.role === 'sub_admin').length || 0, color: 'bg-orange-500', bgColor: 'bg-orange-50', textColor: 'text-orange-700', borderColor: 'border-orange-200', percentage: totalStaff > 0 ? (((staffMembers?.filter((s: StaffMember) => s.role === 'admin' || s.role === 'sub_admin').length || 0) / totalStaff) * 100).toFixed(1) : '0' }
+                  ].map((item, index) => (
+                    <div key={index} className={`p-4 rounded-lg border ${item.bgColor} ${item.borderColor} hover:shadow-md transition-shadow`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className={`w-8 h-8 rounded-full ${item.color} flex items-center justify-center`}>
+                          <Users className="w-4 h-4 text-white" />
                       </div>
-                      <div className="flex items-center space-x-4">
-                        <Badge variant="outline">
-                          {staffMembers?.filter((s: StaffMember) => s.department === dept.name).length || 0} staff
+                        <Badge variant="outline" className={`${item.textColor} ${item.borderColor}`}>
+                          {item.count}
                         </Badge>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-1">{item.role}</h3>
+                        <p className="text-sm text-gray-600 mb-3">{item.count} staff members</p>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Percentage:</span>
+                            <span className={`font-bold ${item.textColor}`}>{item.percentage}%</span>
+                          </div>
+                          <Progress value={parseFloat(item.percentage)} className="w-full h-2" />
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Branch-wise Staff Distribution */}
+            <Card className="bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <MapPin className="w-5 h-5 text-purple-600" />
+                  <span>Branch-wise Staff Distribution</span>
+                </CardTitle>
+                <CardDescription>Staff allocation across different branches</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {branches?.map((branch: any) => {
+                    const branchStaff = staffMembers?.filter((s: StaffMember) => s.branchId?._id === branch._id) || [];
+                    const activeBranchStaff = branchStaff.filter((s: StaffMember) => s.isActive);
+                    const doctorsInBranch = branchStaff.filter((s: StaffMember) => s.role === 'doctor').length;
+                    const nursesInBranch = branchStaff.filter((s: StaffMember) => s.role === 'nurse').length;
+                    
+                    return (
+                      <div key={branch._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <h4 className="font-semibold text-gray-900">{branch.branchName}</h4>
+                            <p className="text-sm text-gray-600">{branch.city}, {branch.state}</p>
+                          </div>
+                          <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                            {branchStaff.length} staff
+                          </Badge>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Active:</span>
+                            <span className="font-medium text-green-600">{activeBranchStaff.length}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Doctors:</span>
+                            <span className="font-medium text-blue-600">{doctorsInBranch}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Nurses:</span>
+                            <span className="font-medium text-green-600">{nursesInBranch}</span>
+                          </div>
+                          <div className="pt-2 border-t border-gray-100">
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>Status</span>
+                              <span className={branch.isActive ? 'text-green-600' : 'text-gray-400'}>
+                                {branch.isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent Activity & Quick Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Staff Activity */}
+              <Card className="bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Activity className="w-5 h-5 text-blue-600" />
+                    <span>Recent Staff Activity</span>
+                  </CardTitle>
+                  <CardDescription>Latest staff updates and activities</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {filteredStaff && filteredStaff.length > 0 ? (
+                      filteredStaff.slice(0, 5).map((staff: StaffMember, index: number) => (
+                        <div key={staff._id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={staff.profilePhotoUrl} />
+                            <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
+                              {staff.firstName[0]}{staff.lastName[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {staff.firstName} {staff.lastName}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {staff.role.replace('_', ' ')} • {staff.department || 'No department'}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant={staff.isActive ? "default" : "secondary"} className="text-xs">
+                              {staff.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {staff.lastLogin ? 
+                                `Last active ${new Date(staff.lastLogin).toLocaleDateString()}` : 
+                                'Never logged in'
+                              }
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8">
+                        <Activity className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                        <p className="text-gray-500">No staff activity to display</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card className="bg-white shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-2">
+                    <Settings className="w-5 h-5 text-green-600" />
+                    <span>Quick Actions</span>
+                  </CardTitle>
+                  <CardDescription>Common staff management tasks</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      onClick={() => setShowAddDialog(true)}
+                      className="h-auto p-4 flex flex-col items-center space-y-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                    >
+                      <UserPlus className="w-6 h-6" />
+                      <span className="text-sm font-medium">Add Staff</span>
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={handleExportData}
+                      className="h-auto p-4 flex flex-col items-center space-y-2 hover:bg-green-50 hover:border-green-200 hover:text-green-700"
+                    >
+                      <Download className="w-6 h-6" />
+                      <span className="text-sm font-medium">Export Data</span>
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={() => setShowImportDialog(true)}
+                      className="h-auto p-4 flex flex-col items-center space-y-2 hover:bg-purple-50 hover:border-purple-200 hover:text-purple-700"
+                    >
+                      <Upload className="w-6 h-6" />
+                      <span className="text-sm font-medium">Import Staff</span>
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={() => setActiveTab('schedules')}
+                      className="h-auto p-4 flex flex-col items-center space-y-2 hover:bg-orange-50 hover:border-orange-200 hover:text-orange-700"
+                    >
+                      <Calendar className="w-6 h-6" />
+                      <span className="text-sm font-medium">Manage Schedules</span>
+                    </Button>
+                  </div>
+                  
+                  {/* Staff Status Summary */}
+                  <div className="mt-6 pt-4 border-t border-gray-100">
+                    <h4 className="font-medium text-gray-900 mb-3">Staff Status Summary</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="text-center p-3 bg-green-50 rounded-lg">
+                        <p className="text-2xl font-bold text-green-600">{activeStaff}</p>
+                        <p className="text-xs text-green-700">Active Staff</p>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <p className="text-2xl font-bold text-gray-600">{totalStaff - activeStaff}</p>
+                        <p className="text-xs text-gray-700">Inactive Staff</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="staff" className="space-y-6">
@@ -816,12 +1114,142 @@ const StaffManagement: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Staff Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Staff Table */}
+            <Card className="bg-white shadow-sm">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead className="font-semibold">Staff Member</TableHead>
+                        <TableHead className="font-semibold">Role</TableHead>
+                        <TableHead className="font-semibold">Department</TableHead>
+                        <TableHead className="font-semibold">Branch</TableHead>
+                        <TableHead className="font-semibold">Contact</TableHead>
+                        <TableHead className="font-semibold">Status</TableHead>
+                        <TableHead className="font-semibold">Joined</TableHead>
+                        <TableHead className="font-semibold text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
               {filteredStaff?.map((staff: StaffMember) => (
-                <StaffCard key={staff._id} staff={staff} />
-              ))}
+                        <TableRow key={staff._id} className="hover:bg-gray-50">
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <Avatar className="h-8 w-8">
+                                <AvatarImage 
+                                  src={staff.profilePhotoUrl} 
+                                  alt={`${staff.firstName} ${staff.lastName}`}
+                                />
+                                <AvatarFallback className="bg-blue-500 text-white text-xs">
+                                  {staff.firstName[0]}{staff.lastName[0]}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  {staff.firstName} {staff.lastName}
+                                </div>
+                                <div className="text-sm text-gray-500">{staff.email}</div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getRoleColor(staff.role)}>
+                              {staff.role.replace('_', ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-gray-600">
+                              {staff.department || 'No department'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-gray-600">
+                              {staff.branchId?.branchName || 'No branch'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm text-gray-600">
+                              <div>{staff.phoneNumber || 'No phone'}</div>
+                              <div className="text-xs text-gray-400">{staff.username}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(staff.isActive)}>
+                              {staff.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-gray-600">
+                              {new Date(staff.createdAt).toLocaleDateString()}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewDetails(staff)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEdit(staff)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => toggleStaffStatus(staff._id, !staff.isActive)}>
+                                  {staff.isActive ? (
+                                    <>
+                                      <XCircle className="h-4 w-4 mr-2" />
+                                      Deactivate
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="h-4 w-4 mr-2" />
+                                      Activate
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleDelete(staff)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
             </div>
+                
+                {filteredStaff?.length === 0 && (
+                  <div className="text-center py-8">
+                    <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No staff members found</h3>
+                    <p className="text-gray-600 mb-4">
+                      {searchTerm || selectedRole !== 'all' || selectedDepartment !== 'all' || selectedBranch !== 'all'
+                        ? 'Try adjusting your filters or search terms'
+                        : 'Get started by adding your first staff member'
+                      }
+                    </p>
+                    {!searchTerm && selectedRole === 'all' && selectedDepartment === 'all' && selectedBranch === 'all' && (
+                      <Button onClick={() => setShowAddDialog(true)}>
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Add Staff Member
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="performance" className="space-y-6">
@@ -887,14 +1315,32 @@ const StaffManagement: React.FC = () => {
                     ))}
                   </div>
                 </div>
-                {/* Quick Activity Feed (demo) */}
+                {/* Quick Activity Feed */}
                 <div className="mt-6">
                   <h4 className="font-semibold mb-2 ml-2">Latest Staff Activity</h4>
+                  {filteredStaff && filteredStaff.length > 0 ? (
                   <ul className="divide-y">
-                    <li className="py-2 text-sm flex items-center"><CheckCircle className="text-green-500 w-4 h-4 mr-1" />Dr. Varma completed rounds - 2 hours ago.</li>
-                    <li className="py-2 text-sm flex items-center"><Activity className="text-blue-500 w-4 h-4 mr-1" />Nurse Sharon clocked in on time.</li>
-                    <li className="py-2 text-sm flex items-center"><Award className="text-yellow-500 w-4 h-4 mr-1" />Receptionist Preeti awarded for perfect attendance.</li>
+                      {filteredStaff.slice(0, 5).map((staff: StaffMember, index: number) => (
+                        <li key={staff._id} className="py-2 text-sm flex items-center">
+                          <Activity className="text-blue-500 w-4 h-4 mr-1" />
+                          <span className="text-gray-700">
+                            {staff.firstName} {staff.lastName} 
+                            <span className="text-gray-500"> ({staff.role.replace('_', ' ')})</span>
+                            {staff.lastLogin ? (
+                              <span className="text-gray-400"> - Last active {new Date(staff.lastLogin).toLocaleDateString()}</span>
+                            ) : (
+                              <span className="text-gray-400"> - Never logged in</span>
+                            )}
+                          </span>
+                        </li>
+                      ))}
                   </ul>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      <Activity className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                      <p>No staff activity to display</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -928,8 +1374,8 @@ const StaffManagement: React.FC = () => {
                         <th className="px-3 py-2 text-left">Shift</th>
                         <th className="px-3 py-2 text-left">Day</th>
                         <th className="px-3 py-2 text-left">Timing</th>
-                        <th className="px-3 py-2">Status</th>
-                        <th className="px-3 py-2">Actions</th>
+                        <th className="px-3 py-2 text-center">Status</th>
+                        <th className="px-3 py-2 text-center">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -941,10 +1387,53 @@ const StaffManagement: React.FC = () => {
                           <td className="px-3 py-2 capitalize">{s.shiftTiming || ['morning','evening','night'][idx%3]}</td>
                           <td className="px-3 py-2">{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][idx%7]}</td>
                           <td className="px-3 py-2">{['7am - 3pm','3pm - 11pm','11pm - 7am'][idx%3]}</td>
-                          <td className={"px-3 py-2 " + (s.isActive ? 'text-green-600':'text-gray-400')}>{s.isActive?'Active':'Inactive'}</td>
-                          <td className="px-3 py-2 ">
-                            <Button size="icon" variant="ghost"><Edit className="w-4 h-4" /></Button>
-                            <Button size="icon" variant="ghost"><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                          <td className="px-3 py-2 text-center">
+                            <Badge 
+                              variant={s.isActive ? "default" : "secondary"} 
+                              className={s.isActive ? "bg-green-100 text-green-800 hover:bg-green-200" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}
+                            >
+                              {s.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleScheduleEdit(s)}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Edit Schedule
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleViewDetails(s)}>
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => toggleStaffStatus(s._id, !s.isActive)}>
+                                  {s.isActive ? (
+                                    <>
+                                      <XCircle className="h-4 w-4 mr-2" />
+                                      Deactivate Staff
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="h-4 w-4 mr-2" />
+                                      Activate Staff
+                                    </>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleScheduleDelete(s)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete Schedule
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
                       ))}
@@ -1361,6 +1850,171 @@ const StaffManagement: React.FC = () => {
               disabled={deleteStaffMutation.isPending}
             >
               {deleteStaffMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Edit Dialog */}
+      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Schedule</DialogTitle>
+            <DialogDescription>
+              Update schedule for {selectedScheduleStaff?.firstName} {selectedScheduleStaff?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="shift">Shift</Label>
+              <Select 
+                value={scheduleForm.shift} 
+                onValueChange={(value) => setScheduleForm(prev => ({ ...prev, shift: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="morning">Morning</SelectItem>
+                  <SelectItem value="evening">Evening</SelectItem>
+                  <SelectItem value="night">Night</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="day">Day</Label>
+              <Select 
+                value={scheduleForm.day} 
+                onValueChange={(value) => setScheduleForm(prev => ({ ...prev, day: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monday">Monday</SelectItem>
+                  <SelectItem value="tuesday">Tuesday</SelectItem>
+                  <SelectItem value="wednesday">Wednesday</SelectItem>
+                  <SelectItem value="thursday">Thursday</SelectItem>
+                  <SelectItem value="friday">Friday</SelectItem>
+                  <SelectItem value="saturday">Saturday</SelectItem>
+                  <SelectItem value="sunday">Sunday</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="startTime">Start Time</Label>
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={scheduleForm.startTime}
+                  onChange={(e) => setScheduleForm(prev => ({ ...prev, startTime: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="endTime">End Time</Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={scheduleForm.endTime}
+                  onChange={(e) => setScheduleForm(prev => ({ ...prev, endTime: e.target.value }))}
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch 
+                id="scheduleActive" 
+                checked={scheduleForm.isActive}
+                onCheckedChange={(checked) => setScheduleForm(prev => ({ ...prev, isActive: checked }))}
+              />
+              <Label htmlFor="scheduleActive">Active Schedule</Label>
+            </div>
+          </div>
+          
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowScheduleDialog(false);
+                setSelectedScheduleStaff(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleScheduleSave}>
+              <Save className="w-4 h-4 mr-2" />
+              Save Schedule
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Staff Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Import Staff Members</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to import multiple staff members at once
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600 mb-2">Drag and drop your CSV file here, or click to browse</p>
+              <p className="text-sm text-gray-500">
+                Supported format: CSV with columns: Name, Email, Role, Department, Branch, Phone
+              </p>
+              <Button variant="outline" className="mt-4">
+                <Upload className="w-4 h-4 mr-2" />
+                Choose File
+              </Button>
+            </div>
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-2">CSV Template</h4>
+              <p className="text-sm text-blue-700 mb-2">
+                Download our template to ensure your CSV file has the correct format:
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  const templateData = [
+                    ['Name', 'Email', 'Role', 'Department', 'Branch', 'Phone'],
+                    ['John Doe', 'john.doe@example.com', 'doctor', 'Cardiology', 'Main Branch', '+1234567890'],
+                    ['Jane Smith', 'jane.smith@example.com', 'nurse', 'Emergency', 'Main Branch', '+1234567891']
+                  ];
+                  const csvString = templateData.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+                  const blob = new Blob([csvString], { type: 'text/csv' });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = 'staff_import_template.csv';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  window.URL.revokeObjectURL(url);
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Template
+              </Button>
+            </div>
+          </div>
+          
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+              Cancel
+            </Button>
+            <Button disabled>
+              Import Staff
             </Button>
           </div>
         </DialogContent>

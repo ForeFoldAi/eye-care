@@ -8,6 +8,7 @@ import {
   Bell, 
   LogOut,
   Hospital,
+  AlertCircle,
   Menu,
   X,
   User,
@@ -26,7 +27,20 @@ import {
   Eye,
   EyeOff,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  Mail,
+  HelpCircle,
+  Clock,
+  Phone,
+  Globe,
+  Server,
+  Network,
+  Cpu,
+  HardDrive,
+  Zap,
+  UserPlus,
+  BarChart3,
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -51,6 +65,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
@@ -71,9 +86,11 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
   const [showProfileModal, setShowProfileModal] = React.useState(false);
+  const [showSupportModal, setShowSupportModal] = React.useState(false);
+  const [showSettingsModal, setShowSettingsModal] = React.useState(false);
+  const [currentTime, setCurrentTime] = React.useState(new Date());
   const [profileData, setProfileData] = React.useState({
     firstName: '',
     lastName: '',
@@ -93,13 +110,26 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
   });
 
   // Add hospital data query
-  const { data: hospitalData } = useQuery({
+  const { data: hospitalData, isLoading: hospitalLoading } = useQuery({
     queryKey: ['hospital', user?.hospitalId],
     queryFn: async () => {
       const response = await fetch(`${API_URL}/api/hospitals/${user?.hospitalId}`, {
         headers: { 'Authorization': `Bearer ${authService.getToken()}` }
       });
       if (!response.ok) throw new Error('Failed to fetch hospital data');
+      return response.json();
+    },
+    enabled: !!user?.hospitalId
+  });
+
+  // Add subscription data query
+  const { data: subscriptionData } = useQuery({
+    queryKey: ['subscription', user?.hospitalId],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/subscriptions/hospital/${user?.hospitalId}`, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) return null;
       return response.json();
     },
     enabled: !!user?.hospitalId
@@ -120,6 +150,15 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
     }
   }, [user]);
 
+  // Update time every minute
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
+
   const navigation = [
     { 
       name: 'Dashboard', 
@@ -128,11 +167,17 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       description: 'Overview and key metrics'
     },
     { 
+      name: 'Branch Management', 
+      href: '/admin/branches', 
+      icon: Building2,
+      description: 'Manage all branch locations'
+    },
+    /*{ 
       name: 'Add Branch', 
       href: '/admin/add-branch', 
-      icon: Building2,
+      icon: Plus,
       description: 'Create new branch location'
-    },
+    },*/
     { 
       name: 'Department Management', 
       href: '/admin/department-management', 
@@ -140,7 +185,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       description: 'Manage hospital departments'
     },
     { 
-      name: 'Doctor Availability', 
+      name: 'Dr. Calendar', 
       href: '/admin/doctor-availability', 
       icon: Stethoscope,
       description: 'Manage doctor schedules and availability'
@@ -247,35 +292,19 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <div className={`${
-        mobileSidebarOpen ? 'w-72' : 'w-0'
-      } lg:${sidebarOpen ? 'w-72' : 'w-16'} transition-all duration-300 ease-in-out bg-white shadow-lg z-50 fixed inset-y-0 left-0 overflow-hidden border-r border-gray-200 ${mobileSidebarOpen ? 'block' : 'hidden lg:block'}`}>
+        sidebarOpen ? 'w-72' : 'w-0 lg:w-16'
+      } transition-all duration-300 ease-in-out bg-white shadow-lg z-50 fixed lg:fixed inset-y-0 left-0 overflow-hidden border-r border-gray-200`}>
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b bg-gradient-to-r from-blue-600 to-indigo-600">
             <div className="flex items-center space-x-2 min-w-0 flex-1">
               <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
-                {hospitalData?.logoUrl ? (
-                  <img 
-                    src={hospitalData.logoUrl}
-                    alt={`${hospitalData.name} Logo`}
-                    className="w-5 h-5 object-contain rounded"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                      target.nextElementSibling?.classList.remove('hidden');
-                    }}
-                  />
-                ) : null}
-                <Hospital className="w-5 h-5 text-blue-600 hidden" />
+                <img src="/logo.png" alt="ForeFold HMS Logo" className="w-5 h-5 object-contain rounded" />
               </div>
-              {(sidebarOpen || mobileSidebarOpen) && (
+              {sidebarOpen && (
                 <div className="text-white min-w-0 flex-1">
-                  <h1 className="text-sm font-bold truncate">
-                    {hospitalData?.name || 'Admin Panel'}
-                  </h1>
-                  <p className="text-xs text-blue-100 truncate">
-                    {hospitalData?.name ? 'Administration' : 'Hospital Management'}
-                  </p>
+                  <h1 className="text-sm font-bold truncate">ForeFold HMS</h1>
+                  <p className="text-xs text-blue-100 truncate">Hospital Management System</p>
                 </div>
               )}
             </div>
@@ -283,7 +312,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
               variant="ghost"
               size="sm"
               className="lg:hidden text-white hover:bg-white/10 flex-shrink-0 ml-2"
-              onClick={() => setMobileSidebarOpen(false)}
+              onClick={() => setSidebarOpen(false)}
             >
               <X className="w-5 h-5" />
             </Button>
@@ -310,7 +339,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                   }`}>
                     <item.icon className="w-4 h-4" />
                   </div>
-                  {(sidebarOpen || mobileSidebarOpen) && (
+                  {sidebarOpen && (
                     <div className="flex-1 min-w-0">
                       <div className="font-medium truncate">{item.name}</div>
                       <div className="text-xs text-gray-500 mt-0.5 truncate">{item.description}</div>
@@ -319,8 +348,8 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                 </Link>
               );
 
-              // Show tooltip only when sidebar is closed on desktop
-              if (!sidebarOpen && !mobileSidebarOpen) {
+              // Show tooltip only when sidebar is closed
+              if (!sidebarOpen) {
                 return (
                   <TooltipProvider key={item.name}>
                     <Tooltip>
@@ -340,37 +369,26 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
             })}
           </nav>
 
-          {/* Hospital Info */}
-          <div className="p-3 border-t bg-gray-50">
-            <div className="flex items-center justify-between">
-              <Badge variant="outline" className="text-xs">
-                <Activity className="w-3 h-3 mr-1" />
-                Online
-              </Badge>
-              <span className="text-xs text-gray-500">
-                {new Date().toLocaleDateString()}
-              </span>
-            </div>
-          </div>
+
         </div>
       </div>
 
       {/* Mobile sidebar overlay */}
-      {mobileSidebarOpen && (
+      {sidebarOpen && (
         <div 
-          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden" 
-          onClick={() => setMobileSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Main content */}
       <div className={`flex-1 transition-all duration-300 ease-in-out ${
         sidebarOpen ? 'lg:ml-72' : 'lg:ml-16'
-      } ${mobileSidebarOpen ? 'ml-0' : ''}`}>
+      }`}>
         {/* Desktop Header */}
         <div className="hidden lg:block bg-white border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between h-16 px-6">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 min-w-0 flex-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -379,9 +397,78 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
               >
                 {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5" />}
               </Button>
-              <h1 className="text-xl font-semibold text-gray-900">Hospital Management</h1>
+              
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+                  {hospitalData?.logoUrl ? (
+                    <img 
+                      src={hospitalData.logoUrl}
+                      alt={`${hospitalData.name} Logo`}
+                      className="w-10 h-10 object-contain rounded-lg"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : (
+                    <Hospital className="w-7 h-7 text-white" />
+                  )}
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold text-gray-900">
+                    {hospitalLoading ? 'Loading...' : hospitalData?.name || 'Hospital Management'}
+                  </h1>
+                  
+                  {hospitalData?.description && (
+                    <p className="text-xs text-gray-500">{hospitalData.description}</p>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-medium text-gray-900">Status</span>
+                <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                  subscriptionData?.status === 'active' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-red-600 text-white'
+                }`}>
+                  {subscriptionData?.status === 'active' ? 'Active' : 'Inactive'}
+                </div>
+              </div>
+              
+              <Button 
+                variant="outline"
+                onClick={() => setShowSupportModal(true)}
+                className="flex items-center gap-2"
+              >
+                <AlertCircle className="w-4 h-4" />
+                Support
+              </Button>
+
+              {/* Date and Time */}
+              <div className="hidden lg:flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 min-w-[120px]">
+                <div className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                <div className="text-sm min-w-0">
+                  <div className="font-medium text-gray-900 truncate">
+                    {currentTime.toLocaleTimeString('en-US', { 
+                      hour: '2-digit', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })}
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {currentTime.toLocaleDateString('en-US', { 
+                      weekday: 'short', 
+                      month: 'short', 
+                      day: 'numeric' 
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4 flex-shrink-0">
               <NotificationBell />
               
               {/* User Profile Dropdown */}
@@ -410,6 +497,10 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                     <User className="w-4 h-4 mr-2" />
                     Profile Settings
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowSettingsModal(true)}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    System Settings
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                     <LogOut className="w-4 h-4 mr-2" />
@@ -427,7 +518,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setMobileSidebarOpen(true)}
+              onClick={() => setSidebarOpen(true)}
             >
               <Menu className="w-5 h-5" />
             </Button>
@@ -453,6 +544,10 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                   <DropdownMenuItem onClick={() => setShowProfileModal(true)}>
                     <User className="w-4 h-4 mr-2" />
                     Profile Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowSettingsModal(true)}>
+                    <Settings className="w-4 h-4 mr-2" />
+                    System Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600">
@@ -675,6 +770,271 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
             <Button onClick={handleProfileUpdate}>
               Update Profile
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Support Modal */}
+      <Dialog open={showSupportModal} onOpenChange={setShowSupportModal}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create Support Ticket</DialogTitle>
+            <DialogDescription>
+              Submit a support ticket for assistance with the Hospital Management System
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="ticketType">Ticket Type</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select ticket type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="technical">Technical Issue</SelectItem>
+                    <SelectItem value="feature">Feature Request</SelectItem>
+                    <SelectItem value="bug">Bug Report</SelectItem>
+                    <SelectItem value="training">Training Request</SelectItem>
+                    <SelectItem value="general">General Inquiry</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="priority">Priority</Label>
+                <Select>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="subject">Subject</Label>
+              <Input 
+                id="subject" 
+                placeholder="Brief description of your issue"
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Textarea 
+                id="description" 
+                placeholder="Please provide detailed information about your issue, including steps to reproduce if applicable..."
+                rows={4}
+                className="mt-1"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="contactEmail">Contact Email</Label>
+                <Input 
+                  id="contactEmail" 
+                  type="email"
+                  placeholder="your.email@hospital.com"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="contactPhone">Contact Phone</Label>
+                <Input 
+                  id="contactPhone" 
+                  type="tel"
+                  placeholder="+1 (555) 123-4567"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="urgent" 
+                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              />
+              <Label htmlFor="urgent" className="text-sm">
+                Mark as urgent (for critical system issues)
+              </Label>
+            </div>
+            
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowSupportModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={() => {
+                toast({
+                  title: "Support Ticket Submitted",
+                  description: "Your support ticket has been submitted successfully. We'll get back to you within 24 hours.",
+                });
+                setShowSupportModal(false);
+              }}>
+                <Mail className="w-4 h-4 mr-2" />
+                Submit Ticket
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* System Settings Modal */}
+      <Dialog open={showSettingsModal} onOpenChange={setShowSettingsModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">System Settings</DialogTitle>
+            <DialogDescription>
+              Manage hospital settings, system configuration, and administrative tasks
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Hospital Information */}
+            <Card className="bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center text-xl">
+                  <Building2 className="w-6 h-6 mr-2" />
+                  Hospital Information
+                </CardTitle>
+                <CardDescription>Manage hospital details and contact information</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Hospital Name</label>
+                      <p className="text-lg font-semibold text-gray-900">{hospitalData?.name || 'Hospital Name'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Address</label>
+                      <p className="text-gray-600">{hospitalData?.address || 'Address not available'}</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Phone Number</label>
+                      <p className="text-gray-600 flex items-center">
+                        <Phone className="w-4 h-4 mr-2" />
+                        {hospitalData?.phoneNumber || 'Phone not available'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Email</label>
+                      <p className="text-gray-600 flex items-center">
+                        <Mail className="w-4 h-4 mr-2" />
+                        {hospitalData?.email || 'Email not available'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {hospitalData?.website && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-700">Website</label>
+                        <p className="text-gray-600 flex items-center">
+                          <Globe className="w-4 h-4 mr-2" />
+                          <a 
+                            href={hospitalData.website} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            {hospitalData.website}
+                          </a>
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Status</label>
+                      <Badge variant={hospitalData?.isActive ? "default" : "secondary"} className="mt-1">
+                        {hospitalData?.isActive ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">Description</label>
+                      <p className="text-gray-600">{hospitalData?.description || 'No description available'}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* System Configuration */}
+            <Card className="bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center text-xl">
+                  <Settings className="w-6 h-6 mr-2" />
+                  System Configuration
+                </CardTitle>
+                <CardDescription>Manage system settings and preferences</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Database className="w-5 h-5 text-blue-600" />
+                        <span className="text-sm font-medium">Database Status</span>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">Connected</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Server className="w-5 h-5 text-green-600" />
+                        <span className="text-sm font-medium">Server Status</span>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">Online</Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Shield className="w-5 h-5 text-purple-600" />
+                        <span className="text-sm font-medium">Security</span>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">Secure</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Network className="w-5 h-5 text-orange-600" />
+                        <span className="text-sm font-medium">Network</span>
+                      </div>
+                      <Badge className="bg-green-100 text-green-800">Stable</Badge>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Cpu className="w-5 h-5 text-red-600" />
+                        <span className="text-sm font-medium">CPU Usage</span>
+                      </div>
+                      <span className="text-sm text-gray-600">45%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <HardDrive className="w-5 h-5 text-indigo-600" />
+                        <span className="text-sm font-medium">Storage</span>
+                      </div>
+                      <span className="text-sm text-gray-600">2.1GB / 10GB</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            
           </div>
         </DialogContent>
       </Dialog>

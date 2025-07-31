@@ -463,19 +463,6 @@ const AdminDashboard: React.FC = () => {
     enabled: !!user?.hospitalId
   });
 
-  const { data: hospitalInfo, isLoading: hospitalLoading } = useQuery({
-    queryKey: ['admin', 'hospital', user?.hospitalId],
-    queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/hospitals/${user?.hospitalId}`, {
-        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch hospital info');
-      }
-      return response.json();
-    },
-    enabled: !!user?.hospitalId
-  });
 
   // Fetch staff members for current hospital only
   const { data: staffMembers, isLoading: staffLoading, error: staffError } = useQuery({
@@ -674,71 +661,15 @@ const AdminDashboard: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-6">
-              {/* Hospital Logo */}
-              <div className="flex items-center">
-                {hospitalInfo?.logo ? (
-                  <img 
-                    src={hospitalInfo.logo} 
-                    alt={`${hospitalInfo.name} Logo`}
-                    className="h-16 w-16 rounded-lg object-cover border-2 border-gray-200"
-                  />
-                ) : (
-                  <div className="h-16 w-16 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                    <Building2 className="h-8 w-8 text-white" />
-                  </div>
-                )}
-              </div>
-              
-              {/* Hospital Info */}
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">
-                  {hospitalLoading ? 'Loading...' : hospitalInfo?.name || 'Hospital Dashboard'}
-                </h1>
-                <p className="text-gray-600 mt-1">Hospital Administration</p>
-                {hospitalInfo?.description && (
-                  <p className="text-sm text-gray-500 mt-1">{hospitalInfo.description}</p>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <Badge variant="outline" className="px-3 py-1 bg-green-50 text-green-700 border-green-200">
-                <Activity className="w-4 h-4 mr-2" />
-                {hospitalInfo?.isActive ? 'Hospital Active' : 'Hospital Inactive'}
-              </Badge>
-              
-              <Button 
-                variant="outline"
-                onClick={() => setIsSupportModalOpen(true)}
-                className="flex items-center gap-2"
-              >
-                <AlertCircle className="w-4 h-4" />
-                Support
-              </Button>
-              
-              <Button 
-                className="bg-blue-600 hover:bg-blue-700"
-                onClick={() => navigate({ to: '/admin/add-branch' })}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Branch
-              </Button>
-              
-              {/* Admin Profile Dropdown */}
-              
-            </div>
-          </div>
-        </div>
-      </div>
+     
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
+        {/* Key Metrics - Primary Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          <Card 
+            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-blue-500 cursor-pointer hover:bg-blue-50"
+            onClick={() => navigate({ to: '/admin/branches' })}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">Total Branches</CardTitle>
               <Building2 className="h-6 w-6 text-blue-600" />
@@ -758,7 +689,10 @@ const AdminDashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-green-500">
+          <Card 
+            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-green-500 cursor-pointer hover:bg-green-50"
+            onClick={() => navigate({ to: '/admin/staff' })}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">Total Staff</CardTitle>
               <Users className="h-6 w-6 text-green-600" />
@@ -778,7 +712,10 @@ const AdminDashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-purple-500">
+          <Card 
+            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-purple-500 cursor-pointer hover:bg-purple-50"
+            onClick={() => navigate({ to: '/admin/analytics' })}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">Total Patients</CardTitle>
               <Users2 className="h-6 w-6 text-purple-600" />
@@ -796,51 +733,37 @@ const AdminDashboard: React.FC = () => {
               </p>
             </CardContent>
           </Card>
-
-          <Card className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-emerald-500">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Revenue</CardTitle>
-              <IndianRupee className="h-6 w-6 text-emerald-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {statsLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  formatCurrency(hospitalStats?.totalRevenue || 0)
-                )}
-              </div>
-              <p className="text-xs text-green-600 mt-1 flex items-center">
-                <TrendingUp className="inline w-3 h-3 mr-1" />
-                +{analyticsData?.revenue?.growth || 12}% from last month
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Additional Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-indigo-500">
+        {/* Secondary Metrics Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          <Card 
+            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-indigo-500 cursor-pointer hover:bg-indigo-50"
+            onClick={() => navigate({ to: '/admin/doctor-availability' })}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Appointments</CardTitle>
-              <Calendar className="h-6 w-6 text-indigo-600" />
+              <CardTitle className="text-sm font-medium text-gray-600">Total Doctors</CardTitle>
+              <Stethoscope className="h-6 w-6 text-indigo-600" />
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-gray-900">
                 {statsLoading ? (
                   <Skeleton className="h-8 w-16" />
                 ) : (
-                  hospitalStats?.totalAppointments || 0
+                  filteredStaff.filter((s: StaffMember) => s.role === 'doctor').length || hospitalStats?.activeDoctors || 0
                 )}
               </div>
               <div className="flex space-x-4 mt-2 text-xs">
-                <span className="text-green-600">{hospitalStats?.completedAppointments || 0} Completed</span>
-                <span className="text-orange-600">{Math.floor((hospitalStats?.totalAppointments || 0) * 0.05)} Pending</span>
+                <span className="text-green-600">{filteredStaff.filter((s: StaffMember) => s.role === 'doctor' && s.isActive).length} Active</span>
+                <span className="text-blue-600">Across all branches</span>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-yellow-500">
+          <Card 
+            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-yellow-500 cursor-pointer hover:bg-yellow-50"
+            onClick={() => navigate({ to: '/admin/financial' })}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">Payments</CardTitle>
               <IndianRupee className="h-6 w-6 text-yellow-600" />
@@ -860,27 +783,10 @@ const AdminDashboard: React.FC = () => {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-pink-500">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">System Health</CardTitle>
-              <Activity className="h-6 w-6 text-pink-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {analyticsLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  `${analyticsData?.performance?.systemUptime || 99.8}%`
-                )}
-              </div>
-              <p className="text-xs text-green-600 mt-1 flex items-center">
-                <CheckCircle className="inline w-3 h-3 mr-1" />
-                All systems operational
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-cyan-500">
+          <Card 
+            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-cyan-500 cursor-pointer hover:bg-cyan-50"
+            onClick={() => navigate({ to: '/admin/analytics' })}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">User Satisfaction</CardTitle>
               <Star className="h-6 w-6 text-cyan-600" />
@@ -901,973 +807,11 @@ const AdminDashboard: React.FC = () => {
           </Card>
         </div>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="branches" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 bg-white shadow-sm">
-            <TabsTrigger value="branches" className="flex items-center">
-              <MapPin className="w-4 h-4 mr-2" />
-              Branches
-            </TabsTrigger>
-            <TabsTrigger value="staff" className="flex items-center">
-              <Users className="w-4 h-4 mr-2" />
-              Staff Management
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Analytics
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center">
-              <Settings className="w-4 h-4 mr-2" />
-              Settings
-            </TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="branches" className="space-y-6">
-            <Card className="bg-white shadow-sm">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="text-xl">Branch Management</CardTitle>
-                    <CardDescription>Manage branches for {hospitalInfo?.name}</CardDescription>
-                  </div>
-                  <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => navigate({ to: '/admin/add-branch' })}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add New Branch
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {branchesLoading ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading branches...</p>
-                  </div>
-                ) : branches && branches.length > 0 ? (
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Branch Name</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Location</TableHead>
-                          <TableHead>Contact</TableHead>
-                          <TableHead>Manager</TableHead>
-                          <TableHead>Status</TableHead>
-                         
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {branches
-                          .filter((branch: BranchData) => {
-                            // Handle both string and object types for hospitalId
-                            const branchHospitalId = typeof branch.hospitalId === 'string' 
-                              ? branch.hospitalId 
-                              : branch.hospitalId?._id;
-                            return branchHospitalId === user?.hospitalId;
-                          })
-                          .map((branch: BranchData) => (
-                          <TableRow key={branch._id} className="hover:bg-gray-50">
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-gray-900">{branch.branchName}</p>
-                                <p className="text-sm text-gray-500">{branch.email}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="capitalize">
-                                {branch.branchType || 'sub'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="max-w-xs">
-                                <p className="text-sm text-gray-900 flex items-center">
-                                  <MapPin className="w-4 h-4 mr-2 text-gray-400" />
-                                  {branch.city}, {branch.state}
-                                </p>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {branch.addressLine1}
-                                </p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="space-y-1">
-                                <p className="text-sm text-gray-900 flex items-center">
-                                  <Phone className="w-3 h-3 mr-1" />
-                                  {branch.phoneNumber}
-                                </p>
-                                {branch.alternatePhone && (
-                                  <p className="text-xs text-gray-500">
-                                    Alt: {branch.alternatePhone}
-                                  </p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {branch.subAdminId?.firstName} {branch.subAdminId?.lastName}
-                                </p>
-                                <p className="text-xs text-gray-500">{branch.subAdminId?.email}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={branch.isActive ? "default" : "secondary"}>
-                                {branch.isActive ? 'Active' : 'Inactive'}
-                              </Badge>
-                            </TableCell>
-                            
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleViewDetails(branch)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  
-                                  
-                                  <DropdownMenuItem onClick={() => handleSendMessage('branch', branch)}>
-                                    <Mail className="mr-2 h-4 w-4" />
-                                    Send Message
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => handleEditBranch(branch)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Branch
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem 
-                                    className="text-red-600"
-                                    onClick={() => handleDeleteBranch(branch)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Branch
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Building2 className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Branches Yet</h3>
-                    <p className="text-gray-600 mb-6">
-                      Start by creating your first branch to manage operations
-                    </p>
-                    <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => navigate({ to: '/admin/add-branch' })}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create First Branch
-                    </Button>
-                    
-                    {/* Show Hospital Information */}
-                    {hospitalInfo && (
-                      <Card className="mt-8 max-w-2xl mx-auto">
-                        <CardHeader>
-                          <CardTitle className="text-left">Hospital Information</CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-left">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-sm font-medium text-gray-700 mb-1">Address</p>
-                              <p className="text-sm text-gray-600">{hospitalInfo.address}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-700 mb-1">Phone</p>
-                              <p className="text-sm text-gray-600">{hospitalInfo.phoneNumber}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-700 mb-1">Email</p>
-                              <p className="text-sm text-gray-600">{hospitalInfo.email}</p>
-                            </div>
-                            {hospitalInfo.website && (
-                              <div>
-                                <p className="text-sm font-medium text-gray-700 mb-1">Website</p>
-                                <a 
-                                  href={hospitalInfo.website} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-sm text-blue-600 hover:underline"
-                                >
-                                  {hospitalInfo.website}
-                                </a>
-                              </div>
-                            )}
-                          </div>
-                          
-                          {hospitalInfo.settings && (
-                            <div className="mt-4 pt-4 border-t">
-                              <p className="text-sm font-medium text-gray-700 mb-2">Working Hours</p>
-                              <p className="text-sm text-gray-600">
-                                {hospitalInfo.settings.workingHours?.start} - {hospitalInfo.settings.workingHours?.end}
-                              </p>
-                              <p className="text-sm font-medium text-gray-700 mb-1 mt-2">Working Days</p>
-                              <div className="flex flex-wrap gap-1">
-                                {hospitalInfo.settings.workingDays?.map((day: string) => (
-                                  <Badge key={day} variant="outline" className="text-xs capitalize">
-                                    {day}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+        
 
-          <TabsContent value="staff">
-            <Card className="bg-white shadow-sm">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                                      <CardTitle className="text-xl">Staff Management</CardTitle>
-                  <CardDescription>Manage all users including staff and patients for {hospitalInfo?.name}</CardDescription>
-                  </div>
-                  <Button className="bg-green-600 hover:bg-green-700" onClick={() => navigate({ to: '/admin/staff' })}>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Add Staff Member
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {/* Staff Statistics */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
-                  <Card className="border-l-4 border-l-blue-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600">Sub-Admins</p>
-                          <p className="text-2xl font-bold text-blue-600">
-                            {filteredStaff.filter((s: StaffMember) => s.role === 'sub_admin').length}
-                          </p>
-                        </div>
-                        <Users className="h-8 w-8 text-blue-600" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="border-l-4 border-l-green-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600">Doctors</p>
-                          <p className="text-2xl font-bold text-green-600">
-                            {filteredStaff.filter((s: StaffMember) => s.role === 'doctor').length}
-                          </p>
-                        </div>
-                        <Stethoscope className="h-8 w-8 text-green-600" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="border-l-4 border-l-purple-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600">Receptionists</p>
-                          <p className="text-2xl font-bold text-purple-600">
-                            {filteredStaff.filter((s: StaffMember) => s.role === 'receptionist').length}
-                          </p>
-                        </div>
-                        <ClipboardList className="h-8 w-8 text-purple-600" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-l-4 border-l-indigo-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600">Patients</p>
-                          <p className="text-2xl font-bold text-indigo-600">
-                            {filteredStaff.filter((s: StaffMember) => s.role === 'patient').length}
-                          </p>
-                        </div>
-                        <UserIcon className="h-8 w-8 text-indigo-600" />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-l-4 border-l-emerald-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-gray-600">Active Users</p>
-                          <p className="text-2xl font-bold text-emerald-600">
-                            {filteredStaff.filter((s: StaffMember) => s.isActive).length}
-                          </p>
-                        </div>
-                        <CheckCircle className="h-8 w-8 text-emerald-600" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      placeholder="Search staff members..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Select value={selectedRole} onValueChange={setSelectedRole}>
-                    <SelectTrigger className="w-full sm:w-48">
-                      <SelectValue placeholder="Filter by role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="sub_admin">Sub-Admins</SelectItem>
-                      <SelectItem value="doctor">Doctors</SelectItem>
-                      <SelectItem value="receptionist">Receptionists</SelectItem>
-                      <SelectItem value="nurse">Nurses</SelectItem>
-                      <SelectItem value="patient">Patients</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                    <SelectTrigger className="w-full sm:w-48">
-                      <SelectValue placeholder="Filter by branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Branches</SelectItem>
-                      {branches
-                        ?.filter((branch: BranchData) => {
-                          // Handle both string and object types for hospitalId
-                          const branchHospitalId = typeof branch.hospitalId === 'string' 
-                            ? branch.hospitalId 
-                            : branch.hospitalId?._id;
-                          return branchHospitalId === user?.hospitalId;
-                        })
-                        .map((branch: BranchData) => (
-                          <SelectItem key={branch._id} value={branch._id}>
-                            {branch.branchName}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Staff Table */}
-                {staffError ? (
-                  <div className="text-center py-12">
-                    <AlertCircle className="w-16 h-16 mx-auto mb-4 text-red-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Staff</h3>
-                    <p className="text-gray-600 mb-4">
-                      {staffError.message || 'Failed to load staff members'}
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => window.location.reload()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                      Retry
-                    </Button>
-                  </div>
-                ) : staffLoading ? (
-                  <div className="space-y-4">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg">
-                        <Skeleton className="h-12 w-12 rounded-full" />
-                        <div className="space-y-2 flex-1">
-                          <Skeleton className="h-4 w-48" />
-                          <Skeleton className="h-3 w-32" />
-                        </div>
-                        <Skeleton className="h-6 w-20" />
-                        <Skeleton className="h-6 w-20" />
-                      </div>
-                    ))}
-                  </div>
-                ) : filteredStaff.length > 0 ? (
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>User</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Branch</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Last Login</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredStaff.map((staff: StaffMember) => (
-                          <TableRow key={staff._id} className="hover:bg-gray-50">
-                            <TableCell>
-                              <div className="flex items-center space-x-3">
-                                <Avatar className="h-10 w-10">
-                                  <AvatarFallback className={`text-white ${
-                                    staff.role === 'doctor' ? 'bg-blue-500' :
-                                    staff.role === 'nurse' ? 'bg-green-500' :
-                                    staff.role === 'receptionist' ? 'bg-purple-500' :
-                                    staff.role === 'sub_admin' ? 'bg-orange-500' :
-                                    staff.role === 'patient' ? 'bg-indigo-500' : 'bg-gray-500'
-                                  }`}>
-                                    {staff.firstName[0]}{staff.lastName[0]}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-medium text-gray-900">{staff.firstName} {staff.lastName}</p>
-                                  <p className="text-sm text-gray-500">{staff.email}</p>
-                                  {staff.phoneNumber && (
-                                    <p className="text-xs text-gray-400 flex items-center">
-                                      <Phone className="w-3 h-3 mr-1" />
-                                      {staff.phoneNumber}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col space-y-1">
-                                <Badge className={getRoleColor(staff.role)}>
-                                  {staff.role.replace('_', ' ')}
-                                </Badge>
-                                {staff.specialization && (
-                                  <p className="text-xs text-gray-500">{staff.specialization}</p>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <MapPin className="w-4 h-4 text-gray-400" />
-                                <span className="text-sm text-gray-900">
-                                  {staff.branchId?.branchName || 'Not Assigned'}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-sm text-gray-600">
-                                {staff.department || 'General'}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={getStatusColor(staff.isActive)}>
-                                {staff.isActive ? 'Active' : 'Inactive'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <Clock className="w-4 h-4 text-gray-400" />
-                                {staff.lastLogin ? (
-                                  <span className="text-sm text-gray-600">
-                                    {formatDate(staff.lastLogin)}
-                                  </span>
-                                ) : (
-                                  <span className="text-sm text-gray-400">Never</span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleViewStaffDetails(staff)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEditStaff(staff)}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Profile
-                                  </DropdownMenuItem>
-                                  
-                                  <DropdownMenuItem onClick={() => handleSendMessage('staff', staff)}>
-                                    <Mail className="mr-2 h-4 w-4" />
-                                    Send Message
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem className="text-orange-600" onClick={() => handleViewStaffActivity(staff)}>
-                                    <Clock className="mr-2 h-4 w-4" />
-                                    View Activity
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteStaff(staff)}>
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete User
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <Users className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Staff Members Found</h3>
-                    <p className="text-gray-600 mb-4">
-                      {searchTerm || selectedRole !== 'all' || selectedBranch !== 'all' 
-                        ? 'Try adjusting your filters to see more results'
-                        : 'Start by adding your first staff member'
-                      }
-                    </p>
-                    
-                    {/* Debug Information */}
-                    <div className="bg-gray-50 p-4 rounded-lg mb-6 text-left max-w-md mx-auto">
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">Debug Info:</h4>
-                      <div className="text-xs text-gray-600 space-y-1">
-                        <p>Hospital ID: {user?.hospitalId || 'Not set'}</p>
-                        <p>Total Users: {staffMembers?.length || 0}</p>
-                        <p>Filtered Users: {filteredStaff.length}</p>
-                        <p>Hospital Stats: {JSON.stringify(hospitalStats, null, 2)}</p>
-                        <p>Search Term: "{searchTerm}"</p>
-                        <p>Selected Role: {selectedRole}</p>
-                        <p>Selected Branch: {selectedBranch}</p>
-                      </div>
-                    </div>
-                    
-                    <Button className="bg-green-600 hover:bg-green-700" onClick={() => navigate({ to: '/admin/staff' })}>
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Add First Staff Member
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="analytics">
-            <Card className="bg-white shadow-sm">
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                                      <CardTitle className="flex items-center text-xl">
-                    <BarChart3 className="w-6 h-6 mr-2" />
-                    Hospital Analytics
-                  </CardTitle>
-                  <CardDescription>Performance metrics and insights for {hospitalInfo?.name}</CardDescription>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Select value={timeRange} onValueChange={setTimeRange}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7d">Last 7 days</SelectItem>
-                        <SelectItem value="30d">Last 30 days</SelectItem>
-                        <SelectItem value="90d">Last 90 days</SelectItem>
-                        <SelectItem value="1y">Last year</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button variant="outline" size="sm">
-                      <Download className="w-4 h-4 mr-2" />
-                      Export
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {analyticsLoading ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      {[...Array(4)].map((_, i) => (
-                        <Skeleton key={i} className="h-32" />
-                      ))}
-                    </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <Skeleton className="h-80" />
-                      <Skeleton className="h-80" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Key Performance Indicators */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <Card>
-                        <CardContent className="p-6">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-600">Revenue Growth</p>
-                              <p className="text-2xl font-bold text-green-600">
-                                +{analyticsData?.revenue?.growth || 0}%
-                              </p>
-                            </div>
-                            <div className="p-3 bg-green-100 rounded-full">
-                              <TrendingUp className="h-6 w-6 text-green-600" />
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-500 mt-2">
-                            {formatCurrency(analyticsData?.revenue?.current || 0)} this month
-                          </p>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardContent className="p-6">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-600">Patient Growth</p>
-                              <p className="text-2xl font-bold text-blue-600">
-                                +{analyticsData?.patients?.growth || 0}%
-                              </p>
-                            </div>
-                            <div className="p-3 bg-blue-100 rounded-full">
-                              <Users className="h-6 w-6 text-blue-600" />
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-500 mt-2">
-                            {analyticsData?.patients?.newThisMonth || 0} new patients
-                          </p>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardContent className="p-6">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-600">Appointment Rate</p>
-                              <p className="text-2xl font-bold text-purple-600">
-                                {analyticsData?.appointments?.completionRate || 0}%
-                              </p>
-                            </div>
-                            <div className="p-3 bg-purple-100 rounded-full">
-                              <Calendar className="h-6 w-6 text-purple-600" />
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-500 mt-2">
-                            {analyticsData?.appointments?.completed || 0} completed
-                          </p>
-                        </CardContent>
-                      </Card>
-
-                      <Card>
-                        <CardContent className="p-6">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-600">System Uptime</p>
-                              <p className="text-2xl font-bold text-emerald-600">
-                                {analyticsData?.performance?.systemUptime || 99.8}%
-                              </p>
-                            </div>
-                            <div className="p-3 bg-emerald-100 rounded-full">
-                              <Server className="h-6 w-6 text-emerald-600" />
-                            </div>
-                          </div>
-                          <p className="text-sm text-gray-500 mt-2">
-                            Excellent performance
-                          </p>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Detailed Analytics */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {/* Revenue Overview */}
-                      <Card>
-                        <CardHeader>
-                                                     <CardTitle className="flex items-center">
-                             <IndianRupee className="w-5 h-5 mr-2" />
-                             Revenue Overview
-                           </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Current Month</span>
-                              <span className="font-semibold">
-                                {formatCurrency(analyticsData?.revenue?.current || 0)}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Previous Month</span>
-                              <span className="font-semibold">
-                                {formatCurrency(analyticsData?.revenue?.previous || 0)}
-                              </span>
-                            </div>
-                            <Separator />
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Growth</span>
-                              <span className={`font-semibold ${((analyticsData?.revenue?.growth ?? 0) >= 0) ? 'text-green-600' : 'text-red-600'}`}>
-                                {(analyticsData?.revenue?.growth ?? 0) >= 0 ? '+' : ''}{(analyticsData?.revenue?.growth ?? 0)}%
-                              </span>
-                            </div>
-                            <Progress value={Math.min((analyticsData?.revenue?.growth ?? 0) + 100, 100)} className="w-full" />
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      {/* Patient Analytics */}
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center">
-                            <Users className="w-5 h-5 mr-2" />
-                            Patient Analytics
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Total Patients</span>
-                              <span className="font-semibold">{analyticsData?.patients?.total || 0}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">New This Month</span>
-                              <span className="font-semibold">{analyticsData?.patients?.newThisMonth || 0}</span>
-                            </div>
-                            <Separator />
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Growth Rate</span>
-                              <span className={`font-semibold ${((analyticsData?.patients?.growth ?? 0) >= 0) ? 'text-green-600' : 'text-red-600'}`}>
-                                {(analyticsData?.patients?.growth ?? 0) >= 0 ? '+' : ''}{(analyticsData?.patients?.growth ?? 0)}%
-                              </span>
-                            </div>
-                            <Progress value={Math.min((analyticsData?.patients?.growth ?? 0) + 100, 100)} className="w-full" />
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-
-                    {/* Performance Metrics */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center">
-                          <Activity className="w-5 h-5 mr-2" />
-                          System Performance
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          <div className="text-center">
-                            <div className="p-4 bg-blue-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                              <Clock className="h-8 w-8 text-blue-600" />
-                            </div>
-                            <h3 className="font-semibold text-lg">Response Time</h3>
-                            <p className="text-2xl font-bold text-blue-600">
-                              {analyticsData?.performance?.avgResponseTime || 245}ms
-                            </p>
-                            <p className="text-sm text-gray-500">Average API response</p>
-                          </div>
-
-                          <div className="text-center">
-                            <div className="p-4 bg-green-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                              <Server className="h-8 w-8 text-green-600" />
-                            </div>
-                            <h3 className="font-semibold text-lg">Uptime</h3>
-                            <p className="text-2xl font-bold text-green-600">
-                              {analyticsData?.performance?.systemUptime || 99.8}%
-                            </p>
-                            <p className="text-sm text-gray-500">System availability</p>
-                          </div>
-
-                          <div className="text-center">
-                            <div className="p-4 bg-purple-100 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                              <Star className="h-8 w-8 text-purple-600" />
-                            </div>
-                            <h3 className="font-semibold text-lg">Satisfaction</h3>
-                            <p className="text-2xl font-bold text-purple-600">
-                              {analyticsData?.performance?.userSatisfaction || 4.6}/5
-                            </p>
-                            <p className="text-sm text-gray-500">User rating</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <div className="space-y-6">
-              {/* Hospital Information */}
-              <Card className="bg-white shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-xl">
-                    <Building2 className="w-6 h-6 mr-2" />
-                    Hospital Information
-                  </CardTitle>
-                  <CardDescription>Manage hospital details and contact information</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {hospitalLoading ? (
-                    <div className="space-y-4">
-                      <Skeleton className="h-4 w-48" />
-                      <Skeleton className="h-4 w-64" />
-                      <Skeleton className="h-4 w-56" />
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Hospital Name</label>
-                          <p className="text-lg font-semibold text-gray-900">{hospitalInfo?.name}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Address</label>
-                          <p className="text-gray-600">{hospitalInfo?.address}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Phone Number</label>
-                          <p className="text-gray-600 flex items-center">
-                            <Phone className="w-4 h-4 mr-2" />
-                            {hospitalInfo?.phoneNumber}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Email</label>
-                          <p className="text-gray-600 flex items-center">
-                            <Mail className="w-4 h-4 mr-2" />
-                            {hospitalInfo?.email}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="space-y-4">
-                        {hospitalInfo?.website && (
-                          <div>
-                            <label className="text-sm font-medium text-gray-700">Website</label>
-                            <p className="text-gray-600 flex items-center">
-                              <Globe className="w-4 h-4 mr-2" />
-                              <a 
-                                href={hospitalInfo.website} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
-                              >
-                                {hospitalInfo.website}
-                              </a>
-                            </p>
-                          </div>
-                        )}
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Status</label>
-                          <Badge variant={hospitalInfo?.isActive ? "default" : "secondary"} className="mt-1">
-                            {hospitalInfo?.isActive ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-gray-700">Description</label>
-                          <p className="text-gray-600">{hospitalInfo?.description || 'No description available'}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Working Hours & Days */}
-              <Card className="bg-white shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-xl">
-                    <Clock className="w-6 h-6 mr-2" />
-                    Working Hours & Days
-                  </CardTitle>
-                  <CardDescription>Configure hospital operating hours and working days</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {hospitalInfo?.settings ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Working Hours</label>
-                        <p className="text-gray-600 mt-1">
-                          {hospitalInfo.settings.workingHours?.start} - {hospitalInfo.settings.workingHours?.end}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Working Days</label>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {hospitalInfo.settings.workingDays?.map((day: string) => (
-                            <Badge key={day} variant="outline" className="text-xs capitalize">
-                              {day}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-gray-500">No working hours configured</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* System Configuration */}
-              <Card className="bg-white shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-xl">
-                    <Settings className="w-6 h-6 mr-2" />
-                    System Configuration
-                  </CardTitle>
-                  <CardDescription>Manage system settings and preferences</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Database className="w-5 h-5 text-blue-600" />
-                          <span className="text-sm font-medium">Database Status</span>
-                        </div>
-                        <Badge className="bg-green-100 text-green-800">Connected</Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Server className="w-5 h-5 text-green-600" />
-                          <span className="text-sm font-medium">Server Status</span>
-                        </div>
-                        <Badge className="bg-green-100 text-green-800">Online</Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Shield className="w-5 h-5 text-purple-600" />
-                          <span className="text-sm font-medium">Security</span>
-                        </div>
-                        <Badge className="bg-green-100 text-green-800">Secure</Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Network className="w-5 h-5 text-orange-600" />
-                          <span className="text-sm font-medium">Network</span>
-                        </div>
-                        <Badge className="bg-green-100 text-green-800">Stable</Badge>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <Cpu className="w-5 h-5 text-red-600" />
-                          <span className="text-sm font-medium">CPU Usage</span>
-                        </div>
-                        <span className="text-sm text-gray-600">45%</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <HardDrive className="w-5 h-5 text-indigo-600" />
-                          <span className="text-sm font-medium">Storage</span>
-                        </div>
-                        <span className="text-sm text-gray-600">2.1GB / 10GB</span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Quick Actions */}
+        {/* Quick Actions Section */}
+        <div className="mb-8">
               <Card className="bg-white shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center text-xl">
@@ -1878,28 +822,28 @@ const AdminDashboard: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Button variant="outline" className="h-20 flex flex-col items-center justify-center" onClick={() => navigate({ to: '/admin/staff' })}>
-                      <UserPlus className="w-6 h-6 mb-2" />
-                      <span className="text-sm">Add Staff</span>
+                <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => navigate({ to: '/admin/staff' })}>
+                  <UserPlus className="w-6 h-6 mb-2 text-blue-600" />
+                  <span className="text-sm font-medium">Add Staff</span>
                     </Button>
-                    <Button variant="outline" className="h-20 flex flex-col items-center justify-center" onClick={() => navigate({ to: '/admin/add-branch' })}>
-                      <Building2 className="w-6 h-6 mb-2" />
-                      <span className="text-sm">Add Branch</span>
+                <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-green-50 hover:border-green-200 transition-colors" onClick={() => navigate({ to: '/admin/add-branch' })}>
+                  <Building2 className="w-6 h-6 mb-2 text-green-600" />
+                  <span className="text-sm font-medium">Add Branch</span>
                     </Button>
-                    <Button variant="outline" className="h-20 flex flex-col items-center justify-center" onClick={() => navigate({ to: '/admin/analytics' })}>
-                      <BarChart3 className="w-6 h-6 mb-2" />
-                      <span className="text-sm">View Reports</span>
+                <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-purple-50 hover:border-purple-200 transition-colors" onClick={() => navigate({ to: '/admin/analytics' })}>
+                  <BarChart3 className="w-6 h-6 mb-2 text-purple-600" />
+                  <span className="text-sm font-medium">View Reports</span>
                     </Button>
-                    <Button variant="outline" className="h-20 flex flex-col items-center justify-center" onClick={() => navigate({ to: '/admin/settings' })}>
-                      <Settings className="w-6 h-6 mb-2" />
-                      <span className="text-sm">System Config</span>
+                <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-orange-50 hover:border-orange-200 transition-colors" onClick={() => navigate({ to: '/admin/settings' })}>
+                  <Settings className="w-6 h-6 mb-2 text-orange-600" />
+                  <span className="text-sm font-medium">System Config</span>
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-        </Tabs>
+          
+        
       </div>
       
       {/* Send Message Modal */}

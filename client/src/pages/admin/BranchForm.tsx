@@ -392,10 +392,10 @@ const BranchForm: React.FC = () => {
         ))}
       </div>
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
           {steps[currentStep].title}
         </h2>
-        <p className="text-gray-600 text-lg">{steps[currentStep].description}</p>
+        <p className="text-gray-600 text-base">{steps[currentStep].description}</p>
       </div>
       <div className="relative">
         <Progress 
@@ -411,23 +411,23 @@ const BranchForm: React.FC = () => {
   const EnhancedInput = useCallback((props: React.ComponentProps<typeof Input>) => (
     <Input
       {...props}
-      className="h-12 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300"
+      className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300"
     />
   ), []);
 
 
 
   const FormField = useCallback(({ label, required, error, children }: any) => (
-    <div className="space-y-3">
-      <Label className="text-base font-semibold text-gray-800 flex items-center">
+    <div className="space-y-2">
+      <Label className="text-sm font-semibold text-gray-800 flex items-center">
         {label}
-        {required && <span className="text-red-500 ml-2 text-lg">*</span>}
+        {required && <span className="text-red-500 ml-1 text-sm">*</span>}
       </Label>
       <div className="relative">
         {children}
         {error && (
-          <div className="flex items-center space-x-2 text-red-600 text-sm mt-2 p-2 bg-red-50 rounded-lg border border-red-200">
-            <AlertCircle className="h-4 w-4" />
+          <div className="flex items-center space-x-2 text-red-600 text-xs mt-1 p-2 bg-red-50 rounded-lg border border-red-200">
+            <AlertCircle className="h-3 w-3" />
             <span className="font-medium">{error}</span>
           </div>
         )}
@@ -451,7 +451,7 @@ const BranchForm: React.FC = () => {
               
               <FormField label="Hospital (Parent)" required error={errors.hospitalId}>
                 <Select value={formData.hospitalId} onValueChange={(value) => handleInputChange('hospitalId', value)}>
-                  <SelectTrigger className="h-12 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
+                  <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
                     <SelectValue placeholder="Select hospital" />
                   </SelectTrigger>
                   <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
@@ -514,7 +514,7 @@ const BranchForm: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField label="Country" required error={errors.country}>
                 <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
-                  <SelectTrigger className="h-12 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
+                  <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
                   <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
@@ -594,7 +594,7 @@ const BranchForm: React.FC = () => {
                       checked={formData.workingDays.includes(day)}
                       onCheckedChange={(checked) => handleWorkingDayChange(day, checked as boolean)}
                     />
-                    <Label htmlFor={day} className="text-sm font-medium">
+                    <Label htmlFor={day} className="text-xs font-medium">
                       {day.substring(0, 3)}
                     </Label>
                   </div>
@@ -621,7 +621,7 @@ const BranchForm: React.FC = () => {
               
               <FormField label="Timezone" required error={errors.timezone}>
                 <Select value={formData.timezone} onValueChange={(value) => handleInputChange('timezone', value)}>
-                  <SelectTrigger className="h-12 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
+                  <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
                     <SelectValue placeholder="Select timezone" />
                   </SelectTrigger>
                   <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
@@ -647,7 +647,7 @@ const BranchForm: React.FC = () => {
               
               <FormField label="Default Language">
                 <Select value={formData.defaultLanguage} onValueChange={(value) => handleInputChange('defaultLanguage', value)}>
-                  <SelectTrigger className="h-12 text-base border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
+                  <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
                     <SelectValue placeholder="Select language" />
                   </SelectTrigger>
                   <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
@@ -666,12 +666,12 @@ const BranchForm: React.FC = () => {
       case 3: // Branch Admin Setup
         return (
           <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
               <div className="flex items-center space-x-2">
-                <Shield className="h-5 w-5 text-blue-600" />
-                <h3 className="font-medium text-blue-900">Branch Admin Account</h3>
+                <Shield className="h-4 w-4 text-blue-600" />
+                <h3 className="font-medium text-blue-900 text-sm">Branch Admin Account</h3>
               </div>
-              <p className="text-blue-700 text-sm mt-1">
+              <p className="text-blue-700 text-xs mt-1">
                 This admin will be able to log in as a sub-admin to manage this branch
               </p>
             </div>
@@ -741,7 +741,7 @@ const BranchForm: React.FC = () => {
                     Generate
                   </Button>
                 </div>
-                <div className="text-xs text-gray-600">
+                <div className="text-xs text-gray-500">
                   Password must contain uppercase, lowercase, and number
                 </div>
               </div>
@@ -780,13 +780,13 @@ const BranchForm: React.FC = () => {
             </div>
 
             {/* Review Summary */}
-            <div className="border border-gray-200 rounded-lg p-6 bg-gray-50">
-              <h3 className="font-semibold text-lg mb-4">Review Branch Details</h3>
+            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+              <h3 className="font-semibold text-base mb-3">Review Branch Details</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Basic Information</h4>
-                  <div className="space-y-1 text-sm">
+                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Basic Information</h4>
+                  <div className="space-y-1 text-xs">
                     <p><span className="text-gray-600">Branch Name:</span> {formData.branchName}</p>
                     <p><span className="text-gray-600">Email:</span> {formData.email}</p>
                     <p><span className="text-gray-600">Phone:</span> {formData.phoneNumber}</p>
@@ -794,8 +794,8 @@ const BranchForm: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Location</h4>
-                  <div className="space-y-1 text-sm">
+                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Location</h4>
+                  <div className="space-y-1 text-xs">
                     <p><span className="text-gray-600">City:</span> {formData.city}, {formData.state}</p>
                     <p><span className="text-gray-600">Country:</span> {formData.country}</p>
                     <p><span className="text-gray-600">Address:</span> {formData.addressLine1}</p>
@@ -803,8 +803,8 @@ const BranchForm: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Operations</h4>
-                  <div className="space-y-1 text-sm">
+                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Operations</h4>
+                  <div className="space-y-1 text-xs">
                     <p><span className="text-gray-600">Working Days:</span> {formData.workingDays.join(', ')}</p>
                     <p><span className="text-gray-600">Hours:</span> {formData.workingHoursStart} - {formData.workingHoursEnd}</p>
                     <p><span className="text-gray-600">Timezone:</span> {formData.timezone}</p>
@@ -812,8 +812,8 @@ const BranchForm: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2">Branch Admin</h4>
-                  <div className="space-y-1 text-sm">
+                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Branch Admin</h4>
+                  <div className="space-y-1 text-xs">
                     <p><span className="text-gray-600">Name:</span> {formData.adminFirstName} {formData.adminLastName}</p>
                     <p><span className="text-gray-600">Email:</span> {formData.adminEmail}</p>
                     <p><span className="text-gray-600">Phone:</span> {formData.adminPhone}</p>
@@ -839,15 +839,15 @@ const BranchForm: React.FC = () => {
               
                 <Separator orientation="vertical" className="h-8" />
                 <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                     Create New Branch
                   </h1>
-                  <p className="text-gray-600 mt-1 text-base">Set up a new branch with sub-admin access</p>
+                  <p className="text-gray-600 mt-1 text-sm">Set up a new branch with sub-admin access</p>
                 </div>
               </div>
             
-            <Badge variant="outline" className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-0 px-4 py-2 text-sm font-semibold shadow-md">
-              <Building2 className="w-4 h-4 mr-2" />
+            <Badge variant="outline" className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-0 px-3 py-1 text-xs font-semibold shadow-md">
+              <Building2 className="w-3 h-3 mr-1" />
               Step {currentStep + 1} of {steps.length}
             </Badge>
           </div>
@@ -870,7 +870,7 @@ const BranchForm: React.FC = () => {
                 variant="outline"
                 onClick={handlePrevious}
                 disabled={currentStep === 0}
-                className="px-8 py-3 text-base font-medium hover:bg-gray-50 transition-all duration-200"
+                className="px-6 py-2 text-sm font-medium hover:bg-gray-50 transition-all duration-200"
               >
                 <ArrowLeft className="h-5 w-5 mr-3" />
                 Previous
@@ -880,7 +880,7 @@ const BranchForm: React.FC = () => {
                 {currentStep < steps.length - 1 ? (
                   <Button 
                     onClick={handleNext}
-                    className="px-8 py-3 text-base font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="px-6 py-2 text-sm font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl transition-all duration-200"
                   >
                     Next
                     <ArrowRight className="h-5 w-5 ml-3" />
@@ -889,7 +889,7 @@ const BranchForm: React.FC = () => {
                   <Button
                     onClick={handleSubmit}
                     disabled={createBranchMutation.isPending}
-                    className="px-8 py-3 text-base font-medium bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="px-6 py-2 text-sm font-medium bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200"
                   >
                     {createBranchMutation.isPending ? (
                       <>

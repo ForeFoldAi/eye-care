@@ -607,13 +607,13 @@ export default function LoginPage() {
                         <SelectItem value="admin">
                           <div className="flex items-center gap-2">
                             <UserCog className="w-4 h-4 text-emerald-500" />
-                            Admin
+                            Account Admin
                           </div>
                         </SelectItem>
                         <SelectItem value="sub_admin">
                           <div className="flex items-center gap-2">
                             <Settings className="w-4 h-4 text-purple-500" />
-                            Sub Admin
+                            Hospital Branch Admin 
                           </div>
                         </SelectItem>
                         <SelectItem value="doctor">
