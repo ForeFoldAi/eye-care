@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
@@ -31,7 +31,7 @@ import { type User as AuthUser } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PrescriptionModal from "@/components/PrescriptionModal";
 import { authService } from "@/lib/auth";
-import Layout from "@/components/Layout";
+// Layout is now handled by DoctorLayout
 import LoadingEye from '@/components/ui/LoadingEye';
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
@@ -133,7 +133,6 @@ interface AppointmentColumns {
 }
 
 export default function DoctorDashboard() {
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const navigate = useNavigate();
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
@@ -397,24 +396,25 @@ export default function DoctorDashboard() {
   const [followUpDate, setFollowUpDate] = useState<Date | undefined>();
   const [followUpNotes, setFollowUpNotes] = useState('');
   const [appointmentStates, setAppointmentStates] = useState<{ [key: string]: AppointmentState }>({});
+  const initializedRef = useRef(false);
 
   // Initialize appointment states when appointments data changes
   useEffect(() => {
-    // Only initialize if appointmentStates is empty
-    if (Object.keys(appointmentStates).length === 0) {
-    const initialStates = todaysAppointments.reduce((acc, appointment) => ({
-      ...acc,
-      [appointment.id]: {
-          ...appointment,
-          isModified: false,
-          isPendingSave: false,
-          originalStatus: appointment.status,
-          isApproved: false
-      }
-    }), {} as { [key: string]: AppointmentState });
-    setAppointmentStates(initialStates);
+    // Only initialize once when we have appointments and haven't initialized yet
+    if (todaysAppointments.length > 0 && !initializedRef.current) {
+      const initialStates = todaysAppointments.reduce((acc, appointment) => ({
+        ...acc,
+        [appointment.id]: {
+            ...appointment,
+            isModified: false,
+            isPendingSave: false,
+            originalStatus: appointment.status,
+            isApproved: false
+        }
+      }), {} as { [key: string]: AppointmentState });
+      setAppointmentStates(initialStates);
+      initializedRef.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todaysAppointments]);
 
   // Mutation for updating appointment
@@ -713,20 +713,8 @@ export default function DoctorDashboard() {
     actions: appointment.id,
   }));
 
-  // Render a loading state if user is not set yet
-  if (!currentUser) {
-    return (
-      <ProtectedRoute requiredRole="doctor">
-        {(user: AuthUser) => {
-          setCurrentUser(user);
-          return null;
-        }}
-      </ProtectedRoute>
-    );
-  }
-
   return (
-    <>
+    <div className="p-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {statsCards.map((stat, index) => {
@@ -1187,6 +1175,6 @@ export default function DoctorDashboard() {
           
           {/* Chat Widget - Fixed Bottom Right */}
           <ChatWidget />
-         </>
-        );
+    </div>
+  );
 }

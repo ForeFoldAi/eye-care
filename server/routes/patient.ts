@@ -1,7 +1,7 @@
 // server/routes/patients.ts
 import { Request, Response } from 'express';
 import Patient, { IPatient } from '../models/patient';
-import connectDB from '../config/database';
+import { connectDB } from '../db/connect';
 
 export interface PatientRequestBody {
   firstName: string;

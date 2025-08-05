@@ -109,7 +109,7 @@ router.get('/my-hospitals', authenticateToken, authorizeRole(['admin']), async (
 });
 
 // Get single hospital
-router.get('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 'sub_admin']), async (req: AuthRequest, res) => {
+router.get('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 'sub_admin', 'doctor', 'receptionist']), async (req: AuthRequest, res) => {
   try {
     const hospital = await Hospital.findById(req.params.id)
       .populate('createdBy', 'firstName lastName email')
@@ -121,6 +121,9 @@ router.get('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 's
 
     // Check if user has access to this hospital
     if (req.user?.role === 'admin' && hospital.adminId._id.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    if (['doctor', 'receptionist', 'sub_admin'].includes(req.user?.role || '') && req.user?.hospitalId !== req.params.id) {
       return res.status(403).json({ message: 'Access denied' });
     }
 

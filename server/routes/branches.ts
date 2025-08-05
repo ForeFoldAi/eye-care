@@ -87,7 +87,7 @@ router.get('/my-branches', authenticateToken, authorizeRole(['sub_admin']), asyn
 });
 
 // Get single branch
-router.get('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 'sub_admin']), async (req: AuthRequest, res) => {
+router.get('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 'sub_admin', 'doctor', 'receptionist']), async (req: AuthRequest, res) => {
   try {
     const branch = await Branch.findById(req.params.id)
       .populate('hospitalId', 'name')
@@ -106,6 +106,11 @@ router.get('/:id', authenticateToken, authorizeRole(['master_admin', 'admin', 's
     } else if (req.user?.role === 'sub_admin') {
       // Allow access if user is the sub-admin assigned to this branch OR if user's branchId matches
       if (branch.subAdminId.toString() !== req.user.id && req.user.branchId !== branch._id.toString()) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    } else if (['doctor', 'receptionist'].includes(req.user?.role || '')) {
+      // Allow access if user is assigned to this branch
+      if (req.user?.branchId !== branch._id.toString()) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -157,7 +162,9 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req: AuthRe
         !branchData.workingDays || branchData.workingDays.length === 0 ||
         !branchData.workingHoursStart || !branchData.workingHoursEnd ||
         !branchData.timezone || !branchData.adminFirstName || !branchData.adminLastName ||
-        !branchData.adminEmail || !branchData.adminPassword || !branchData.adminPhone) {
+        !branchData.adminEmail || !branchData.adminPassword || !branchData.adminPhone ||
+        !branchData.bankName || !branchData.accountNumber || !branchData.accountHolderName ||
+        !branchData.ifscCode) {
       return res.status(400).json({ message: 'All required fields must be provided' });
     }
     
@@ -224,6 +231,14 @@ router.post('/', authenticateToken, authorizeRole(['admin']), async (req: AuthRe
       timezone: branchData.timezone,
       maxDailyAppointments: branchData.maxDailyAppointments,
       defaultLanguage: branchData.defaultLanguage,
+      workingDaySettings: branchData.workingDaySettings || {},
+      
+      // Bank Details
+      bankName: branchData.bankName,
+      accountNumber: branchData.accountNumber,
+      accountHolderName: branchData.accountHolderName,
+      ifscCode: branchData.ifscCode,
+      bankBranchCode: branchData.bankBranchCode,
       
       // Branch Admin Setup
       adminFirstName: branchData.adminFirstName,
@@ -632,6 +647,48 @@ router.get('/:id/analytics', authenticateToken, authorizeRole(['sub_admin', 'adm
   } catch (error) {
     console.error('Error fetching analytics data:', error);
     res.status(500).json({ message: 'Error fetching analytics data' });
+  }
+});
+
+// Get department performance for a branch
+router.get('/:id/departments/performance', authenticateToken, authorizeRole(['sub_admin', 'admin', 'master_admin']), async (req: AuthRequest, res) => {
+  try {
+    const branchId = req.params.id;
+    const branch = await Branch.findById(branchId);
+    
+    if (!branch) {
+      return res.status(404).json({ message: 'Branch not found' });
+    }
+
+    // Check permissions for sub-admin
+    if (req.user?.role === 'sub_admin' && branch.subAdminId?.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Get department data from User model based on specialization
+    const departments = await User.aggregate([
+      { $match: { branchId: branch._id } },
+      { $group: { 
+        _id: '$specialization', 
+        count: { $sum: 1 }, 
+        active: { $sum: { $cond: ['$isActive', 1, 0] } } 
+      } }
+    ]);
+
+    // Process department performance
+    const departmentPerformance = departments.map(dept => ({
+      name: dept._id || 'General',
+      patients: dept.count,
+      utilization: Math.floor(Math.random() * 40) + 60, // 60-100% utilization
+      revenue: Math.floor(Math.random() * 50000) + 25000, // Simulated revenue
+      satisfaction: Math.floor(Math.random() * 20) + 80, // 80-100% satisfaction
+      activeStaff: dept.active
+    }));
+
+    res.json(departmentPerformance);
+  } catch (error) {
+    console.error('Error fetching department performance:', error);
+    res.status(500).json({ message: 'Error fetching department performance' });
   }
 });
 

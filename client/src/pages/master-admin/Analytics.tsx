@@ -353,7 +353,7 @@ const AnalyticsPage: React.FC = () => {
         target: 99.9
       },
       {
-        name: 'User Satisfaction',
+        name: 'Patient Feedback',
         value: 4.8,
         change: 0.2,
         trend: 'up' as const,

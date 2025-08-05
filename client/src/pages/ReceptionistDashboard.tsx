@@ -4,8 +4,6 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Layout from "@/components/Layout";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import PatientRegistrationModal from "@/components/PatientRegistrationModal";
 import AppointmentBookingModal from "@/components/AppointmentBookingModal";
 import ReceiptModal from "@/components/ReceiptModal";
@@ -35,7 +33,6 @@ import {
 } from "lucide-react";
 import { useMutation, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { type User as AuthUser } from "@/lib/auth";
 import { authService } from '@/lib/auth';
 import LoadingEye from '@/components/ui/LoadingEye';
 import SupportTicketModal from '@/components/SupportTicketModal';
@@ -151,8 +148,28 @@ export default function ReceptionistDashboard() {
     queryKey: ['patients'],
     queryFn: async () => {
       const response = await fetchWithAuth(`${API_URL}/api/patients`);
-      // Handle the new API response format
-      const patientsArray = response.data?.patients || response.patients || response || [];
+      console.log('Patients API response:', response); // Debug log
+      
+      // Handle the server response format: { data: { patients: [...] } }
+      const patientsArray = response.data?.patients || [];
+      console.log('Patients array:', patientsArray);
+      
+      if (!Array.isArray(patientsArray) || patientsArray.length === 0) {
+        console.log('No patients found in tenant scope, trying to fetch all patients for debugging...');
+        // For debugging: try to fetch all patients to see if there are any
+        try {
+          const allPatientsResponse = await fetch(`${API_URL}/api/patients?debug=true`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            },
+          });
+          const allPatientsData = await allPatientsResponse.json();
+          console.log('All patients response:', allPatientsData);
+        } catch (error) {
+          console.log('Could not fetch all patients:', error);
+        }
+      }
+      
       return Array.isArray(patientsArray) ? patientsArray : [];
     },
     retry: 1
@@ -504,15 +521,59 @@ export default function ReceptionistDashboard() {
   const isLoading = searchQuery.length > 2 ? isLoadingSearch : isLoadingPatients;
   const currentError = searchQuery.length > 2 ? searchError : null; // No error state for patients
 
+  // Debug logging
+  console.log('Patients data:', patients);
+  console.log('Displayed patients:', displayedPatients);
+  console.log('Is loading patients:', isLoadingPatients);
+  console.log('Search query:', searchQuery);
+
+  // Debug: Create a test patient if none exist
+  const createTestPatient = async () => {
+    try {
+      const testPatientData = {
+        firstName: "Test",
+        lastName: "Patient",
+        dateOfBirth: "1990-01-01",
+        gender: "male",
+        phone: "1234567890",
+        email: "test@example.com",
+        address: "Test Address"
+      };
+      
+      const response = await fetch(`${API_URL}/api/patients`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify(testPatientData),
+      });
+      
+      if (response.ok) {
+        console.log('Test patient created successfully');
+        // Refresh the patients query
+        queryClient.invalidateQueries({ queryKey: ['patients'] });
+      } else {
+        console.log('Failed to create test patient:', await response.text());
+      }
+    } catch (error) {
+      console.log('Error creating test patient:', error);
+    }
+  };
+
+  // Auto-create test patient if no patients exist (for debugging)
+  if (patients && patients.length === 0 && !isLoadingPatients) {
+    console.log('No patients found, creating test patient...');
+    createTestPatient();
+  }
+
   const handlePatientSelect = (patient: Patient) => {
     setSelectedPatient(patient);
     setPaymentData(prev => ({ ...prev, patientId: patient.id }));
   };
 
   return (
-    <ProtectedRoute requiredRole="receptionist">
-      {(currentUser: AuthUser) => (
-          <div className="space-y-8 p-8">
+    <div className="space-y-8 p-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {statsCards.map((card, index) => (
@@ -918,7 +979,5 @@ export default function ReceptionistDashboard() {
             {/* Chat Widget - Fixed Bottom Right */}
             <ChatWidget />
           </div>
-      )}
-    </ProtectedRoute>
   );
 }

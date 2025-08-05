@@ -8,6 +8,7 @@ export interface AuthRequest extends Request {
     role: string;
     hospitalId?: string;
     branchId?: string;
+    department?: string;
   };
 }
 
@@ -50,7 +51,8 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       id: user._id.toString(),
       role: user.role,
       hospitalId: user.hospitalId?.toString(),
-      branchId: user.branchId?.toString()
+      branchId: user.branchId?.toString(),
+      department: user.department
     };
     console.log('authenticateToken: User set in request:', req.user);
     next();
@@ -87,7 +89,8 @@ export const verifyToken = async (token: string) => {
       userId: user._id.toString(),
       role: user.role,
       hospitalId: user.hospitalId?.toString(),
-      branchId: user.branchId?.toString()
+      branchId: user.branchId?.toString(),
+      department: user.department
     };
   } catch (error) {
     return null;

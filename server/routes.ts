@@ -17,6 +17,7 @@ import {
 import mongoose from 'mongoose';
 import { User, Appointment } from './models'; 
 import { authenticateToken, authorizeRole } from './middleware/auth';
+import { enforceTenantIsolation, buildTenantFilter, TenantRequest } from './middleware/tenant';
 import { Router } from 'express';
 import authRoutes from './routes/auth';
 import patientRoutes from './routes/patients';
@@ -32,6 +33,7 @@ import supportRoutes from './routes/support';
 import chatRoutes from './routes/chat';
 import notificationRoutes from './routes/notifications';
 import subscriptionPlanRoutes from './routes/subscription-plans';
+import subscriptionsRoutes from './routes/subscriptions';
 import knowledgeBaseRoutes from './routes/knowledge-base';
 import { connectDB } from './db/connect';
 import { seedDatabase } from './db/seed';
@@ -211,6 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/knowledge-base', knowledgeBaseRoutes);
   app.use('/api/master-admin', masterAdminRoutes);
   app.use('/api/master-admin/subscription-plans', subscriptionPlanRoutes);
+  app.use('/api/subscriptions', subscriptionsRoutes);
   app.use('/api/billing', billingRoutes);
   app.use('/api/analytics', analyticsRoutes);
   app.use('/api/doctor-availability', doctorAvailabilityRoutes);
@@ -570,38 +573,321 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard stats routes
   app.get("/api/dashboard/stats", authenticateToken, async (req: any, res) => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
       
       if (req.user.role === 'doctor') {
-        const todayAppointments = await storage.getAppointmentsByDate(today);
-        const doctorAppointments = todayAppointments.filter(apt => apt.doctorId === req.user.id);
-        const recentPrescriptions = await storage.getPrescriptionsByDoctor(req.user.id);
+        // Get today's appointments for this doctor
+        const todayAppointments = await Appointment.countDocuments({
+          doctorId: req.user.id,
+          datetime: { $gte: today, $lt: tomorrow }
+        });
+
+        const completedToday = await Appointment.countDocuments({
+          doctorId: req.user.id,
+          datetime: { $gte: today, $lt: tomorrow },
+          status: 'completed'
+        });
+
+        const pendingToday = await Appointment.countDocuments({
+          doctorId: req.user.id,
+          datetime: { $gte: today, $lt: tomorrow },
+          status: 'pending'
+        });
+
+        // Get total unique patients for this doctor
+        const totalPatients = await Appointment.distinct('patientId', {
+          doctorId: req.user.id
+        });
+
+        // Get active prescriptions for this doctor
+        const { Prescription } = await import('./models');
+        const prescriptions = await Prescription.countDocuments({
+          doctorId: req.user.id,
+          isActive: true
+        }).catch(() => 0); // Fallback if Prescription model doesn't exist
         
         res.json({
-          todayAppointments: doctorAppointments.length,
-          totalPatients: (await storage.getAllPatients()).length,
-          prescriptions: recentPrescriptions.filter(p => p.isActive).length,
-          revenue: 0 // Doctors don't track revenue directly
+          todayAppointments,
+          totalPatients: totalPatients.length,
+          prescriptions,
+          completedToday,
+          pendingToday
         });
       } else {
-        const todayAppointments = await storage.getAppointmentsByDate(today);
-        const todayPayments = await storage.getPaymentsByDate(today);
-        const allPatients = await storage.getAllPatients();
-        
-        const totalRevenue = todayPayments.reduce((sum, payment) => 
-          sum + Number(payment.amount), 0
-        );
+        // For other roles, provide general stats
+        const todayAppointments = await Appointment.countDocuments({
+          datetime: { $gte: today, $lt: tomorrow }
+        });
+
+                 const totalPatients = await Patient.countDocuments();
         
         res.json({
-          todayAppointments: todayAppointments.length,
-          newPatients: allPatients.filter(p => 
-            p.createdAt && p.createdAt.toISOString().split('T')[0] === today
-          ).length,
-          paymentsToday: totalRevenue,
-          cancellations: todayAppointments.filter(apt => apt.status === 'cancelled').length
+          todayAppointments,
+          totalPatients,
+          prescriptions: 0,
+          completedToday: 0,
+          pendingToday: 0
         });
       }
     } catch (error) {
+      console.error('Dashboard stats error:', error);
+      res.status(500).json({ message: "Internal server error", error: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
+  // Today's Key Metrics endpoint - Simple version like DoctorAvailability
+  app.get("/api/dashboard/today-metrics", authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const todayDate = new Date().toISOString().split('T')[0];
+      const todayStart = new Date(todayDate);
+      const todayEnd = new Date(todayDate);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+      
+      // Get all data for today
+      const todayAppointments = await storage.getAppointmentsByDate(todayDate);
+      const allPatients = await storage.getAllPatients();
+      const allDoctors = await storage.getAllDoctors();
+      const allAvailabilities = await storage.getAllAvailabilities();
+      
+      // Filter data for this hospital using tenant filter
+      const hospitalPatients = allPatients.filter((p: any) => {
+        const patientHospitalId = typeof p.hospitalId === 'string' 
+          ? p.hospitalId 
+          : p.hospitalId?._id;
+        return patientHospitalId === req.tenant?.hospitalId;
+      });
+      
+      const hospitalAppointments = todayAppointments.filter((apt: any) => {
+        const appointmentHospitalId = typeof apt.hospitalId === 'string' 
+          ? apt.hospitalId 
+          : apt.hospitalId?._id;
+        return appointmentHospitalId === req.tenant?.hospitalId;
+      });
+      
+      // Calculate today's patients metrics (keep existing logic)
+      const todayPatients = hospitalPatients.filter((p: any) => {
+        if (!p.createdAt) return false;
+        const patientDate = new Date(p.createdAt);
+        return patientDate >= todayStart && patientDate < todayEnd;
+      });
+      
+      const newPatients = todayPatients.length;
+      const repeatedPatients = hospitalAppointments.filter((apt: any) => {
+        const patient = hospitalPatients.find((p: any) => p.id === apt.patientId);
+        if (!patient || !patient.createdAt) return false;
+        const patientCreatedDate = new Date(patient.createdAt);
+        return patientCreatedDate < todayStart;
+      }).length;
+      
+      const followUpPatients = hospitalAppointments.filter((apt: any) => 
+        apt.type === 'follow-up'
+      ).length;
+      
+      const totalTodayPatients = newPatients + repeatedPatients;
+      
+      // Calculate today's appointments metrics (keep existing logic)
+      const completedAppointments = hospitalAppointments.filter((apt: any) => 
+        apt.status === 'completed'
+      ).length;
+      
+      const upcomingAppointments = hospitalAppointments.filter((apt: any) => 
+        apt.status === 'pending' || apt.status === 'confirmed'
+      ).length;
+      
+      const totalTodayAppointments = hospitalAppointments.length;
+      
+      // Calculate doctors using the same logic as DoctorAvailability
+      const hospitalDoctors = allDoctors.filter((doc: any) => {
+        const doctorHospitalId = typeof doc.hospitalId === 'string' 
+          ? doc.hospitalId 
+          : doc.hospitalId?._id;
+        return doctorHospitalId === req.tenant?.hospitalId;
+      });
+      
+      // Use the same logic as DoctorAvailability
+      const totalDoctors = hospitalDoctors.length;
+      const activeDoctors = hospitalDoctors.filter((d: any) => d.isActive).length;
+      
+      // Get today's day of week
+      const currentDate = new Date();
+      const dayOfWeek = currentDate.getDay();
+      
+      // Filter availabilities for today
+      const todayAvailabilities = allAvailabilities.filter((av: any) => av.dayOfWeek === dayOfWeek);
+      
+      // Calculate available doctors (same as DoctorAvailability)
+      const availableDoctors = todayAvailabilities.filter((av: any) => 
+        av.isActive && av.isAvailable && av.slots.length > 0
+      ).length;
+      
+      // Calculate unavailable doctors
+      const unavailableDoctors = totalDoctors - availableDoctors;
+      
+      res.json({
+        patients: {
+          total: totalTodayPatients,
+          new: newPatients,
+          repeated: repeatedPatients,
+          followUps: followUpPatients
+        },
+        appointments: {
+          total: totalTodayAppointments,
+          completed: completedAppointments,
+          upcoming: upcomingAppointments
+        },
+        doctors: {
+          total: totalDoctors,
+          available: availableDoctors,
+          unavailable: unavailableDoctors
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching today metrics:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Patient Trends endpoint
+  app.get("/api/dashboard/patient-trends", authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { days = 7 } = req.query;
+      const daysNum = typeof days === 'string' ? parseInt(days) : 7;
+      const trends = [];
+      
+      // Generate data for the last N days
+      for (let i = daysNum - 1; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        
+        // Get appointments for this date
+        const dayAppointments = await storage.getAppointmentsByDate(dateStr);
+        const allPatients = await storage.getAllPatients();
+        
+        // Filter patients and appointments for this hospital
+        const hospitalPatients = allPatients.filter((p: any) => {
+          const patientHospitalId = typeof p.hospitalId === 'string' 
+            ? p.hospitalId 
+            : p.hospitalId?._id;
+          return patientHospitalId === req.tenant?.hospitalId;
+        });
+        
+        const hospitalAppointments = dayAppointments.filter((apt: any) => {
+          const appointmentHospitalId = typeof apt.hospitalId === 'string' 
+            ? apt.hospitalId 
+            : apt.hospitalId?._id;
+          return appointmentHospitalId === req.tenant?.hospitalId;
+        });
+        
+        // Calculate metrics for this day
+        const dayStart = new Date(dateStr);
+        const dayEnd = new Date(dateStr);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+        
+        const newPatients = hospitalPatients.filter((p: any) => {
+          if (!p.createdAt) return false;
+          const patientDate = new Date(p.createdAt);
+          return patientDate >= dayStart && patientDate < dayEnd;
+        }).length;
+        
+        const repeatedPatients = hospitalAppointments.filter((apt: any) => {
+          const patient = hospitalPatients.find((p: any) => p.id === apt.patientId);
+          if (!patient || !patient.createdAt) return false;
+          const patientCreatedDate = new Date(patient.createdAt);
+          return patientCreatedDate < dayStart;
+        }).length;
+        
+        const followUpPatients = hospitalAppointments.filter((apt: any) => 
+          apt.type === 'follow-up'
+        ).length;
+        
+        trends.push({
+          date: dateStr,
+          day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+          new: newPatients,
+          repeated: repeatedPatients,
+          followUps: followUpPatients,
+          total: newPatients + repeatedPatients
+        });
+      }
+      
+      res.json(trends);
+    } catch (error) {
+      console.error('Error fetching patient trends:', error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Doctor Efficiency endpoint
+  app.get("/api/dashboard/doctor-efficiency", authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {
+    try {
+      const { branch = 'all', department = 'all' } = req.query;
+      
+      // Get all doctors with filters
+      const allDoctors = await storage.getAllDoctors();
+      const allAvailabilities = await storage.getAllAvailabilities();
+      const allAppointments = await storage.getAllAppointments();
+      
+      // Filter doctors by hospital first (only doctors from this hospital)
+      let hospitalDoctors = allDoctors.filter((doc: any) => {
+        const doctorHospitalId = typeof doc.hospitalId === 'string' 
+          ? doc.hospitalId 
+          : doc.hospitalId?._id;
+        return doctorHospitalId === req.tenant?.hospitalId;
+      });
+      
+      // Filter doctors by branch and department
+      let filteredDoctors = hospitalDoctors;
+      if (branch !== 'all') {
+        filteredDoctors = filteredDoctors.filter((doc: any) => {
+          if (typeof doc.branchId === 'object' && doc.branchId !== null) {
+            return doc.branchId._id === branch;
+          }
+          return doc.branchId === branch;
+        });
+      }
+      
+      if (department !== 'all') {
+        filteredDoctors = filteredDoctors.filter((doc: any) => doc.department === department);
+      }
+      
+      // Calculate efficiency for each doctor
+      const efficiency = filteredDoctors.map((doctor: any) => {
+        // Get doctor's availabilities for this week
+        const doctorAvailabilities = allAvailabilities.filter((av: any) => av.doctorId === doctor._id);
+        const scheduledSlots = doctorAvailabilities.reduce((sum: number, av: any) => 
+          sum + av.slots.reduce((slotSum: number, slot: any) => slotSum + slot.tokenCount, 0), 0
+        );
+        
+        // Get doctor's completed appointments for this week
+        const weekStart = new Date();
+        weekStart.setDate(weekStart.getDate() - 7);
+        const doctorAppointments = allAppointments.filter((apt: any) => 
+          apt.doctorId === doctor._id && 
+          apt.status === 'completed' &&
+          new Date(apt.datetime) >= weekStart
+        );
+        
+        const treatedPatients = doctorAppointments.length;
+        const efficiencyRate = scheduledSlots > 0 ? (treatedPatients / scheduledSlots) * 100 : 0;
+        
+        return {
+          doctorId: doctor._id,
+          doctorName: `${doctor.firstName} ${doctor.lastName}`,
+          specialization: doctor.specialization || 'General',
+          scheduled: scheduledSlots,
+          treated: treatedPatients,
+          efficiency: Math.round(efficiencyRate),
+          department: doctor.department || 'General'
+        };
+      });
+      
+      res.json(efficiency);
+    } catch (error) {
+      console.error('Error fetching doctor efficiency:', error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

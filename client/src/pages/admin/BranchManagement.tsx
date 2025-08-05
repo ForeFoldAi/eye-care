@@ -53,6 +53,7 @@ interface BranchData {
   _id: string;
   branchName: string;
   branchType?: 'main' | 'sub';
+  branchCode?: string;
   addressLine1: string;
   addressLine2?: string;
   city: string;
@@ -64,6 +65,28 @@ interface BranchData {
   alternatePhone?: string;
   googleMapLink?: string;
   isActive: boolean;
+  
+  // Operational Settings
+  workingDays?: string[];
+  workingHoursStart?: string;
+  workingHoursEnd?: string;
+  timezone?: string;
+  workingDaySettings?: {
+    [day: string]: {
+      isWorking: boolean;
+      dayType: 'full' | 'half';
+      startTime?: string;
+      endTime?: string;
+    };
+  };
+  
+  // Bank Details
+  bankName?: string;
+  accountNumber?: string;
+  accountHolderName?: string;
+  ifscCode?: string;
+  bankBranchCode?: string;
+  
   hospitalId: {
     _id: string;
     name: string;
@@ -79,7 +102,22 @@ interface BranchData {
     totalDoctors: number;
     totalAppointments: number;
     totalRevenue: number;
+    totalStaff?: number;
   };
+  departments?: Array<{
+    _id: string;
+    name: string;
+    doctorCount: number;
+  }>;
+  services?: Array<{
+    _id: string;
+    name: string;
+    description: string;
+  }>;
+  specializations?: Array<{
+    name: string;
+    doctorCount: number;
+  }>;
 }
 
 interface HospitalInfo {
@@ -138,6 +176,51 @@ const BranchManagement: React.FC = () => {
     enabled: !!user?.hospitalId
   });
 
+  // Fetch departments for the hospital
+  const { data: departments, isLoading: departmentsLoading } = useQuery({
+    queryKey: ['admin', 'departments', user?.hospitalId],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/departments/hospital/${user?.hospitalId}`, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch departments');
+      }
+      return response.json();
+    },
+    enabled: !!user?.hospitalId
+  });
+
+  // Fetch services for the hospital
+  const { data: services, isLoading: servicesLoading } = useQuery({
+    queryKey: ['admin', 'services', user?.hospitalId],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/services/hospital/${user?.hospitalId}`, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch services');
+      }
+      return response.json();
+    },
+    enabled: !!user?.hospitalId
+  });
+
+  // Fetch doctor specializations for the hospital
+  const { data: specializations, isLoading: specializationsLoading } = useQuery({
+    queryKey: ['admin', 'specializations', user?.hospitalId],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/doctors/specializations/hospital/${user?.hospitalId}`, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch specializations');
+      }
+      return response.json();
+    },
+    enabled: !!user?.hospitalId
+  });
+
   // State for modals
   const [isMessageModalOpen, setIsMessageModalOpen] = React.useState(false);
   const [messageRecipient, setMessageRecipient] = React.useState<BranchData | null>(null);
@@ -154,24 +237,71 @@ const BranchManagement: React.FC = () => {
   
   // Form states for edit branch
   const [editFormData, setEditFormData] = React.useState({
+    // Basic Information
     branchName: '',
+    branchCode: '',
     email: '',
     phoneNumber: '',
-    addressLine1: '',
-    city: '',
+    alternatePhone: '',
+    
+    // Location Details
+    country: 'IN',
     state: '',
+    city: '',
+    addressLine1: '',
+    addressLine2: '',
+    postalCode: '',
+    googleMapLink: '',
+    
+    // Operational Settings
+    workingDays: [] as string[],
+    workingHoursStart: '09:00',
+    workingHoursEnd: '18:00',
+    timezone: 'IST',
+    workingDaySettings: {
+      Monday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Tuesday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Wednesday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Thursday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Friday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Saturday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Sunday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' }
+    },
+    
+    // Bank Details
+    bankName: '',
+    accountNumber: '',
+    accountHolderName: '',
+    ifscCode: '',
+    bankBranchCode: '',
+    
+    // Status
     isActive: true
   });
   
   // Staff management state
   const [staffList, setStaffList] = React.useState<any[]>([]);
   const [showAddStaff, setShowAddStaff] = React.useState(false);
+  const [showEditStaff, setShowEditStaff] = React.useState(false);
+  const [selectedStaff, setSelectedStaff] = React.useState<any>(null);
   const [newStaffData, setNewStaffData] = React.useState({
     firstName: '',
     lastName: '',
     email: '',
     role: 'doctor',
-    specialization: ''
+    specialization: '',
+    phoneNumber: '',
+    department: ''
+  });
+  const [editStaffData, setEditStaffData] = React.useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    role: 'doctor',
+    specialization: '',
+    phoneNumber: '',
+    department: '',
+    isActive: true
   });
   
   // Settings state
@@ -196,11 +326,7 @@ const BranchManagement: React.FC = () => {
     setShowStaffManagement(true);
   };
 
-  const handleSettings = (branch: BranchData) => {
-    // Show branch settings modal
-    setSelectedBranch(branch);
-    setShowBranchSettings(true);
-  };
+  
 
   const handleEditBranch = (branch: BranchData) => {
     // Show edit branch modal
@@ -353,7 +479,7 @@ const BranchManagement: React.FC = () => {
     onSuccess: () => {
       toast({ title: "Success", description: "Staff member added successfully" });
       setShowAddStaff(false);
-      setNewStaffData({ firstName: '', lastName: '', email: '', role: 'doctor', specialization: '' });
+      setNewStaffData({ firstName: '', lastName: '', email: '', role: 'doctor', specialization: '', phoneNumber: '', department: '' });
       // Refresh staff list
       fetchStaffList();
     },
@@ -362,19 +488,84 @@ const BranchManagement: React.FC = () => {
     }
   });
 
+  const updateStaffMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string, data: any }) => {
+      const response = await fetch(`${API_URL}/api/users/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authService.getToken()}`,
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error('Failed to update staff');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Staff member updated successfully" });
+      setShowEditStaff(false);
+      setSelectedStaff(null);
+      // Refresh staff list
+      fetchStaffList();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update staff member", variant: "destructive" });
+    }
+  });
+
+  const deleteStaffMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`${API_URL}/api/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authService.getToken()}`,
+        },
+      });
+      if (!response.ok) throw new Error('Failed to delete staff');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Staff member removed successfully" });
+      setSelectedStaff(null);
+      // Refresh staff list
+      fetchStaffList();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove staff member", variant: "destructive" });
+    }
+  });
+
   // Fetch staff list for selected branch
   const fetchStaffList = async () => {
     if (!selectedBranch) return;
     try {
+      // First try to fetch from branch-specific endpoint
       const response = await fetch(`${API_URL}/api/branches/${selectedBranch._id}/staff`, {
         headers: { 'Authorization': `Bearer ${authService.getToken()}` }
       });
+      
       if (response.ok) {
         const data = await response.json();
         setStaffList(data);
+      } else {
+        // Fallback: fetch all doctors and filter by branch
+        const doctorsResponse = await fetch(`${API_URL}/api/doctor-availability/doctors/list`, {
+          headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+        });
+        
+        if (doctorsResponse.ok) {
+          const doctorsData = await doctorsResponse.json();
+          // Filter doctors by branch (assuming branchId is stored in doctor data)
+          const branchDoctors = doctorsData.filter((doctor: any) => 
+            doctor.branchId === selectedBranch._id || doctor.hospitalId === selectedBranch.hospitalId
+          );
+          setStaffList(branchDoctors);
+        }
       }
     } catch (error) {
       console.error('Failed to fetch staff:', error);
+      // Set empty array to prevent undefined errors
+      setStaffList([]);
     }
   };
 
@@ -393,16 +584,112 @@ const BranchManagement: React.FC = () => {
     addStaffMutation.mutate(newStaffData);
   };
 
+  // Handle edit staff
+  const handleEditStaff = (staff: any) => {
+    setSelectedStaff(staff);
+    setEditStaffData({
+      firstName: staff.firstName || '',
+      lastName: staff.lastName || '',
+      email: staff.email || '',
+      role: staff.role || 'doctor',
+      specialization: staff.specialization || '',
+      phoneNumber: staff.phoneNumber || '',
+      department: staff.department || '',
+      isActive: staff.isActive !== false
+    });
+    setShowEditStaff(true);
+  };
+
+  // Handle delete staff
+  const handleDeleteStaff = (staff: any) => {
+    setSelectedStaff(staff);
+    // You can add a confirmation modal here if needed
+    deleteStaffMutation.mutate(staff._id);
+  };
+
+  // Handle edit staff form submission
+  const handleEditStaffSubmit = () => {
+    updateStaffMutation.mutate({ id: selectedStaff._id, data: editStaffData });
+  };
+
   // Initialize form data when branch is selected
   React.useEffect(() => {
     if (selectedBranch && showEditBranch) {
       setEditFormData({
+        // Basic Information
         branchName: selectedBranch.branchName,
+        branchCode: selectedBranch.branchCode || '',
         email: selectedBranch.email,
         phoneNumber: selectedBranch.phoneNumber,
-        addressLine1: selectedBranch.addressLine1,
-        city: selectedBranch.city,
+        alternatePhone: selectedBranch.alternatePhone || '',
+        
+        // Location Details
+        country: selectedBranch.country || 'IN',
         state: selectedBranch.state,
+        city: selectedBranch.city,
+        addressLine1: selectedBranch.addressLine1,
+        addressLine2: selectedBranch.addressLine2 || '',
+        postalCode: selectedBranch.postalCode || '',
+        googleMapLink: selectedBranch.googleMapLink || '',
+        
+        // Operational Settings
+        workingDays: selectedBranch.workingDays || [],
+        workingHoursStart: selectedBranch.workingHoursStart || '09:00',
+        workingHoursEnd: selectedBranch.workingHoursEnd || '18:00',
+        timezone: selectedBranch.timezone || 'IST',
+        workingDaySettings: {
+          Monday: { 
+            isWorking: selectedBranch.workingDaySettings?.Monday?.isWorking || false, 
+            dayType: selectedBranch.workingDaySettings?.Monday?.dayType || 'full', 
+            startTime: selectedBranch.workingDaySettings?.Monday?.startTime || '09:00', 
+            endTime: selectedBranch.workingDaySettings?.Monday?.endTime || '18:00' 
+          },
+          Tuesday: { 
+            isWorking: selectedBranch.workingDaySettings?.Tuesday?.isWorking || false, 
+            dayType: selectedBranch.workingDaySettings?.Tuesday?.dayType || 'full', 
+            startTime: selectedBranch.workingDaySettings?.Tuesday?.startTime || '09:00', 
+            endTime: selectedBranch.workingDaySettings?.Tuesday?.endTime || '18:00' 
+          },
+          Wednesday: { 
+            isWorking: selectedBranch.workingDaySettings?.Wednesday?.isWorking || false, 
+            dayType: selectedBranch.workingDaySettings?.Wednesday?.dayType || 'full', 
+            startTime: selectedBranch.workingDaySettings?.Wednesday?.startTime || '09:00', 
+            endTime: selectedBranch.workingDaySettings?.Wednesday?.endTime || '18:00' 
+          },
+          Thursday: { 
+            isWorking: selectedBranch.workingDaySettings?.Thursday?.isWorking || false, 
+            dayType: selectedBranch.workingDaySettings?.Thursday?.dayType || 'full', 
+            startTime: selectedBranch.workingDaySettings?.Thursday?.startTime || '09:00', 
+            endTime: selectedBranch.workingDaySettings?.Thursday?.endTime || '18:00' 
+          },
+          Friday: { 
+            isWorking: selectedBranch.workingDaySettings?.Friday?.isWorking || false, 
+            dayType: selectedBranch.workingDaySettings?.Friday?.dayType || 'full', 
+            startTime: selectedBranch.workingDaySettings?.Friday?.startTime || '09:00', 
+            endTime: selectedBranch.workingDaySettings?.Friday?.endTime || '18:00' 
+          },
+          Saturday: { 
+            isWorking: selectedBranch.workingDaySettings?.Saturday?.isWorking || false, 
+            dayType: selectedBranch.workingDaySettings?.Saturday?.dayType || 'full', 
+            startTime: selectedBranch.workingDaySettings?.Saturday?.startTime || '09:00', 
+            endTime: selectedBranch.workingDaySettings?.Saturday?.endTime || '18:00' 
+          },
+          Sunday: { 
+            isWorking: selectedBranch.workingDaySettings?.Sunday?.isWorking || false, 
+            dayType: selectedBranch.workingDaySettings?.Sunday?.dayType || 'full', 
+            startTime: selectedBranch.workingDaySettings?.Sunday?.startTime || '09:00', 
+            endTime: selectedBranch.workingDaySettings?.Sunday?.endTime || '18:00' 
+          }
+        },
+        
+        // Bank Details
+        bankName: selectedBranch.bankName || '',
+        accountNumber: selectedBranch.accountNumber || '',
+        accountHolderName: selectedBranch.accountHolderName || '',
+        ifscCode: selectedBranch.ifscCode || '',
+        bankBranchCode: selectedBranch.bankBranchCode || '',
+        
+        // Status
         isActive: selectedBranch.isActive
       });
     }
@@ -537,16 +824,13 @@ const BranchManagement: React.FC = () => {
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => handleViewDetails(branch)}>
                                 <Eye className="mr-2 h-4 w-4" />
-                                View Details
+                                Branch Details
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleManageStaff(branch)}>
                                 <Users className="mr-2 h-4 w-4" />
-                                Manage Staff
+                                Branch Team
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleSettings(branch)}>
-                                <Settings className="mr-2 h-4 w-4" />
-                                Settings
-                              </DropdownMenuItem>
+                              
                               <DropdownMenuItem onClick={() => handleSendMessage('branch', branch)}>
                                 <Mail className="mr-2 h-4 w-4" />
                                 Send Message
@@ -799,49 +1083,6 @@ const BranchManagement: React.FC = () => {
                 </div>
               </div>
 
-              {/* Statistics */}
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Branch Statistics</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <Users className="w-5 h-5 text-blue-600" />
-                      <div>
-                        <p className="text-sm text-gray-600">Total Patients</p>
-                        <p className="text-2xl font-bold text-blue-600">{selectedBranch.stats?.totalPatients || 0}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <Activity className="w-5 h-5 text-green-600" />
-                      <div>
-                        <p className="text-sm text-gray-600">Total Doctors</p>
-                        <p className="text-2xl font-bold text-green-600">{selectedBranch.stats?.totalDoctors || 0}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <TrendingUp className="w-5 h-5 text-purple-600" />
-                      <div>
-                        <p className="text-sm text-gray-600">Appointments</p>
-                        <p className="text-2xl font-bold text-purple-600">{selectedBranch.stats?.totalAppointments || 0}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      <Star className="w-5 h-5 text-orange-600" />
-                      <div>
-                        <p className="text-sm text-gray-600">Revenue</p>
-                        <p className="text-2xl font-bold text-orange-600">${selectedBranch.stats?.totalRevenue || 0}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Branch Manager */}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Branch Manager</h3>
@@ -860,6 +1101,121 @@ const BranchManagement: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Statistics */}
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Branch Team</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <Activity className="w-5 h-5 text-green-600" />
+                      <div>
+                        <p className="text-sm text-gray-600">Total Doctors</p>
+                        <p className="text-2xl font-bold text-green-600">{selectedBranch.stats?.totalDoctors || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <Users className="w-5 h-5 text-blue-600" />
+                      <div>
+                        <p className="text-sm text-gray-600">Other Staff</p>
+                        <p className="text-2xl font-bold text-blue-600">{selectedBranch.stats?.totalStaff || 0}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Branch Services */}
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Branch Services</h3>
+                <div className="space-y-4">
+                  {/* Medical Departments */}
+                  <div>
+                    <h4 className="text-md font-medium text-gray-800 mb-3">Medical Departments</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {departmentsLoading ? (
+                        <div className="col-span-full text-center py-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                          <p className="text-sm text-gray-500">Loading departments...</p>
+                        </div>
+                      ) : departments && departments.length > 0 ? (
+                        departments.map((dept: any) => (
+                          <div key={dept._id} className="bg-gray-50 p-3 rounded-lg border">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <span className="text-sm font-medium text-gray-900">{dept.name}</span>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1">{dept.doctorCount || 0} doctors</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-full text-center py-4 text-gray-500">
+                          <Activity className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                          <p className="text-sm">No departments configured</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Specialized Services */}
+                  <div>
+                    <h4 className="text-md font-medium text-gray-800 mb-3">Specialized Services</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {servicesLoading ? (
+                        <div className="col-span-full text-center py-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto mb-2"></div>
+                          <p className="text-sm text-gray-500">Loading services...</p>
+                        </div>
+                      ) : services && services.length > 0 ? (
+                        services.map((service: any) => (
+                          <div key={service._id} className="bg-gray-50 p-3 rounded-lg border">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                              <span className="text-sm font-medium text-gray-900">{service.name}</span>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1">{service.description}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-full text-center py-4 text-gray-500">
+                          <TrendingUp className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                          <p className="text-sm">No specialized services configured</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Doctor Specializations */}
+                  <div>
+                    <h4 className="text-md font-medium text-gray-800 mb-3">Doctor Specializations</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {specializationsLoading ? (
+                        <div className="col-span-full text-center py-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mx-auto mb-2"></div>
+                          <p className="text-sm text-gray-500">Loading specializations...</p>
+                        </div>
+                      ) : specializations && specializations.length > 0 ? (
+                        specializations.map((spec: any) => (
+                          <div key={spec.name} className="bg-gray-50 p-3 rounded-lg border">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                              <span className="text-sm font-medium text-gray-900">{spec.name}</span>
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1">{spec.doctorCount || 0} specialists</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="col-span-full text-center py-4 text-gray-500">
+                          <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                          <p className="text-sm">No specializations available</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </DialogContent>
@@ -869,22 +1225,15 @@ const BranchManagement: React.FC = () => {
       <Dialog open={showStaffManagement} onOpenChange={setShowStaffManagement}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-bold">Staff Management</DialogTitle>
-            <DialogDescription>Manage staff members for {selectedBranch?.branchName}</DialogDescription>
+            <DialogTitle className="text-2xl font-bold">Branch Team Management</DialogTitle>
+            <DialogDescription>Manage Team members for {selectedBranch?.branchName}</DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6">
-            {/* Add Staff Button */}
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-900">Staff Members</h3>
-              <Button onClick={() => setShowAddStaff(true)} className="bg-blue-600 hover:bg-blue-700">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Staff Member
-              </Button>
-            </div>
+                      <div className="space-y-6">
+           
 
-            {/* Staff List */}
-            <div className="border rounded-lg overflow-hidden">
+              {/* Staff List */}
+              <div className="border rounded-lg overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -929,15 +1278,14 @@ const BranchManagement: React.FC = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditStaff(staff)}>
                               <Edit className="mr-2 h-4 w-4" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={() => handleDeleteStaff(staff)}
+                            >
                               <Trash2 className="mr-2 h-4 w-4" />
                               Remove
                             </DropdownMenuItem>
@@ -983,15 +1331,26 @@ const BranchManagement: React.FC = () => {
               </div>
             </div>
             
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={newStaffData.email}
-                onChange={(e) => setNewStaffData({...newStaffData, email: e.target.value})}
-                placeholder="john.doe@example.com"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newStaffData.email}
+                  onChange={(e) => setNewStaffData({...newStaffData, email: e.target.value})}
+                  placeholder="john.doe@example.com"
+                />
+              </div>
+              <div>
+                <Label htmlFor="phoneNumber">Phone Number</Label>
+                <Input
+                  id="phoneNumber"
+                  value={newStaffData.phoneNumber}
+                  onChange={(e) => setNewStaffData({...newStaffData, phoneNumber: e.target.value})}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4">
@@ -1010,14 +1369,28 @@ const BranchManagement: React.FC = () => {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="specialization">Specialization</Label>
-                <Input
-                  id="specialization"
-                  value={newStaffData.specialization}
-                  onChange={(e) => setNewStaffData({...newStaffData, specialization: e.target.value})}
-                  placeholder="Cardiology"
-                />
+                <Label htmlFor="department">Department</Label>
+                <Select value={newStaffData.department} onValueChange={(value) => setNewStaffData({...newStaffData, department: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments?.map((dept: any) => (
+                      <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="specialization">Specialization</Label>
+              <Input
+                id="specialization"
+                value={newStaffData.specialization}
+                onChange={(e) => setNewStaffData({...newStaffData, specialization: e.target.value})}
+                placeholder="Cardiology, Pediatrics, etc."
+              />
             </div>
           </div>
           
@@ -1033,89 +1406,115 @@ const BranchManagement: React.FC = () => {
       </Dialog>
 
       {/* Branch Settings Modal */}
-      <Dialog open={showBranchSettings} onOpenChange={setShowBranchSettings}>
+     
+
+      {/* Edit Staff Modal */}
+      <Dialog open={showEditStaff} onOpenChange={setShowEditStaff}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Branch Settings</DialogTitle>
-            <DialogDescription>Configure settings for {selectedBranch?.branchName}</DialogDescription>
+            <DialogTitle className="text-xl font-bold">Edit Team Member</DialogTitle>
+            <DialogDescription>Update information for {selectedStaff?.firstName} {selectedStaff?.lastName}</DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="startTime">Working Hours Start</Label>
+                <Label htmlFor="editFirstName">First Name</Label>
                 <Input
-                  id="startTime"
-                  type="time"
-                  value={settingsData.workingHoursStart}
-                  onChange={(e) => setSettingsData({...settingsData, workingHoursStart: e.target.value})}
+                  id="editFirstName"
+                  value={editStaffData.firstName}
+                  onChange={(e) => setEditStaffData({...editStaffData, firstName: e.target.value})}
+                  placeholder="John"
                 />
               </div>
               <div>
-                <Label htmlFor="endTime">Working Hours End</Label>
+                <Label htmlFor="editLastName">Last Name</Label>
                 <Input
-                  id="endTime"
-                  type="time"
-                  value={settingsData.workingHoursEnd}
-                  onChange={(e) => setSettingsData({...settingsData, workingHoursEnd: e.target.value})}
+                  id="editLastName"
+                  value={editStaffData.lastName}
+                  onChange={(e) => setEditStaffData({...editStaffData, lastName: e.target.value})}
+                  placeholder="Doe"
                 />
               </div>
             </div>
             
-            <div>
-              <Label>Working Days</Label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                  <div key={day} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={day}
-                      checked={settingsData.workingDays.includes(day)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSettingsData({
-                            ...settingsData,
-                            workingDays: [...settingsData.workingDays, day]
-                          });
-                        } else {
-                          setSettingsData({
-                            ...settingsData,
-                            workingDays: settingsData.workingDays.filter(d => d !== day)
-                          });
-                        }
-                      }}
-                    />
-                    <Label htmlFor={day} className="text-sm">{day.substring(0, 3)}</Label>
-                  </div>
-                ))}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="editEmail">Email</Label>
+                <Input
+                  id="editEmail"
+                  type="email"
+                  value={editStaffData.email}
+                  onChange={(e) => setEditStaffData({...editStaffData, email: e.target.value})}
+                  placeholder="john.doe@example.com"
+                />
+              </div>
+              <div>
+                <Label htmlFor="editPhoneNumber">Phone Number</Label>
+                <Input
+                  id="editPhoneNumber"
+                  value={editStaffData.phoneNumber}
+                  onChange={(e) => setEditStaffData({...editStaffData, phoneNumber: e.target.value})}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="editRole">Role</Label>
+                <Select value={editStaffData.role} onValueChange={(value) => setEditStaffData({...editStaffData, role: value})}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="doctor">Doctor</SelectItem>
+                    <SelectItem value="nurse">Nurse</SelectItem>
+                    <SelectItem value="receptionist">Receptionist</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="editDepartment">Department</Label>
+                <Select value={editStaffData.department} onValueChange={(value) => setEditStaffData({...editStaffData, department: value})}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments?.map((dept: any) => (
+                      <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             
             <div>
-              <Label htmlFor="maxAppointments">Max Daily Appointments</Label>
+              <Label htmlFor="editSpecialization">Specialization</Label>
               <Input
-                id="maxAppointments"
-                type="number"
-                value={settingsData.maxDailyAppointments}
-                onChange={(e) => setSettingsData({...settingsData, maxDailyAppointments: parseInt(e.target.value)})}
-                placeholder="50"
+                id="editSpecialization"
+                value={editStaffData.specialization}
+                onChange={(e) => setEditStaffData({...editStaffData, specialization: e.target.value})}
+                placeholder="Cardiology, Pediatrics, etc."
               />
             </div>
             
             <div className="flex items-center space-x-2">
               <Switch
-                checked={settingsData.isActive}
-                onCheckedChange={(checked) => setSettingsData({...settingsData, isActive: checked})}
+                checked={editStaffData.isActive}
+                onCheckedChange={(checked) => setEditStaffData({...editStaffData, isActive: checked})}
               />
-              <Label>Branch Active</Label>
+              <Label>Active Status</Label>
             </div>
           </div>
           
           <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="outline" onClick={() => setShowBranchSettings(false)}>
+            <Button variant="outline" onClick={() => setShowEditStaff(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSettingsSubmit} disabled={updateSettingsMutation.isPending}>
-              {updateSettingsMutation.isPending ? 'Saving...' : 'Save Settings'}
+            <Button onClick={handleEditStaffSubmit} disabled={updateStaffMutation.isPending}>
+              {updateStaffMutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>
         </DialogContent>
@@ -1123,81 +1522,265 @@ const BranchManagement: React.FC = () => {
 
       {/* Edit Branch Modal */}
       <Dialog open={showEditBranch} onOpenChange={setShowEditBranch}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Edit Branch</DialogTitle>
             <DialogDescription>Update information for {selectedBranch?.branchName}</DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Basic Information */}
             <div>
-              <Label htmlFor="editBranchName">Branch Name</Label>
-              <Input
-                id="editBranchName"
-                value={editFormData.branchName}
-                onChange={(e) => setEditFormData({...editFormData, branchName: e.target.value})}
-                placeholder="Branch Name"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="editEmail">Email</Label>
-              <Input
-                id="editEmail"
-                type="email"
-                value={editFormData.email}
-                onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
-                placeholder="branch@example.com"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="editPhone">Phone Number</Label>
-              <Input
-                id="editPhone"
-                value={editFormData.phoneNumber}
-                onChange={(e) => setEditFormData({...editFormData, phoneNumber: e.target.value})}
-                placeholder="+1 (555) 123-4567"
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="editAddress">Address</Label>
-              <Input
-                id="editAddress"
-                value={editFormData.addressLine1}
-                onChange={(e) => setEditFormData({...editFormData, addressLine1: e.target.value})}
-                placeholder="123 Main Street"
-              />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="editCity">City</Label>
-                <Input
-                  id="editCity"
-                  value={editFormData.city}
-                  onChange={(e) => setEditFormData({...editFormData, city: e.target.value})}
-                  placeholder="City"
-                />
-              </div>
-              <div>
-                <Label htmlFor="editState">State</Label>
-                <Input
-                  id="editState"
-                  value={editFormData.state}
-                  onChange={(e) => setEditFormData({...editFormData, state: e.target.value})}
-                  placeholder="State"
-                />
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editBranchName">Branch Name</Label>
+                  <Input
+                    id="editBranchName"
+                    value={editFormData.branchName}
+                    onChange={(e) => setEditFormData({...editFormData, branchName: e.target.value})}
+                    placeholder="Branch Name"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editBranchCode">Branch Code</Label>
+                  <Input
+                    id="editBranchCode"
+                    value={editFormData.branchCode}
+                    onChange={(e) => setEditFormData({...editFormData, branchCode: e.target.value})}
+                    placeholder="Optional unique identifier"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editEmail">Email</Label>
+                  <Input
+                    id="editEmail"
+                    type="email"
+                    value={editFormData.email}
+                    onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
+                    placeholder="branch@example.com"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editPhone">Phone Number</Label>
+                  <Input
+                    id="editPhone"
+                    value={editFormData.phoneNumber}
+                    onChange={(e) => setEditFormData({...editFormData, phoneNumber: e.target.value})}
+                    placeholder="+1 (555) 123-4567"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editAlternatePhone">Alternate Phone</Label>
+                  <Input
+                    id="editAlternatePhone"
+                    value={editFormData.alternatePhone}
+                    onChange={(e) => setEditFormData({...editFormData, alternatePhone: e.target.value})}
+                    placeholder="+1 (555) 987-6543"
+                  />
+                </div>
               </div>
             </div>
-            
-            <div className="flex items-center space-x-2">
-              <Switch
-                checked={editFormData.isActive}
-                onCheckedChange={(checked) => setEditFormData({...editFormData, isActive: checked})}
-              />
-              <Label>Branch Active</Label>
+
+            {/* Location Details */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Location Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="editCountry">Country</Label>
+                  <Select value={editFormData.country} onValueChange={(value) => setEditFormData({...editFormData, country: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IN">India</SelectItem>
+                      <SelectItem value="US">United States</SelectItem>
+                      <SelectItem value="CA">Canada</SelectItem>
+                      <SelectItem value="UK">United Kingdom</SelectItem>
+                      <SelectItem value="AU">Australia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="editState">State</Label>
+                  <Input
+                    id="editState"
+                    value={editFormData.state}
+                    onChange={(e) => setEditFormData({...editFormData, state: e.target.value})}
+                    placeholder="State"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editCity">City</Label>
+                  <Input
+                    id="editCity"
+                    value={editFormData.city}
+                    onChange={(e) => setEditFormData({...editFormData, city: e.target.value})}
+                    placeholder="City"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <Label htmlFor="editAddress1">Address Line 1</Label>
+                  <Input
+                    id="editAddress1"
+                    value={editFormData.addressLine1}
+                    onChange={(e) => setEditFormData({...editFormData, addressLine1: e.target.value})}
+                    placeholder="Street address, building info"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editAddress2">Address Line 2</Label>
+                  <Input
+                    id="editAddress2"
+                    value={editFormData.addressLine2}
+                    onChange={(e) => setEditFormData({...editFormData, addressLine2: e.target.value})}
+                    placeholder="Landmark, optional details"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <Label htmlFor="editPostalCode">ZIP / Postal Code</Label>
+                  <Input
+                    id="editPostalCode"
+                    value={editFormData.postalCode}
+                    onChange={(e) => setEditFormData({...editFormData, postalCode: e.target.value})}
+                    placeholder="e.g., 90210"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editGoogleMapLink">Google Map Link / GPS</Label>
+                  <Input
+                    id="editGoogleMapLink"
+                    value={editFormData.googleMapLink}
+                    onChange={(e) => setEditFormData({...editFormData, googleMapLink: e.target.value})}
+                    placeholder="https://maps.google.com/..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Operational Settings */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Operational Settings</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="editWorkingHoursStart">Working Hours Start</Label>
+                  <Input
+                    id="editWorkingHoursStart"
+                    type="time"
+                    value={editFormData.workingHoursStart}
+                    onChange={(e) => setEditFormData({...editFormData, workingHoursStart: e.target.value})}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editWorkingHoursEnd">Working Hours End</Label>
+                  <Input
+                    id="editWorkingHoursEnd"
+                    type="time"
+                    value={editFormData.workingHoursEnd}
+                    onChange={(e) => setEditFormData({...editFormData, workingHoursEnd: e.target.value})}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editTimezone">Timezone</Label>
+                  <Select value={editFormData.timezone} onValueChange={(value) => setEditFormData({...editFormData, timezone: value})}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IST">Indian Standard Time (IST)</SelectItem>
+                      <SelectItem value="UTC">UTC</SelectItem>
+                      <SelectItem value="EST">Eastern Time (EST)</SelectItem>
+                      <SelectItem value="PST">Pacific Time (PST)</SelectItem>
+                      <SelectItem value="CST">Central Time (CST)</SelectItem>
+                      <SelectItem value="MST">Mountain Time (MST)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Bank Details */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Bank Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editBankName">Bank Name</Label>
+                  <Input
+                    id="editBankName"
+                    value={editFormData.bankName}
+                    onChange={(e) => setEditFormData({...editFormData, bankName: e.target.value})}
+                    placeholder="e.g., State Bank of India"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editAccountNumber">Account Number</Label>
+                  <Input
+                    id="editAccountNumber"
+                    value={editFormData.accountNumber}
+                    onChange={(e) => setEditFormData({...editFormData, accountNumber: e.target.value})}
+                    placeholder="Enter account number"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editAccountHolderName">Account Holder Name</Label>
+                  <Input
+                    id="editAccountHolderName"
+                    value={editFormData.accountHolderName}
+                    onChange={(e) => setEditFormData({...editFormData, accountHolderName: e.target.value})}
+                    placeholder="Account holder's full name"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editIfscCode">IFSC Code</Label>
+                  <Input
+                    id="editIfscCode"
+                    value={editFormData.ifscCode}
+                    onChange={(e) => setEditFormData({...editFormData, ifscCode: e.target.value})}
+                    placeholder="e.g., SBIN0001234"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="editBankBranchCode">Bank Branch Code</Label>
+                  <Input
+                    id="editBankBranchCode"
+                    value={editFormData.bankBranchCode}
+                    onChange={(e) => setEditFormData({...editFormData, bankBranchCode: e.target.value})}
+                    placeholder="Optional branch code"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Status */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Status</h3>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={editFormData.isActive}
+                  onCheckedChange={(checked) => setEditFormData({...editFormData, isActive: checked})}
+                />
+                <Label>Branch Active</Label>
+              </div>
             </div>
           </div>
           

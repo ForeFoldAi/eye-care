@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -28,145 +28,152 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { authService } from '@/lib/auth';
 
 interface Appointment {
   _id: string;
-  patientName: string;
-  doctorName: string;
-  date: string;
-  time: string;
-  type: string;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'in-progress';
-  department: string;
-  notes: string;
-  duration: number;
+  patientId: any;
+  doctorId: any;
+  datetime: string;
+  type: 'consultation' | 'checkup' | 'follow-up';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  tokenNumber: number;
+  notes?: string;
+  approved?: boolean;
+  followUpDate?: string;
+  branchId?: string;
+  // Computed fields for display
+  patientName?: string;
+  doctorName?: string;
+  date?: string;
+  time?: string;
+  department?: string;
+  duration?: number;
 }
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const Appointments: React.FC = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const user = authService.getStoredUser();
 
-  // Mock data for testing
-  const appointments: Appointment[] = [
-    {
-      _id: '1',
-      patientName: 'John Doe',
-      doctorName: 'Dr. Smith',
-      date: '2024-01-15',
-      time: '10:00 AM',
-      type: 'Consultation',
-      status: 'scheduled',
-      department: 'Cardiology',
-      notes: 'Regular checkup',
-      duration: 30
-    },
-    {
-      _id: '2',
-      patientName: 'Jane Smith',
-      doctorName: 'Dr. Johnson',
-      date: '2024-01-15',
-      time: '2:00 PM',
-      type: 'Follow-up',
-      status: 'completed',
-      department: 'Pediatrics',
-      notes: 'Post-surgery follow-up',
-      duration: 45
-    },
-    {
-      _id: '3',
-      patientName: 'Mike Brown',
-      doctorName: 'Dr. Wilson',
-      date: '2024-01-15',
-      time: '4:00 PM',
-      type: 'Emergency',
-      status: 'cancelled',
-      department: 'Emergency',
-      notes: 'Patient cancelled',
-      duration: 60
-    },
-    {
-      _id: '4',
-      patientName: 'Sarah Davis',
-      doctorName: 'Dr. Anderson',
-      date: '2024-01-16',
-      time: '9:00 AM',
-      type: 'Consultation',
-      status: 'scheduled',
-      department: 'Orthopedics',
-      notes: 'Knee pain evaluation',
-      duration: 30
-    },
-    {
-      _id: '5',
-      patientName: 'Robert Johnson',
-      doctorName: 'Dr. Miller',
-      date: '2024-01-16',
-      time: '11:00 AM',
-      type: 'Procedure',
-      status: 'in-progress',
-      department: 'Surgery',
-      notes: 'Minor surgery',
-      duration: 120
-    },
-    {
-      _id: '6',
-      patientName: 'Emily Wilson',
-      doctorName: 'Dr. Brown',
-      date: '2024-01-16',
-      time: '3:00 PM',
-      type: 'Follow-up',
-      status: 'completed',
-      department: 'Neurology',
-      notes: 'Post-treatment check',
-      duration: 45
-    },
-    {
-      _id: '7',
-      patientName: 'David Taylor',
-      doctorName: 'Dr. Davis',
-      date: '2024-01-17',
-      time: '8:00 AM',
-      type: 'Emergency',
-      status: 'scheduled',
-      department: 'Emergency',
-      notes: 'Urgent care needed',
-      duration: 90
-    },
-    {
-      _id: '8',
-      patientName: 'Lisa Martinez',
-      doctorName: 'Dr. Garcia',
-      date: '2024-01-17',
-      time: '1:00 PM',
-      type: 'Consultation',
-      status: 'cancelled',
-      department: 'Dermatology',
-      notes: 'Rescheduled by patient',
-      duration: 30
-    }
-  ];
+  useEffect(() => {
+    fetchAppointments();
+  }, []);
 
-  const stats = {
-    today: appointments.filter(apt => {
-      const today = new Date();
-      const aptDate = new Date(apt.date);
-      return aptDate.toDateString() === today.toDateString();
-    }).length,
-    completed: appointments.filter(apt => apt.status === 'completed').length,
-    pending: appointments.filter(apt => apt.status === 'scheduled' || apt.status === 'in-progress').length,
-    cancelled: appointments.filter(apt => apt.status === 'cancelled').length
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
   };
 
-  const filteredAppointments = appointments.filter((appointment) => {
+  const fetchAppointments = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        toast({
+          title: 'Error',
+          description: 'Please log in to view appointments',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Fetch appointments (already filtered by branch through tenant isolation)
+      const response = await fetch(`${API_URL}/api/appointments`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch appointments');
+      }
+
+      const data = await response.json();
+      const rawAppointments = data.data || data;
+      
+      // Process appointments to add computed fields
+      const processedAppointments = rawAppointments.map((appointment: any) => {
+        const appointmentDate = new Date(appointment.datetime);
+        
+        // Extract patient and doctor names from populated data
+        const patientName = appointment.patientId?.firstName && appointment.patientId?.lastName 
+          ? `${appointment.patientId.firstName} ${appointment.patientId.lastName}`
+          : 'Unknown Patient';
+        
+        const doctorName = appointment.doctorId?.firstName && appointment.doctorId?.lastName
+          ? `Dr. ${appointment.doctorId.firstName} ${appointment.doctorId.lastName}`
+          : 'Unknown Doctor';
+        
+        // Map status to match frontend expectations
+        const status = appointment.status === 'confirmed' ? 'scheduled' : appointment.status;
+        
+        return {
+          ...appointment,
+          patientName,
+          doctorName,
+          date: appointmentDate.toISOString().split('T')[0],
+          time: appointmentDate.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+          }),
+          department: appointment.doctorId?.specialization || 'General',
+          duration: 30, // Default duration
+          status
+        };
+      });
+      
+      setAppointments(processedAppointments);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error fetching appointments:', error);
+      toast({
+        title: 'Error fetching appointments',
+        description: 'Failed to load appointment data',
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+    }
+  };
+
+
+
+  // Filter appointments by branch
+  const branchAppointments = appointments.filter(appointment => {
+    // Handle different possible formats of branchId
+    const appointmentBranchId = typeof appointment.branchId === 'object' && appointment.branchId !== null 
+      ? (appointment.branchId as any)._id || appointment.branchId 
+      : appointment.branchId;
+    const userBranchId = user?.branchId;
+    return appointmentBranchId === userBranchId || appointmentBranchId === userBranchId?.toString();
+  });
+
+  const stats = {
+    today: branchAppointments.filter(apt => {
+      const today = new Date();
+      const aptDate = apt.date ? new Date(apt.date) : new Date(apt.datetime);
+      return aptDate.toDateString() === today.toDateString();
+    }).length,
+    completed: branchAppointments.filter(apt => apt.status === 'completed').length,
+    pending: branchAppointments.filter(apt => apt.status === 'scheduled' || apt.status === 'confirmed').length,
+    cancelled: branchAppointments.filter(apt => apt.status === 'cancelled').length
+  };
+
+  const filteredAppointments = branchAppointments.filter((appointment) => {
     const matchesSearch = 
-      appointment.patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.doctorName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (appointment.patientName?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (appointment.doctorName?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
       appointment.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.notes.toLowerCase().includes(searchTerm.toLowerCase());
+      (appointment.department?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+      (appointment.notes?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     
     const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter;
     const matchesType = typeFilter === 'all' || appointment.type.toLowerCase() === typeFilter.toLowerCase();
@@ -174,7 +181,7 @@ const Appointments: React.FC = () => {
     // Add date range filtering
     let matchesDateRange = true;
     if (dateRange?.from && dateRange?.to) {
-      const appointmentDate = new Date(appointment.date);
+      const appointmentDate = appointment.date ? new Date(appointment.date) : new Date(appointment.datetime);
       matchesDateRange = appointmentDate >= dateRange.from && appointmentDate <= dateRange.to;
     }
     
@@ -212,10 +219,10 @@ const Appointments: React.FC = () => {
           <div className="flex items-center space-x-3">
             <Avatar className="w-8 h-8">
               <AvatarFallback className="bg-blue-100 text-blue-700 text-xs">
-                {appointment.patientName.split(' ').map(n => n[0]).join('')}
+                {(appointment.patientName || 'Unknown Patient').split(' ').map(n => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
-            <span className="font-medium">{appointment.patientName}</span>
+            <span className="font-medium">{appointment.patientName || 'Unknown Patient'}</span>
           </div>
         );
       },
@@ -317,16 +324,61 @@ const Appointments: React.FC = () => {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Appointments</h1>
+            <p className="text-gray-600 mt-1">Manage and track all appointments</p>
+          </div>
+        </div>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading appointment data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Appointments</h1>
-          <p className="text-gray-600 mt-1">Manage and track all appointments</p>
+          <p className="text-gray-600 mt-1">
+            Manage and track all appointments in your branch
+            {user?.branchId && (
+              <span className="ml-2 text-blue-600 font-medium">
+                (Branch ID: {user.branchId})
+              </span>
+            )}
+          </p>
         </div>
-        
       </div>
+
+      {/* Branch Info Card */}
+      {user?.branchId && (
+        <Card className="mb-4 border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-900">Branch Filter Active</p>
+                <p className="text-xs text-blue-700">
+                  Showing appointments for Branch ID: {user.branchId}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {branchAppointments.length} appointments found in your branch
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -441,7 +493,7 @@ const Appointments: React.FC = () => {
             <div>
               <CardTitle>Appointments</CardTitle>
               <CardDescription>
-                {filteredAppointments.length} of {appointments.length} appointment(s) found
+                {filteredAppointments.length} of {branchAppointments.length} appointment(s) in your branch
                 {(searchTerm || statusFilter !== 'all' || typeFilter !== 'all' || dateRange) && (
                   <span className="ml-2 text-blue-600">
                     (filtered)
@@ -489,11 +541,11 @@ const Appointments: React.FC = () => {
                           <div className="flex items-center space-x-3 mb-2">
                             <Avatar className="w-10 h-10">
                               <AvatarFallback className="bg-blue-100 text-blue-700">
-                                {appointment.patientName.split(' ').map(n => n[0]).join('')}
+                                {(appointment.patientName || 'Unknown Patient').split(' ').map(n => n[0]).join('')}
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <h3 className="font-semibold text-gray-900">{appointment.patientName}</h3>
+                              <h3 className="font-semibold text-gray-900">{appointment.patientName || 'Unknown Patient'}</h3>
                               <p className="text-sm text-gray-600 flex items-center">
                                 <Stethoscope className="w-4 h-4 mr-1" />
                                 {appointment.doctorName}
@@ -553,7 +605,7 @@ const Appointments: React.FC = () => {
                     <p className="text-gray-600 mb-4">
                       {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' || dateRange
                         ? 'Try adjusting your search or filter criteria' 
-                        : 'No appointments scheduled yet'
+                        : 'No appointments scheduled in your branch yet'
                       }
                     </p>
                     {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' || dateRange ? (

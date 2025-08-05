@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { Prescription } from '../models';
+import { Prescription } from '../models/prescription';
 import { insertPrescriptionSchema } from '../shared/schema';
 import { authenticateToken, authorizeRole, AuthRequest } from '../middleware/auth';
-import connectDB from '../config/database';
+import { connectDB } from '../db/connect';
 
 const router = Router();
 

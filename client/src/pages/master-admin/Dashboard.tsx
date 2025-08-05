@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { 
   Building2, 
@@ -309,6 +309,33 @@ const MasterAdminDashboard: React.FC = () => {
       if (!response.ok) throw new Error('Failed to fetch top hospitals');
       const data = await response.json();
       return data as TopHospital[];
+    }
+  });
+
+  // Create test data function
+  const createTestDataMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`${API_URL}/api/master-admin/create-test-data`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) throw new Error('Failed to create test data');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Test Data Created",
+        description: "Sample hospitals, patients, and payments have been created successfully.",
+      });
+      // Refresh all data
+      handleRefresh();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create test data",
+        variant: "destructive",
+      });
     }
   });
 
@@ -802,6 +829,20 @@ const MasterAdminDashboard: React.FC = () => {
                         <RefreshCw className="w-4 h-4 mr-2" />
                         Refresh Data
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          console.log('Top Hospitals Data:', topHospitals);
+                          toast({
+                            title: "Debug Info",
+                            description: `Found ${topHospitals?.length || 0} hospitals. Check console for details.`,
+                          });
+                        }} 
+                        className="cursor-pointer"
+                      >
+                        <Info className="w-4 h-4 mr-2" />
+                        Debug Data
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </CardTitle>
@@ -844,6 +885,25 @@ const MasterAdminDashboard: React.FC = () => {
                   <div className="text-center text-gray-500 py-8">
                     <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                     <p>No hospital data available</p>
+                    <p className="text-sm text-gray-400 mt-2 mb-4">Create test data to see hospital performance metrics</p>
+                    <Button 
+                      onClick={() => createTestDataMutation.mutate()}
+                      disabled={createTestDataMutation.isPending}
+                      size="sm"
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      {createTestDataMutation.isPending ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Create Test Data
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -1119,7 +1179,25 @@ const MasterAdminDashboard: React.FC = () => {
                 <div className="text-center text-gray-500 py-8">
                   <Server className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                   <p>No hospital data available</p>
-                  <p className="text-sm text-gray-400 mt-1">Add hospitals to see performance metrics</p>
+                  <p className="text-sm text-gray-400 mt-1 mb-4">Create test data to see performance metrics</p>
+                  <Button 
+                    onClick={() => createTestDataMutation.mutate()}
+                    disabled={createTestDataMutation.isPending}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {createTestDataMutation.isPending ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Test Data
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -1234,6 +1312,25 @@ const MasterAdminDashboard: React.FC = () => {
                 <div className="text-center text-gray-500 py-8">
                   <IndianRupee className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                   <p>No revenue data available</p>
+                  <p className="text-sm text-gray-400 mt-2 mb-4">Create test data to see revenue analytics</p>
+                  <Button 
+                    onClick={() => createTestDataMutation.mutate()}
+                    disabled={createTestDataMutation.isPending}
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    {createTestDataMutation.isPending ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Test Data
+                      </>
+                    )}
+                  </Button>
                 </div>
               )}
             </CardContent>

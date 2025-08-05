@@ -143,6 +143,20 @@ const DoctorAvailability = () => {
   const [availabilities, setAvailabilities] = useState<Availability[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const user = authService.getStoredUser();
+  
+  // Filter doctors by branch
+  const branchDoctors = doctors.filter(doctor => {
+    // Handle different possible formats of branchId
+    const doctorBranchId = typeof doctor.branchId === 'object' ? doctor.branchId._id || doctor.branchId : doctor.branchId;
+    const userBranchId = user?.branchId;
+    
+    return doctorBranchId === userBranchId || doctorBranchId === userBranchId?.toString();
+  });
+  
+  // Filter availabilities to only show those for branch doctors
+  const branchAvailabilities = availabilities.filter(availability => {
+    return branchDoctors.some(doctor => doctor._id === availability.doctorId);
+  });
 
   const form = useForm({
     defaultValues: {
@@ -337,7 +351,7 @@ const DoctorAvailability = () => {
   };
 
   const getDoctorAvailability = (doctorId: string) => {
-    return availabilities.filter(av => av.doctorId === doctorId);
+    return branchAvailabilities.filter(av => av.doctorId === doctorId);
   };
 
   const getAvailabilityStatus = (availability: Availability) => {
@@ -351,7 +365,7 @@ const DoctorAvailability = () => {
     return { status: 'Available', color: 'bg-green-100 text-green-600' };
   };
 
-  const filteredDoctors = doctors.filter(doctor => {
+  const filteredDoctors = branchDoctors.filter(doctor => {
     const matchesSearch = 
       doctor.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doctor.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -359,380 +373,563 @@ const DoctorAvailability = () => {
     
     const matchesDepartment = selectedDepartment === 'all' || doctor.department === selectedDepartment;
     
-    // Handle branch filtering with populated data
-    let matchesBranch = selectedBranch === 'all';
-    if (selectedBranch !== 'all') {
-      if (typeof doctor.branchId === 'object' && doctor.branchId !== null) {
-        matchesBranch = doctor.branchId._id === selectedBranch;
-      } else if (typeof doctor.branchId === 'string') {
-        matchesBranch = doctor.branchId === selectedBranch;
-      }
-    }
-    
-    return matchesSearch && matchesDepartment && matchesBranch;
+    return matchesSearch && matchesDepartment;
   });
 
-  const departments = Array.from(new Set(doctors.map(d => d.department).filter(Boolean)));
+  const departments = Array.from(new Set(branchDoctors.map(d => d.department).filter(Boolean)));
 
-  // Calculate stats
-  const totalDoctors = doctors.length;
-  const activeDoctors = doctors.filter(d => d.isActive).length;
-  const totalSlots = availabilities.reduce((acc, curr) => acc + curr.slots.length, 0);
-  const totalHours = availabilities.reduce((acc, curr) => 
+  // Calculate stats for branch
+  const totalDoctors = branchDoctors.length;
+  const activeDoctors = branchDoctors.filter(d => d.isActive).length;
+  const totalSlots = branchAvailabilities.reduce((acc, curr) => acc + curr.slots.length, 0);
+  const totalHours = branchAvailabilities.reduce((acc, curr) => 
     acc + curr.slots.reduce((sum, slot) => sum + slot.hoursAvailable, 0), 0
   );
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Doctor Availability</h1>
-          <p className="text-gray-600 mt-1">Manage doctor schedules and view availability for appointments</p>
+    <div className="p-6 space-y-8">
+      {/* Enhanced Header */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-3 lg:space-y-0">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Doctor Availability</h1>
+            <p className="text-sm text-gray-600 mb-2">
+              Manage doctor schedules and optimize appointment availability across all departments in your branch
+            </p>
+            <div className="flex items-center space-x-4 text-xs text-gray-500">
+              <span className="flex items-center">
+                <Stethoscope className="w-3 h-3 mr-1" />
+                {totalDoctors} Total Doctors
+              </span>
+              <span className="flex items-center">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                {activeDoctors} Active
+              </span>
+              <span className="flex items-center">
+                <Calendar className="w-3 h-3 mr-1" />
+                {totalSlots} Time Slots
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              <Settings className="w-3 h-3 mr-1" />
+              Settings
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setShowAddAvailability(true)}
+              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-lg"
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add Availability
+            </Button>
+          </div>
         </div>
-        <Button 
-          onClick={() => setShowAddAvailability(true)}
-          className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Availability
-        </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+      {/* Branch Info Card */}
+      {user?.branchId && (
+        <Card className="mb-4 border-blue-200 bg-blue-50">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Doctors</p>
-                <p className="text-2xl font-bold text-blue-600">{totalDoctors}</p>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Stethoscope className="w-5 h-5 text-blue-600" />
               </div>
-              <Stethoscope className="w-8 h-8 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium text-blue-900">Branch Filter Active</p>
+                <p className="text-xs text-blue-700">
+                  Showing doctors for Branch ID: {user.branchId}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {branchDoctors.length} doctors found in your branch
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+      )}
+
+      {/* Enhanced Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Active Doctors</p>
-                <p className="text-2xl font-bold text-green-600">{activeDoctors}</p>
+                <p className="text-sm font-medium text-blue-700 mb-1">Total Doctors</p>
+                <p className="text-3xl font-bold text-blue-800">{totalDoctors}</p>
+                <p className="text-xs text-blue-600 mt-1">In your branch</p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
+              <div className="w-12 h-12 bg-blue-200 rounded-xl flex items-center justify-center">
+                <Stethoscope className="w-6 h-6 text-blue-700" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Time Slots</p>
-                <p className="text-2xl font-bold text-purple-600">{totalSlots}</p>
+                <p className="text-sm font-medium text-green-700 mb-1">Active Doctors</p>
+                <p className="text-3xl font-bold text-green-800">{activeDoctors}</p>
+                <p className="text-xs text-green-600 mt-1">
+                  {totalDoctors > 0 ? ((activeDoctors / totalDoctors) * 100).toFixed(1) : '0'}% active rate
+                </p>
               </div>
-              <Calendar className="w-8 h-8 text-purple-500" />
+              <div className="w-12 h-12 bg-green-200 rounded-xl flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-green-700" />
+              </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
+
+        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Hours</p>
-                <p className="text-2xl font-bold text-orange-600">{totalHours}h</p>
+                <p className="text-sm font-medium text-purple-700 mb-1">Total Time Slots</p>
+                <p className="text-3xl font-bold text-purple-800">{totalSlots}</p>
+                <p className="text-xs text-purple-600 mt-1">Available appointments</p>
               </div>
-              <Clock className="w-8 h-8 text-orange-500" />
+              <div className="w-12 h-12 bg-purple-200 rounded-xl flex items-center justify-center">
+                <Calendar className="w-6 h-6 text-purple-700" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:shadow-lg transition-shadow">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-orange-700 mb-1">Total Hours</p>
+                <p className="text-3xl font-bold text-orange-800">{totalHours}h</p>
+                <p className="text-xs text-orange-600 mt-1">Weekly availability</p>
+              </div>
+              <div className="w-12 h-12 bg-orange-200 rounded-xl flex items-center justify-center">
+                <Clock className="w-6 h-6 text-orange-700" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="doctors" className="flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Doctors List
-          </TabsTrigger>
-          <TabsTrigger value="availability" className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            Availability Schedule
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="doctors" className="mt-6">
-          {/* Search and Filters */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <Input
-                      placeholder="Search doctors by name or specialization..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div className="w-full md:w-48">
-                  <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Departments" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Departments</SelectItem>
-                      {departments.filter((dept): dept is string => dept !== undefined).map(dept => (
-                        <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-full md:w-48">
-                  <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All Branches" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Branches</SelectItem>
-                      {Array.from(new Set(doctors.map(d => {
-                        let branchId = '';
-                        let branchName = '';
-                        
-                        if (typeof d.branchId === 'object' && d.branchId !== null) {
-                          branchId = d.branchId._id;
-                          branchName = d.branchId.branchName;
-                        } else if (typeof d.branchId === 'string') {
-                          branchId = d.branchId;
-                          branchName = d.branchName || '';
-                        }
-                        
-                        return { id: branchId, name: branchName };
-                      }).filter((branch): branch is { id: string, name: string } => branch.id !== '' && branch.name !== ''))).map(branch => (
-                        <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Hierarchical View */}
-          <div className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+      {/* Enhanced Main Content */}
+      <Card className="border-0 shadow-lg">
+        <CardContent className="p-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <div className="border-b border-gray-200">
+              <TabsList className="grid w-full grid-cols-2 h-16 bg-transparent">
+                <TabsTrigger
+                  value="doctors"
+                  className="flex items-center gap-3 text-lg font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-b-2 data-[state=active]:border-blue-600"
+                >
                   <User className="w-5 h-5" />
-                  Branch Hierarchy
-                </CardTitle>
-                <CardDescription>
-                  View doctors organized by branch structure
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {(() => {
-                  // Group doctors by department
-                  const groupedDoctors = doctors.reduce((acc, doctor) => {
-                    const department = doctor.department || 'General';
-                    
-                    if (!acc[department]) {
-                      acc[department] = [];
-                    }
-                    acc[department].push(doctor);
-                    return acc;
-                  }, {} as Record<string, Doctor[]>);
+                  Doctors List
+                </TabsTrigger>
+                <TabsTrigger
+                  value="availability"
+                  className="flex items-center gap-3 text-lg font-medium data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:border-b-2 data-[state=active]:border-blue-600"
+                >
+                  <Calendar className="w-5 h-5" />
+                  Availability Schedule
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-                  return (
-                    <div className="space-y-6">
-                      {Object.entries(groupedDoctors).map(([department, doctors]) => (
-                        <div key={department} className="border rounded-lg p-4 bg-gray-50">
-                          <div className="flex items-center gap-2 mb-4">
-                            <Stethoscope className="w-5 h-5 text-green-600" />
-                            <h3 className="text-lg font-semibold text-gray-900">{department}</h3>
-                            <Badge variant="outline" className="bg-green-50 text-green-700">
-                              {doctors.length} Doctors
-                            </Badge>
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {doctors.map((doctor) => (
-                              <Card key={doctor._id} className="hover:shadow-md transition-shadow">
-                                <CardContent className="p-4">
-                    <div className="flex items-center space-x-3">
-                                    <Avatar className="h-10 w-10">
-                        <AvatarImage src={doctor.profilePhotoUrl} />
-                        <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                          {doctor.firstName[0]}{doctor.lastName[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                                    <div className="flex-1">
-                                      <h5 className="font-medium text-gray-900">
-                          {doctor.firstName} {doctor.lastName}
-                                      </h5>
-                        <p className="text-sm text-gray-600">{doctor.specialization}</p>
-                                      <Badge variant={doctor.isActive ? "default" : "secondary"} className="mt-1 text-xs">
-                                        {doctor.isActive ? 'Active' : 'Inactive'}
-                                      </Badge>
+            <TabsContent value="doctors" className="p-6">
+              {/* Enhanced Search and Filters */}
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-6 mb-6">
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Search className="w-5 h-5 text-gray-500" />
+                    <h3 className="text-lg font-semibold text-gray-900">Search & Filter Doctors</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <Input
+                        placeholder="Search by name, specialization..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-12 h-12 text-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                      />
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleViewDoctorDetails(doctor)}>
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Details
-                        </DropdownMenuItem>
+
+                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                      <SelectTrigger className="h-12 border-gray-300">
+                        <SelectValue placeholder="All Departments" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Departments</SelectItem>
+                        {departments.filter((dept): dept is string => dept !== undefined).map(dept => (
+                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Active Filters Display */}
+                  {(searchTerm || selectedDepartment !== 'all') && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {searchTerm && (
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                          Search: "{searchTerm}"
+                        </Badge>
+                      )}
+                      {selectedDepartment !== 'all' && (
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          Department: {selectedDepartment}
+                        </Badge>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setSelectedDepartment('all');
+                        }}
+                        className="text-gray-600 hover:text-gray-900"
+                      >
+                        Clear All
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+                                      {/* Enhanced Doctors Table */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Doctors Directory</h2>
+                    <p className="text-gray-600">Complete list of doctors in your branch</p>
+                  </div>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                    {filteredDoctors.length} Doctors Found
+                  </Badge>
+                </div>
+
+                {/* Doctors Table */}
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-gray-50">
+                            <TableHead className="font-semibold text-gray-900">Doctor</TableHead>
+                            <TableHead className="font-semibold text-gray-900">Department</TableHead>
+                            <TableHead className="font-semibold text-gray-900">Specialization</TableHead>
+                            <TableHead className="font-semibold text-gray-900 text-center">Status</TableHead>
+                            <TableHead className="font-semibold text-gray-900 text-center">Availability</TableHead>
+                            <TableHead className="font-semibold text-gray-900 text-center">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredDoctors.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center py-8">
+                                <div className="flex flex-col items-center space-y-3">
+                                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                                    <User className="w-8 h-8 text-gray-400" />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-lg font-medium text-gray-900">No Doctors Found</h3>
+                                    <p className="text-gray-600">Try adjusting your search or filter criteria</p>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredDoctors.map((doctor) => {
+                              const doctorAvailabilities = getDoctorAvailability(doctor._id);
+                              const totalSlots = doctorAvailabilities.reduce((sum, av) => sum + av.slots.length, 0);
+                              const activeAvailabilities = doctorAvailabilities.filter(av => av.isAvailable);
+
+                              return (
+                                <TableRow key={doctor._id} className="hover:bg-gray-50 transition-colors">
+                                  <TableCell>
+                                    <div className="flex items-center space-x-3">
+                                      <Avatar className="h-10 w-10">
+                                        <AvatarImage src={doctor.profilePhotoUrl} />
+                                        <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                                          {doctor.firstName[0]}{doctor.lastName[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div>
+                                        <div className="font-medium text-gray-900">
+                                          Dr. {doctor.firstName} {doctor.lastName}
+                                        </div>
+                                        <div className="text-sm text-gray-500">{doctor.email}</div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center space-x-2">
+                                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                        <Stethoscope className="w-4 h-4 text-blue-600" />
+                                      </div>
+                                      <span className="font-medium text-gray-900">{doctor.department || 'General'}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <span className="text-gray-900">{doctor.specialization || 'General Medicine'}</span>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Badge 
+                                      variant={doctor.isActive ? "default" : "secondary"}
+                                      className={doctor.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}
+                                    >
+                                      {doctor.isActive ? 'Active' : 'Inactive'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <div className="flex flex-col items-center space-y-1">
+                                      <div className="flex items-center space-x-2">
+                                        <Calendar className="w-4 h-4 text-purple-500" />
+                                        <span className="font-medium text-purple-600">{totalSlots}</span>
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {activeAvailabilities.length} active days
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm">
+                                          <MoreHorizontal className="w-4 h-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleViewDoctorDetails(doctor)}>
+                                          <Eye className="w-4 h-4 mr-2" />
+                                          View Details
+                                        </DropdownMenuItem>
                                         <DropdownMenuItem onClick={() => {
                                           form.setValue('doctorId', doctor._id);
                                           setShowAddAvailability(true);
                                         }}>
                                           <Plus className="w-4 h-4 mr-2" />
                                           Add Availability
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                                        </DropdownMenuItem>
+                                        {doctorAvailabilities.length > 0 && (
+                                          <DropdownMenuItem>
+                                            <Calendar className="w-4 h-4 mr-2" />
+                                            View Schedule
+                                          </DropdownMenuItem>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="availability" className="p-6">
+              <div className="space-y-6">
+                {/* Simple Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Availability Schedule</h2>
+                    <p className="text-gray-600 mt-1">Manage doctor availability schedules in your branch</p>
                   </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                    </div>
-                    </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-                </CardContent>
-              </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="availability" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5" />
-                Availability Schedule
-              </CardTitle>
-              <CardDescription>
-                View and manage doctor availability organized by department structure
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-2 text-gray-600">Loading availability data...</p>
+                  <Button
+                    onClick={() => setShowAddAvailability(true)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Schedule
+                  </Button>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {(() => {
-                    // Group doctors by department
-                    const groupedDoctors = doctors.reduce((acc, doctor) => {
-                      const department = doctor.department || 'General';
-                      
-                      if (!acc[department]) {
-                        acc[department] = [];
-                      }
-                      acc[department].push(doctor);
-                      return acc;
-                    }, {} as Record<string, Doctor[]>);
 
-                    return (
-                      <div className="space-y-6">
-                        {Object.entries(groupedDoctors).map(([department, doctors]) => (
-                          <div key={department} className="border rounded-lg p-4 bg-gray-50">
-                            <div className="flex items-center gap-2 mb-4">
-                              <Stethoscope className="w-5 h-5 text-green-600" />
-                              <h3 className="text-lg font-semibold text-gray-900">{department}</h3>
-                              <Badge variant="outline" className="bg-green-50 text-green-700">
-                                {doctors.length} Doctors
-                              </Badge>
-                            </div>
-                            
-              <div className="space-y-4">
-                {doctors.map((doctor) => {
-                  const doctorAvailabilities = getDoctorAvailability(doctor._id);
-                  return (
-                                  <div key={doctor._id} className="border rounded-lg p-4 bg-white">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={doctor.profilePhotoUrl} />
-                            <AvatarFallback className="bg-emerald-100 text-emerald-700">
-                              {doctor.firstName[0]}{doctor.lastName[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                                          <h5 className="font-semibold text-gray-900">
-                              {doctor.firstName} {doctor.lastName}
-                                          </h5>
-                            <p className="text-sm text-gray-600">{doctor.specialization}</p>
-                          </div>
-                        </div>
-                        <Badge variant={doctor.isActive ? "default" : "secondary"}>
-                          {doctor.isActive ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </div>
+                {/* Loading State */}
+                {isLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-2 text-gray-600">Loading availability data...</p>
+                  </div>
+                ) : branchAvailabilities.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Availability Schedules</h3>
+                    <p className="text-gray-600 mb-4">Get started by adding the first availability schedule</p>
+                    <Button onClick={() => setShowAddAvailability(true)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add First Schedule
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {branchDoctors.map((doctor) => {
+                      const doctorAvailabilities = getDoctorAvailability(doctor._id);
+                      const totalSlots = doctorAvailabilities.reduce((sum, av) => sum + av.slots.length, 0);
 
-                      {doctorAvailabilities.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {doctorAvailabilities.map((availability) => {
-                            const status = getAvailabilityStatus(availability);
-                                          const dayLabel = DAYS.find(d => d.value === availability.dayOfWeek)?.label;
-                            return (
-                                            <div key={availability._id} className="border rounded-lg p-3 bg-gray-50">
-                                <div className="flex items-center justify-between mb-2">
-                                                <span className="font-medium text-gray-900">{dayLabel}</span>
-                                  <Badge className={status.color}>
-                                    {status.status}
-                                  </Badge>
-                                </div>
-                                <div className="space-y-1 text-sm">
-                                                {availability.slots.map((slot, index) => (
-                                                  <div key={index} className="flex justify-between">
-                                                    <span className="text-gray-600">Slot {index + 1}:</span>
-                                    <span className="font-medium">
-                                                      {slot.startTime} - {slot.endTime}
-                                    </span>
-                                  </div>
-                                                ))}
-                                  <div className="flex justify-between">
-                                                  <span className="text-gray-600">Added by:</span>
-                                                  <span className="font-medium text-xs">
-                                                    {availability.addedBy.name} ({availability.addedBy.role})
-                                    </span>
+                      return (
+                        <Card key={doctor._id} className="border border-gray-200">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage src={doctor.profilePhotoUrl} />
+                                  <AvatarFallback className="bg-blue-100 text-blue-700">
+                                    {doctor.firstName[0]}{doctor.lastName[0]}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <h5 className="font-semibold text-gray-900">
+                                    Dr. {doctor.firstName} {doctor.lastName}
+                                  </h5>
+                                  <p className="text-sm text-gray-600">{doctor.specialization}</p>
+                                  <div className="flex items-center space-x-2 mt-1">
+                                    <Badge variant="outline" className="text-xs px-2 py-0.5">
+                                      {totalSlots} slots
+                                    </Badge>
                                   </div>
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="text-center py-4 text-gray-500">
-                                        <Calendar className="w-6 h-6 mx-auto mb-2 opacity-50" />
-                                        <p className="text-sm">No availability scheduled</p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <MoreVertical className="w-4 h-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => handleViewDoctorDetails(doctor)}>
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View Details
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => {
+                                    form.setValue('doctorId', doctor._id);
+                                    setShowAddAvailability(true);
+                                  }}>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add Availability
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </CardHeader>
+
+                          <CardContent className="pt-0">
+                            {doctorAvailabilities.length > 0 ? (
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <h6 className="font-medium text-gray-900 text-sm">Weekly Schedule</h6>
+                                  <Badge variant="outline" className="text-xs px-2 py-0.5">
+                                    {doctorAvailabilities.length} active days
+                                  </Badge>
+                                </div>
+                                <div className="grid grid-cols-1 gap-2">
+                                  {doctorAvailabilities.map((availability) => {
+                                    const status = getAvailabilityStatus(availability);
+                                    const dayLabel = DAYS.find(d => d.value === availability.dayOfWeek)?.label;
+                                    return (
+                                      <div key={availability._id} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <div className="flex items-center space-x-2">
+                                            <Calendar className="w-4 h-4 text-blue-600" />
+                                            <span className="font-medium text-gray-900 text-sm">{dayLabel}</span>
+                                          </div>
+                                          <div className="flex items-center space-x-2">
+                                            <Badge className={`${status.color} text-xs px-2 py-0.5`}>
+                                              {status.status}
+                                            </Badge>
+                                            <DropdownMenu>
+                                              <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                                  <MoreVertical className="w-3 h-3" />
+                                                </Button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                  className="text-red-600"
+                                                  onClick={() => handleDeleteAvailability(availability.doctorId, availability.dayOfWeek)}
+                                                >
+                                                  <Trash2 className="w-3 h-3 mr-2" />
+                                                  Delete
+                                                </DropdownMenuItem>
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          </div>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                          {availability.slots.map((slot, index) => (
+                                            <div key={index} className="flex items-center justify-between bg-white rounded-md p-2 border border-gray-100">
+                                              <div className="flex items-center space-x-2">
+                                                <Clock className="w-3 h-3 text-gray-500" />
+                                                <span className="text-sm font-medium text-gray-900">
+                                                  {slot.startTime} - {slot.endTime}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center space-x-2 text-xs text-gray-500">
+                                                <span>{slot.hoursAvailable}h</span>
+                                                <span>•</span>
+                                                <span>{slot.tokenCount} tokens</span>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+
+                                        <div className="mt-3 pt-3 border-t border-gray-200">
+                                          <div className="flex items-center justify-between text-xs text-gray-500">
+                                            <span>Added by: {availability.addedBy.name}</span>
+                                            <span className="bg-gray-100 px-2 py-1 rounded-full">
+                                              {availability.addedBy.role}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                  <Calendar className="w-8 h-8 text-gray-400" />
+                                </div>
+                                <h6 className="font-medium text-gray-900 mb-1">No Schedule Set</h6>
+                                <p className="text-sm text-gray-600 mb-4">This doctor hasn't set their availability yet</p>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    form.setValue('doctorId', doctor._id);
+                                    setShowAddAvailability(true);
+                                  }}
+                                  className="bg-purple-600 hover:bg-purple-700"
+                                >
+                                  <Plus className="w-3 h-3 mr-2" />
+                                  Add Schedule
+                                </Button>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Add Availability Modal */}
       <Dialog open={showAddAvailability} onOpenChange={setShowAddAvailability}>
@@ -757,13 +954,13 @@ const DoctorAvailability = () => {
                   <SelectTrigger>
                     <SelectValue placeholder="Select doctor" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {doctors.map(doctor => (
-                      <SelectItem key={doctor._id} value={doctor._id}>
-                        {doctor.firstName} {doctor.lastName} - {doctor.specialization}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
+                                      <SelectContent>
+                      {branchDoctors.map(doctor => (
+                        <SelectItem key={doctor._id} value={doctor._id}>
+                          {doctor.firstName} {doctor.lastName} - {doctor.specialization}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                 </Select>
                     </FormItem>
                   )}

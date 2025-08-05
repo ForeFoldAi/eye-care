@@ -15,6 +15,9 @@ export interface IPatient extends Document {
   patientId: string;
   registrationDate: Date;
   isActive: boolean;
+  // Multi-tenant fields
+  hospitalId?: string;
+  branchId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -79,6 +82,17 @@ const patientSchema = new Schema<IPatient>({
   isActive: {
     type: Boolean,
     default: true
+  },
+  // Multi-tenant fields
+  hospitalId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Hospital',
+    required: false
+  },
+  branchId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Branch',
+    required: false
   }
 }, {
   timestamps: true

@@ -54,6 +54,7 @@ import { Separator } from '@/components/ui/separator';
 import { useDepartments } from '@/contexts/DepartmentContext';
 import { useStaff, StaffMember } from '@/contexts/StaffContext';
 import { useToast } from '@/hooks/use-toast';
+import { authService } from '@/lib/auth';
 
 interface StaffFormData {
   // Personal Information
@@ -113,6 +114,13 @@ const StaffManagement = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  
+  // Get user data for branch context
+  const user = authService.getStoredUser();
+  
+  // Staff data is already filtered by branch at the API level
+  // The StaffContext fetches from /api/users/branch/${user.branchId}
+  const branchStaff = staff;
   const [formData, setFormData] = useState<StaffFormData>({
     firstName: '',
     lastName: '',
@@ -150,7 +158,7 @@ const StaffManagement = () => {
 
 
 
-  const filteredStaff = staff.filter((member) => {
+  const filteredStaff = branchStaff.filter((member) => {
     const matchesSearch = 
       member.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       member.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -606,7 +614,14 @@ const StaffManagement = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Staff Management</h1>
-          <p className="text-gray-600 mt-1">Manage doctors and receptionists in your branch</p>
+          <p className="text-gray-600 mt-1">
+            Manage doctors and receptionists in your branch
+            {user?.branchId && (
+              <span className="ml-2 text-blue-600 font-medium">
+                (Branch ID: {user.branchId})
+              </span>
+            )}
+          </p>
         </div>
         <Button 
           onClick={() => setShowAddForm(true)}
@@ -1561,6 +1576,28 @@ const StaffManagement = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Branch Info Card */}
+      {user?.branchId && (
+        <Card className="mb-4 border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-900">Branch Filter Active</p>
+                <p className="text-xs text-blue-700">
+                  Showing staff for Branch ID: {user.branchId}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {branchStaff.length} staff members found in your branch
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Search and Filters */}
       <Card>
         <CardContent className="p-4">
@@ -1622,7 +1659,7 @@ const StaffManagement = () => {
             <div>
               <CardTitle>Staff Members</CardTitle>
               <CardDescription>
-                {filteredStaff.length} of {staff.length} staff member(s) found
+                {filteredStaff.length} of {branchStaff.length} staff member(s) in your branch
                 {(searchTerm || filterRole !== 'all' || filterStatus !== 'all' || dateRange) && (
                   <span className="ml-2 text-blue-600">
                     (filtered)
@@ -1756,7 +1793,9 @@ const StaffManagement = () => {
                     <p className="text-gray-600 mb-4">
                       {searchTerm || filterRole !== 'all' || filterStatus !== 'all' || dateRange
                         ? 'Try adjusting your search or filter criteria' 
-                        : 'Get started by adding your first staff member'
+                        : branchStaff.length === 0 
+                          ? 'No staff members found for your branch. Get started by adding your first staff member.'
+                          : 'Get started by adding your first staff member'
                       }
                     </p>
                     {searchTerm || filterRole !== 'all' || filterStatus !== 'all' || dateRange ? (

@@ -9,7 +9,6 @@ import { fileURLToPath } from 'url';
 import apiRoutes from './routes/index';
 import { connectDB } from './db/connect';
 import { initializeIndexes } from './db/indexes';
-import { registerRoutes } from './routes';
 import { WebSocketServer } from './websocket';
 
 dotenv.config(); // ✅ Load environment variables
@@ -73,7 +72,7 @@ async function initializeServer() {
       console.error('Index initialization failed (non-critical):', error);
     });
 
-    await registerRoutes(app);
+    app.use('/api', apiRoutes);
 
     if (process.env.NODE_ENV === 'development') {
       // ✅ Redirect all non-API paths to frontend from .env

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   Search, 
@@ -30,206 +30,147 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
+import { authService } from '@/lib/auth';
 
 interface Patient {
   _id: string;
   firstName: string;
   lastName: string;
-  email: string;
+  email?: string;
   phone: string;
   gender: 'male' | 'female' | 'other';
-  age: number;
+  dateOfBirth: string;
+  address?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  medicalHistory?: string;
+  patientId: string;
+  registrationDate: string;
+  isActive: boolean;
+  branchId?: string;
+  // Computed fields for display
+  age?: number;
   bloodGroup: string;
-  address: string;
-  emergencyContact: string;
   allergies: string[];
   chronicConditions: string[];
   lastVisit: string;
   totalVisits: number;
   status: 'active' | 'inactive' | 'critical';
-  registrationDate: string;
+  emergencyContact: string;
 }
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const Patients: React.FC = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [genderFilter, setGenderFilter] = useState<string>('all');
   const [bloodGroupFilter, setBloodGroupFilter] = useState<string>('all');
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date } | undefined>();
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const user = authService.getStoredUser();
 
-  // Mock data for testing
-  const patients: Patient[] = [
-    {
-      _id: '1',
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@email.com',
-      phone: '+1234567890',
-      gender: 'male',
-      age: 35,
-      bloodGroup: 'A+',
-      address: '123 Main St, City',
-      emergencyContact: '+1234567891',
-      allergies: ['Penicillin'],
-      chronicConditions: ['Hypertension'],
-      lastVisit: '2024-01-10',
-      totalVisits: 8,
-      status: 'active',
-      registrationDate: '2023-06-15'
-    },
-    {
-      _id: '2',
-      firstName: 'Jane',
-      lastName: 'Smith',
-      email: 'jane.smith@email.com',
-      phone: '+1234567892',
-      gender: 'female',
-      age: 28,
-      bloodGroup: 'B-',
-      address: '456 Oak Ave, City',
-      emergencyContact: '+1234567893',
-      allergies: [],
-      chronicConditions: [],
-      lastVisit: '2024-01-12',
-      totalVisits: 3,
-      status: 'active',
-      registrationDate: '2023-12-01'
-    },
-    {
-      _id: '3',
-      firstName: 'Mike',
-      lastName: 'Johnson',
-      email: 'mike.johnson@email.com',
-      phone: '+1234567894',
-      gender: 'male',
-      age: 42,
-      bloodGroup: 'O+',
-      address: '789 Pine St, City',
-      emergencyContact: '+1234567895',
-      allergies: ['Shellfish'],
-      chronicConditions: ['Diabetes'],
-      lastVisit: '2023-12-20',
-      totalVisits: 15,
-      status: 'inactive',
-      registrationDate: '2022-03-10'
-    },
-    {
-      _id: '4',
-      firstName: 'Sarah',
-      lastName: 'Williams',
-      email: 'sarah.williams@email.com',
-      phone: '+1234567896',
-      gender: 'female',
-      age: 31,
-      bloodGroup: 'AB+',
-      address: '321 Elm St, City',
-      emergencyContact: '+1234567897',
-      allergies: ['Nuts'],
-      chronicConditions: [],
-      lastVisit: '2024-01-15',
-      totalVisits: 5,
-      status: 'active',
-      registrationDate: '2023-09-20'
-    },
-    {
-      _id: '5',
-      firstName: 'Robert',
-      lastName: 'Brown',
-      email: 'robert.brown@email.com',
-      phone: '+1234567898',
-      gender: 'male',
-      age: 67,
-      bloodGroup: 'O-',
-      address: '654 Maple Ave, City',
-      emergencyContact: '+1234567899',
-      allergies: ['Latex'],
-      chronicConditions: ['Heart Disease', 'Arthritis'],
-      lastVisit: '2024-01-08',
-      totalVisits: 22,
-      status: 'critical',
-      registrationDate: '2021-11-05'
-    },
-    {
-      _id: '6',
-      firstName: 'Emily',
-      lastName: 'Davis',
-      email: 'emily.davis@email.com',
-      phone: '+1234567900',
-      gender: 'female',
-      age: 25,
-      bloodGroup: 'A-',
-      address: '987 Cedar St, City',
-      emergencyContact: '+1234567901',
-      allergies: [],
-      chronicConditions: [],
-      lastVisit: '2024-01-14',
-      totalVisits: 2,
-      status: 'active',
-      registrationDate: '2024-01-01'
-    },
-    {
-      _id: '7',
-      firstName: 'David',
-      lastName: 'Wilson',
-      email: 'david.wilson@email.com',
-      phone: '+1234567902',
-      gender: 'male',
-      age: 54,
-      bloodGroup: 'B+',
-      address: '159 Birch Lane, City',
-      emergencyContact: '+1234567903',
-      allergies: ['Aspirin'],
-      chronicConditions: ['High Cholesterol'],
-      lastVisit: '2023-11-30',
-      totalVisits: 12,
-      status: 'inactive',
-      registrationDate: '2022-08-12'
-    },
-    {
-      _id: '8',
-      firstName: 'Lisa',
-      lastName: 'Anderson',
-      email: 'lisa.anderson@email.com',
-      phone: '+1234567904',
-      gender: 'female',
-      age: 44,
-      bloodGroup: 'AB-',
-      address: '753 Willow Dr, City',
-      emergencyContact: '+1234567905',
-      allergies: ['Sulfa drugs'],
-      chronicConditions: ['Asthma'],
-      lastVisit: '2024-01-09',
-      totalVisits: 18,
-      status: 'critical',
-      registrationDate: '2022-05-18'
+  useEffect(() => {
+    fetchPatients();
+  }, []);
+
+  const getAuthToken = () => {
+    return localStorage.getItem('token');
+  };
+
+  const fetchPatients = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) {
+        toast({
+          title: 'Error',
+          description: 'Please log in to view patients',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Fetch patients (already filtered by branch through tenant isolation)
+      const response = await fetch(`${API_URL}/api/patients`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch patients');
+      }
+
+      const data = await response.json();
+      const rawPatients = data.data.patients || data.patients || data;
+      
+      // Process patients to add computed fields
+      const processedPatients = rawPatients.map((patient: any) => {
+        // Calculate age from dateOfBirth
+        const age = patient.dateOfBirth ? 
+          Math.floor((new Date().getTime() - new Date(patient.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 
+          undefined;
+        
+        // Add computed fields with fallbacks
+        return {
+          ...patient,
+          age,
+          bloodGroup: patient.bloodGroup || 'Unknown',
+          allergies: patient.allergies || [],
+          chronicConditions: patient.chronicConditions || [],
+          lastVisit: patient.lastVisit || 'Never',
+          totalVisits: patient.totalVisits || 0,
+          status: patient.isActive ? 'active' : 'inactive',
+          emergencyContact: patient.emergencyContactPhone || patient.emergencyContactName || 'Not provided'
+        };
+      });
+      
+      setPatients(processedPatients);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+      toast({
+        title: 'Error fetching patients',
+        description: 'Failed to load patient data',
+        variant: 'destructive',
+      });
+      setIsLoading(false);
     }
-  ];
+  };
+
+  // Filter patients by branch
+  const branchPatients = patients.filter(patient => {
+    // Handle different possible formats of branchId
+    const patientBranchId = typeof patient.branchId === 'object' && patient.branchId !== null 
+      ? (patient.branchId as any)._id || patient.branchId 
+      : patient.branchId;
+    const userBranchId = user?.branchId;
+    return patientBranchId === userBranchId || patientBranchId === userBranchId?.toString();
+  });
 
   const stats = {
-    total: patients.length,
-    active: patients.filter(p => p.status === 'active').length,
-    new: patients.filter(p => {
+    total: branchPatients.length,
+    active: branchPatients.filter(p => p.status === 'active').length,
+    new: branchPatients.filter(p => {
       const registrationDate = new Date(p.registrationDate);
       const currentDate = new Date();
       const oneMonthAgo = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, currentDate.getDate());
       return registrationDate >= oneMonthAgo;
     }).length,
-    critical: patients.filter(p => p.status === 'critical').length
+    critical: branchPatients.filter(p => p.status === 'critical').length
   };
 
-  // Remove duplicate patients by _id
-  const uniquePatients = Array.from(
-    new Map(patients.map(patient => [patient._id, patient])).values()
-  );
-
-  const filteredPatients = uniquePatients.filter((patient) => {
+  const filteredPatients = branchPatients.filter((patient) => {
     const matchesSearch = 
       patient.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (patient.email?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
       patient.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      patient.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (patient.address?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
       patient.bloodGroup.toLowerCase().includes(searchTerm.toLowerCase()) ||
       patient.allergies.some(allergy => allergy.toLowerCase().includes(searchTerm.toLowerCase())) ||
       patient.chronicConditions.some(condition => condition.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -273,7 +214,7 @@ const Patients: React.FC = () => {
             </Avatar>
             <div>
               <div className="font-medium">{patient.firstName} {patient.lastName}</div>
-              <div className="text-sm text-gray-500">{patient.email}</div>
+              <div className="text-sm text-gray-500">{patient.email || 'No email'}</div>
             </div>
           </div>
         );
@@ -407,16 +348,61 @@ const Patients: React.FC = () => {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Patients</h1>
+            <p className="text-gray-600 mt-1">Manage patient records and information</p>
+          </div>
+        </div>
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading patient data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Patients</h1>
-          <p className="text-gray-600 mt-1">Manage patient records and information</p>
+          <p className="text-gray-600 mt-1">
+            Manage patient records and information in your branch
+            {user?.branchId && (
+              <span className="ml-2 text-blue-600 font-medium">
+                (Branch ID: {user.branchId})
+              </span>
+            )}
+          </p>
         </div>
-       
       </div>
+
+      {/* Branch Info Card */}
+      {user?.branchId && (
+        <Card className="mb-4 border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-900">Branch Filter Active</p>
+                <p className="text-xs text-blue-700">
+                  Showing patients for Branch ID: {user.branchId}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {branchPatients.length} patients found in your branch
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -550,7 +536,7 @@ const Patients: React.FC = () => {
             <div>
               <CardTitle>Patient Records</CardTitle>
               <CardDescription>
-                {filteredPatients.length} of {patients.length} patient(s) found
+                {filteredPatients.length} of {branchPatients.length} patient(s) in your branch
                 {(searchTerm || statusFilter !== 'all' || genderFilter !== 'all' || bloodGroupFilter !== 'all' || dateRange) && (
                   <span className="ml-2 text-blue-600">
                     (filtered)
@@ -687,7 +673,7 @@ const Patients: React.FC = () => {
                     <p className="text-gray-600 mb-4">
                       {searchTerm || statusFilter !== 'all' || genderFilter !== 'all' || bloodGroupFilter !== 'all' || dateRange
                         ? 'Try adjusting your search or filter criteria' 
-                        : 'No patients registered yet'
+                        : 'No patients registered in your branch yet'
                       }
                     </p>
                     {searchTerm || statusFilter !== 'all' || genderFilter !== 'all' || bloodGroupFilter !== 'all' || dateRange ? (
@@ -705,7 +691,6 @@ const Patients: React.FC = () => {
                         Clear Filters
                       </Button>
                     ) : null}
-                   
                   </div>
                 )}
               </div>

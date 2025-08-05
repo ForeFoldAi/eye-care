@@ -26,6 +26,21 @@ export interface IBranchDocument extends Document {
   timezone: string;
   maxDailyAppointments?: number;
   defaultLanguage?: string;
+  workingDaySettings: {
+    [day: string]: {
+      isWorking: boolean;
+      dayType: 'full' | 'half';
+      startTime?: string;
+      endTime?: string;
+    };
+  };
+  
+  // Bank Details
+  bankName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  ifscCode: string;
+  bankBranchCode?: string;
   
   // Branch Admin Setup
   adminFirstName: string;
@@ -87,6 +102,23 @@ const branchSchema = new mongoose.Schema({
   timezone: { type: String, required: true },
   maxDailyAppointments: { type: Number, default: 50 },
   defaultLanguage: { type: String, default: 'en' },
+  workingDaySettings: {
+    type: Map,
+    of: {
+      isWorking: { type: Boolean, default: false },
+      dayType: { type: String, enum: ['full', 'half'], default: 'full' },
+      startTime: { type: String },
+      endTime: { type: String }
+    },
+    default: {}
+  },
+  
+  // Bank Details
+  bankName: { type: String, required: true },
+  accountNumber: { type: String, required: true },
+  accountHolderName: { type: String, required: true },
+  ifscCode: { type: String, required: true },
+  bankBranchCode: { type: String },
   
   // Branch Admin Setup
   adminFirstName: { type: String, required: true },

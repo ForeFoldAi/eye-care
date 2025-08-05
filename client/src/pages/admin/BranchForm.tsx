@@ -63,14 +63,29 @@ interface BranchFormData {
   workingHoursStart: string;
   workingHoursEnd: string;
   timezone: string;
-  maxDailyAppointments?: number;
-  defaultLanguage?: string;
+  dayType: string; // full day or half day
+  workingDaySettings: {
+    [day: string]: {
+      isWorking: boolean;
+      dayType: 'full' | 'half';
+      startTime?: string;
+      endTime?: string;
+    };
+  };
+  
+  // Bank Details
+  bankName: string;
+  accountNumber: string;
+  accountHolderName: string;
+  ifscCode: string;
+  bankBranchCode?: string;
   
   // Branch Admin Setup
   adminFirstName: string;
   adminLastName: string;
   adminEmail: string;
   adminPassword: string;
+  confirmPassword: string;
   adminPhone: string;
   
   // Status and Activation
@@ -94,7 +109,7 @@ const BranchForm: React.FC = () => {
     email: '',
     phoneNumber: '',
     alternatePhone: '',
-    country: '',
+    country: 'IN',
     state: '',
     city: '',
     addressLine1: '',
@@ -104,13 +119,27 @@ const BranchForm: React.FC = () => {
     workingDays: [],
     workingHoursStart: '09:00',
     workingHoursEnd: '18:00',
-    timezone: 'UTC',
-    maxDailyAppointments: undefined,
-    defaultLanguage: 'en',
+    timezone: 'IST',
+    dayType: 'full',
+    workingDaySettings: {
+      Monday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Tuesday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Wednesday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Thursday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Friday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Saturday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' },
+      Sunday: { isWorking: false, dayType: 'full', startTime: '09:00', endTime: '18:00' }
+    },
+    bankName: '',
+    accountNumber: '',
+    accountHolderName: '',
+    ifscCode: '',
+    bankBranchCode: '',
     adminFirstName: '',
     adminLastName: '',
     adminEmail: '',
     adminPassword: '',
+    confirmPassword: '',
     adminPhone: '',
     isActive: true,
     activationDate: undefined
@@ -126,22 +155,22 @@ const BranchForm: React.FC = () => {
       fields: ['branchName', 'hospitalId', 'branchCode', 'email', 'phoneNumber', 'alternatePhone']
     },
     {
-      title: 'Location Details',
-      description: 'Address and location',
+      title: 'Location & Operations',
+      description: 'Address, location and operational settings',
       icon: MapPin,
-      fields: ['country', 'state', 'city', 'addressLine1', 'addressLine2', 'postalCode', 'googleMapLink']
+      fields: ['country', 'state', 'city', 'addressLine1', 'addressLine2', 'postalCode', 'googleMapLink', 'workingDays', 'workingHoursStart', 'workingHoursEnd', 'timezone', 'dayType', 'workingDaySettings']
     },
     {
-      title: 'Operational Settings',
-      description: 'Working hours and settings',
-      icon: Clock,
-      fields: ['workingDays', 'workingHoursStart', 'workingHoursEnd', 'timezone', 'maxDailyAppointments', 'defaultLanguage']
+      title: 'Bank Details',
+      description: 'Payment and banking information',
+      icon: Building2,
+      fields: ['bankName', 'accountNumber', 'accountHolderName', 'ifscCode', 'bankBranchCode']
     },
     {
       title: 'Branch Admin Setup',
       description: 'Sub-admin credentials',
       icon: Shield,
-      fields: ['adminFirstName', 'adminLastName', 'adminEmail', 'adminPassword', 'adminPhone']
+      fields: ['adminFirstName', 'adminLastName', 'adminEmail', 'adminPassword', 'confirmPassword', 'adminPhone']
     },
     {
       title: 'Review & Submit',
@@ -173,10 +202,52 @@ const BranchForm: React.FC = () => {
 
   const createBranchMutation = useMutation({
     mutationFn: async (data: BranchFormData) => {
+      // Prepare the request data with all form fields
       const requestData = {
-        ...data,
-        createdBy: user?.id,
-        hospitalId: data.hospitalId || user?.hospitalId
+        // Basic Information
+        branchName: data.branchName,
+        hospitalId: data.hospitalId || user?.hospitalId,
+        branchCode: data.branchCode,
+        email: data.email,
+        phoneNumber: data.phoneNumber,
+        alternatePhone: data.alternatePhone,
+        
+        // Location Details
+        country: data.country,
+        state: data.state,
+        city: data.city,
+        addressLine1: data.addressLine1,
+        addressLine2: data.addressLine2,
+        postalCode: data.postalCode,
+        googleMapLink: data.googleMapLink,
+        
+        // Operational Settings
+        workingDays: data.workingDays,
+        workingHoursStart: data.workingHoursStart,
+        workingHoursEnd: data.workingHoursEnd,
+        timezone: data.timezone,
+        workingDaySettings: data.workingDaySettings,
+        
+        // Bank Details
+        bankName: data.bankName,
+        accountNumber: data.accountNumber,
+        accountHolderName: data.accountHolderName,
+        ifscCode: data.ifscCode,
+        bankBranchCode: data.bankBranchCode,
+        
+        // Branch Admin Setup
+        adminFirstName: data.adminFirstName,
+        adminLastName: data.adminLastName,
+        adminEmail: data.adminEmail,
+        adminPassword: data.adminPassword,
+        adminPhone: data.adminPhone,
+        
+        // Status and Activation
+        isActive: data.isActive,
+        activationDate: data.activationDate,
+        
+        // System fields
+        createdBy: user?.id
       };
       
       const response = await fetch(`${API_URL}/api/branches`, {
@@ -213,14 +284,15 @@ const BranchForm: React.FC = () => {
   });
 
   const countries = useMemo(() => [
+    { value: 'IN', label: 'India' },
     { value: 'US', label: 'United States' },
     { value: 'CA', label: 'Canada' },
     { value: 'UK', label: 'United Kingdom' },
-    { value: 'IN', label: 'India' },
     { value: 'AU', label: 'Australia' },
   ], []);
 
   const timezones = useMemo(() => [
+    { value: 'IST', label: 'Indian Standard Time (IST)' },
     { value: 'UTC', label: 'UTC' },
     { value: 'EST', label: 'Eastern Time (EST)' },
     { value: 'PST', label: 'Pacific Time (PST)' },
@@ -228,11 +300,9 @@ const BranchForm: React.FC = () => {
     { value: 'MST', label: 'Mountain Time (MST)' },
   ], []);
 
-  const languages = useMemo(() => [
-    { value: 'en', label: 'English' },
-    { value: 'es', label: 'Spanish' },
-    { value: 'fr', label: 'French' },
-    { value: 'de', label: 'German' },
+  const dayTypes = useMemo(() => [
+    { value: 'full', label: 'Full Day' },
+    { value: 'half', label: 'Half Day' },
   ], []);
 
   const weekDays = useMemo(() => [
@@ -251,7 +321,42 @@ const BranchForm: React.FC = () => {
       ...prev,
       workingDays: checked 
         ? [...prev.workingDays, day]
-        : prev.workingDays.filter(d => d !== day)
+        : prev.workingDays.filter(d => d !== day),
+      workingDaySettings: {
+        ...prev.workingDaySettings,
+        [day]: {
+          ...prev.workingDaySettings[day],
+          isWorking: checked
+        }
+      }
+    }));
+  }, []);
+
+  const handleDayTypeChange = useCallback((day: string, dayType: 'full' | 'half') => {
+    setFormData(prev => ({
+      ...prev,
+      workingDaySettings: {
+        ...prev.workingDaySettings,
+        [day]: {
+          ...prev.workingDaySettings[day],
+          dayType,
+          startTime: dayType === 'half' ? '09:00' : prev.workingDaySettings[day].startTime,
+          endTime: dayType === 'half' ? '13:00' : prev.workingDaySettings[day].endTime
+        }
+      }
+    }));
+  }, []);
+
+  const handleDayTimeChange = useCallback((day: string, field: 'startTime' | 'endTime', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      workingDaySettings: {
+        ...prev.workingDaySettings,
+        [day]: {
+          ...prev.workingDaySettings[day],
+          [field]: value
+        }
+      }
     }));
   }, []);
 
@@ -293,6 +398,13 @@ const BranchForm: React.FC = () => {
             newErrors.adminPassword = 'Password must contain uppercase, lowercase, and number';
           }
           break;
+        case 'confirmPassword':
+          if (!value || (value as string).trim() === '') {
+            newErrors.confirmPassword = 'Please confirm your password';
+          } else if (value !== formData.adminPassword) {
+            newErrors.confirmPassword = 'Passwords do not match';
+          }
+          break;
         case 'adminFirstName':
         case 'adminLastName':
           if (!value || (value as string).trim() === '') {
@@ -312,6 +424,28 @@ const BranchForm: React.FC = () => {
         case 'workingDays':
           if ((value as string[]).length === 0) {
             newErrors.workingDays = 'At least one working day is required';
+          }
+          break;
+        case 'workingDaySettings':
+          const workingDays = Object.values(formData.workingDaySettings).filter(day => day.isWorking);
+          if (workingDays.length === 0) {
+            newErrors.workingDays = 'At least one working day is required';
+          }
+          // Validate that each working day has valid times
+          workingDays.forEach(day => {
+            if (!day.startTime || !day.endTime) {
+              newErrors.workingDays = 'All working days must have start and end times';
+            } else if (day.startTime >= day.endTime) {
+              newErrors.workingDays = 'Start time must be before end time';
+            }
+          });
+          break;
+        case 'bankName':
+        case 'accountNumber':
+        case 'accountHolderName':
+        case 'ifscCode':
+          if (!value || (value as string).trim() === '') {
+            newErrors[field] = 'This field is required';
           }
           break;
       }
@@ -351,22 +485,15 @@ const BranchForm: React.FC = () => {
     }
   }, [validateStep, currentStep, createBranchMutation, formData, errors, steps.length, toast]);
 
-  const generatePassword = useCallback(() => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    handleInputChange('adminPassword', password);
-  }, [handleInputChange]);
+
 
   const StepIndicator = useMemo(() => (
-    <div className="mb-12">
-      <div className="flex items-center justify-between mb-8">
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-3">
         {steps.map((step, index) => (
           <div key={index} className="flex items-center">
             <div className={`
-              flex items-center justify-center w-14 h-14 rounded-full border-3 transition-all duration-300 shadow-lg
+              flex items-center justify-center w-12 h-12 rounded-full border-3 transition-all duration-300 shadow-lg
               ${index <= currentStep 
                 ? 'bg-gradient-to-r from-blue-600 to-indigo-600 border-blue-600 text-white shadow-blue-200' 
                 : 'bg-white border-gray-200 text-gray-400 shadow-gray-100'
@@ -374,14 +501,14 @@ const BranchForm: React.FC = () => {
               ${index === currentStep ? 'scale-110 ring-4 ring-blue-100' : ''}
             `}>
               {index < currentStep ? (
-                <Check className="h-6 w-6" />
+                <Check className="h-5 w-5" />
               ) : (
-                <step.icon className="h-6 w-6" />
+                <step.icon className="h-5 w-5" />
               )}
             </div>
             {index < steps.length - 1 && (
               <div className={`
-                h-2 w-20 mx-4 transition-all duration-300 rounded-full
+                h-2 w-16 mx-3 transition-all duration-300 rounded-full
                 ${index < currentStep 
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600' 
                   : 'bg-gray-200'
@@ -391,16 +518,16 @@ const BranchForm: React.FC = () => {
           </div>
         ))}
       </div>
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+      <div className="text-center mb-3">
+        <h2 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-1">
           {steps[currentStep].title}
         </h2>
-        <p className="text-gray-600 text-base">{steps[currentStep].description}</p>
+        <p className="text-gray-600 text-xs">{steps[currentStep].description}</p>
       </div>
       <div className="relative">
         <Progress 
           value={((currentStep + 1) / steps.length) * 100} 
-          className="h-3 bg-gray-100 rounded-full overflow-hidden"
+          className="h-2 bg-gray-100 rounded-full overflow-hidden"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-500"
              style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }} />
@@ -439,8 +566,8 @@ const BranchForm: React.FC = () => {
     switch (currentStep) {
       case 0: // Basic Information
         return (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <FormField label="Branch Name" required error={errors.branchName}>
                 <EnhancedInput
                   value={formData.branchName}
@@ -475,7 +602,7 @@ const BranchForm: React.FC = () => {
               </FormField>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <FormField label="Email Address" required error={errors.email}>
                 <EnhancedInput
                   type="email"
@@ -494,7 +621,7 @@ const BranchForm: React.FC = () => {
               </FormField>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <FormField label="Alternate Phone" error={errors.alternatePhone}>
                 <EnhancedInput
                   value={formData.alternatePhone}
@@ -508,156 +635,240 @@ const BranchForm: React.FC = () => {
           </div>
         );
 
-      case 1: // Location Details
+      case 1: // Location & Operations
         return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField label="Country" required error={errors.country}>
-                <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
-                  <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
-                    <SelectValue placeholder="Select country" />
-                  </SelectTrigger>
-                  <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
-                    {countries.map((country) => (
-                      <SelectItem key={country.value} value={country.value}>
-                        {country.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FormField>
+          <div className="space-y-4">
+            {/* Location Section */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2 mb-3">
+                <MapPin className="h-4 w-4 text-blue-600" />
+                <h3 className="text-base font-semibold text-gray-900">Location Details</h3>
+              </div>
               
-              <FormField label="State / Province" required error={errors.state}>
-                <EnhancedInput
-                  value={formData.state}
-                  onChange={(e) => handleInputChange('state', e.target.value)}
-                  placeholder="e.g., California"
-                />
-              </FormField>
-              
-              <FormField label="City" required error={errors.city}>
-                <EnhancedInput
-                  value={formData.city}
-                  onChange={(e) => handleInputChange('city', e.target.value)}
-                  placeholder="e.g., Los Angeles"
-                />
-              </FormField>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <FormField label="Country" required error={errors.country}>
+                  <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
+                    <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
+                      {countries.map((country) => (
+                        <SelectItem key={country.value} value={country.value}>
+                          {country.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                
+                <FormField label="State / Province" required error={errors.state}>
+                  <EnhancedInput
+                    value={formData.state}
+                    onChange={(e) => handleInputChange('state', e.target.value)}
+                    placeholder="e.g., California"
+                  />
+                </FormField>
+                
+                <FormField label="City" required error={errors.city}>
+                  <EnhancedInput
+                    value={formData.city}
+                    onChange={(e) => handleInputChange('city', e.target.value)}
+                    placeholder="e.g., Los Angeles"
+                  />
+                </FormField>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormField label="Address Line 1" required error={errors.addressLine1}>
+                  <EnhancedInput
+                    value={formData.addressLine1}
+                    onChange={(e) => handleInputChange('addressLine1', e.target.value)}
+                    placeholder="Street address, building info"
+                  />
+                </FormField>
+                
+                <FormField label="Address Line 2" error={errors.addressLine2}>
+                  <EnhancedInput
+                    value={formData.addressLine2}
+                    onChange={(e) => handleInputChange('addressLine2', e.target.value)}
+                    placeholder="Landmark, optional details"
+                  />
+                </FormField>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormField label="ZIP / Postal Code" required error={errors.postalCode}>
+                  <EnhancedInput
+                    value={formData.postalCode}
+                    onChange={(e) => handleInputChange('postalCode', e.target.value)}
+                    placeholder="e.g., 90210"
+                  />
+                </FormField>
+                
+                <FormField label="Google Map Link / GPS" error={errors.googleMapLink}>
+                  <EnhancedInput
+                    value={formData.googleMapLink}
+                    onChange={(e) => handleInputChange('googleMapLink', e.target.value)}
+                    placeholder="https://maps.google.com/..."
+                  />
+                </FormField>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Address Line 1" required error={errors.addressLine1}>
-                <EnhancedInput
-                  value={formData.addressLine1}
-                  onChange={(e) => handleInputChange('addressLine1', e.target.value)}
-                  placeholder="Street address, building info"
-                />
-              </FormField>
-              
-              <FormField label="Address Line 2" error={errors.addressLine2}>
-                <EnhancedInput
-                  value={formData.addressLine2}
-                  onChange={(e) => handleInputChange('addressLine2', e.target.value)}
-                  placeholder="Landmark, optional details"
-                />
-              </FormField>
-            </div>
+            <Separator className="my-4" />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="ZIP / Postal Code" required error={errors.postalCode}>
-                <EnhancedInput
-                  value={formData.postalCode}
-                  onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                  placeholder="e.g., 90210"
-                />
-              </FormField>
+            {/* Operational Settings Section */}
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2 mb-3">
+                <Clock className="h-4 w-4 text-blue-600" />
+                <h3 className="text-base font-semibold text-gray-900">Operational Settings</h3>
+              </div>
               
-              <FormField label="Google Map Link / GPS" error={errors.googleMapLink}>
-                <EnhancedInput
-                  value={formData.googleMapLink}
-                  onChange={(e) => handleInputChange('googleMapLink', e.target.value)}
-                  placeholder="https://maps.google.com/..."
-                />
+              <FormField label="Working Days & Hours" required error={errors.workingDays}>
+                <div className="space-y-3">
+                  {weekDays.map((day) => {
+                    const daySettings = formData.workingDaySettings[day];
+                    return (
+                      <div key={day} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-3">
+                            <Checkbox
+                              id={day}
+                              checked={daySettings.isWorking}
+                              onCheckedChange={(checked) => handleWorkingDayChange(day, checked as boolean)}
+                            />
+                            <Label htmlFor={day} className="font-medium text-gray-900">
+                              {day}
+                            </Label>
+                          </div>
+                          {daySettings.isWorking && (
+                            <Badge variant={daySettings.dayType === 'full' ? 'default' : 'secondary'} className="text-xs">
+                              {daySettings.dayType === 'full' ? 'Full Day' : 'Half Day'}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {daySettings.isWorking && (
+                          <div className="space-y-2 ml-6">
+                            <div className="flex items-center space-x-4">
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="radio"
+                                  id={`${day}-full`}
+                                  name={`${day}-type`}
+                                  checked={daySettings.dayType === 'full'}
+                                  onChange={() => handleDayTypeChange(day, 'full')}
+                                  className="text-blue-600 focus:ring-blue-500"
+                                />
+                                <Label htmlFor={`${day}-full`} className="text-sm">Full Day</Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <input
+                                  type="radio"
+                                  id={`${day}-half`}
+                                  name={`${day}-type`}
+                                  checked={daySettings.dayType === 'half'}
+                                  onChange={() => handleDayTypeChange(day, 'half')}
+                                  className="text-blue-600 focus:ring-blue-500"
+                                />
+                                <Label htmlFor={`${day}-half`} className="text-sm">Half Day</Label>
+                              </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                              <div>
+                                <Label className="text-xs text-gray-600">Start Time</Label>
+                                <EnhancedInput
+                                  type="time"
+                                  value={daySettings.startTime || ''}
+                                  onChange={(e) => handleDayTimeChange(day, 'startTime', e.target.value)}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-xs text-gray-600">End Time</Label>
+                                <EnhancedInput
+                                  type="time"
+                                  value={daySettings.endTime || ''}
+                                  onChange={(e) => handleDayTimeChange(day, 'endTime', e.target.value)}
+                                  className="h-8 text-xs"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </FormField>
+
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-3">
+                <FormField label="Timezone" required error={errors.timezone}>
+                  <Select value={formData.timezone} onValueChange={(value) => handleInputChange('timezone', value)}>
+                    <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
+                      <SelectValue placeholder="Select timezone" />
+                    </SelectTrigger>
+                    <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
+                      {timezones.map((tz) => (
+                        <SelectItem key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              </div>
             </div>
           </div>
         );
 
-      case 2: // Operational Settings
+      case 2: // Bank Details
         return (
-          <div className="space-y-6">
-            <FormField label="Working Days" required error={errors.workingDays}>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {weekDays.map((day) => (
-                  <div key={day} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={day}
-                      checked={formData.workingDays.includes(day)}
-                      onCheckedChange={(checked) => handleWorkingDayChange(day, checked as boolean)}
-                    />
-                    <Label htmlFor={day} className="text-xs font-medium">
-                      {day.substring(0, 3)}
-                    </Label>
-                  </div>
-                ))}
-              </div>
-            </FormField>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField label="Working Hours Start" required>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="Bank Name" required error={errors.bankName}>
                 <EnhancedInput
-                  type="time"
-                  value={formData.workingHoursStart}
-                  onChange={(e) => handleInputChange('workingHoursStart', e.target.value)}
+                  value={formData.bankName}
+                  onChange={(e) => handleInputChange('bankName', e.target.value)}
+                  placeholder="e.g., State Bank of India"
                 />
               </FormField>
               
-              <FormField label="Working Hours End" required>
+              <FormField label="Account Number" required error={errors.accountNumber}>
                 <EnhancedInput
-                  type="time"
-                  value={formData.workingHoursEnd}
-                  onChange={(e) => handleInputChange('workingHoursEnd', e.target.value)}
+                  value={formData.accountNumber}
+                  onChange={(e) => handleInputChange('accountNumber', e.target.value)}
+                  placeholder="Enter account number"
                 />
-              </FormField>
-              
-              <FormField label="Timezone" required error={errors.timezone}>
-                <Select value={formData.timezone} onValueChange={(value) => handleInputChange('timezone', value)}>
-                  <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
-                    <SelectValue placeholder="Select timezone" />
-                  </SelectTrigger>
-                  <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
-                    {timezones.map((tz) => (
-                      <SelectItem key={tz.value} value={tz.value}>
-                        {tz.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </FormField>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Max Daily Appointments">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="Account Holder Name" required error={errors.accountHolderName}>
                 <EnhancedInput
-                  type="number"
-                  value={formData.maxDailyAppointments || ''}
-                  onChange={(e) => handleInputChange('maxDailyAppointments', e.target.value ? Number(e.target.value) : undefined)}
-                  placeholder="e.g., 50"
+                  value={formData.accountHolderName}
+                  onChange={(e) => handleInputChange('accountHolderName', e.target.value)}
+                  placeholder="Account holder's full name"
                 />
               </FormField>
               
-              <FormField label="Default Language">
-                <Select value={formData.defaultLanguage} onValueChange={(value) => handleInputChange('defaultLanguage', value)}>
-                  <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
-                    {languages.map((lang) => (
-                      <SelectItem key={lang.value} value={lang.value}>
-                        {lang.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <FormField label="IFSC Code" required error={errors.ifscCode}>
+                <EnhancedInput
+                  value={formData.ifscCode}
+                  onChange={(e) => handleInputChange('ifscCode', e.target.value)}
+                  placeholder="e.g., SBIN0001234"
+                />
+              </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="Bank Branch Code" error={errors.bankBranchCode}>
+                <EnhancedInput
+                  value={formData.bankBranchCode}
+                  onChange={(e) => handleInputChange('bankBranchCode', e.target.value)}
+                  placeholder="Optional branch code"
+                />
               </FormField>
             </div>
           </div>
@@ -665,37 +876,29 @@ const BranchForm: React.FC = () => {
 
       case 3: // Branch Admin Setup
         return (
-          <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-              <div className="flex items-center space-x-2">
-                <Shield className="h-4 w-4 text-blue-600" />
-                <h3 className="font-medium text-blue-900 text-sm">Branch Admin Account</h3>
-              </div>
-              <p className="text-blue-700 text-xs mt-1">
-                This admin will be able to log in as a sub-admin to manage this branch
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="First Name" required error={errors.adminFirstName}>
+          <div className="space-y-3">
+            {/* Personal Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="AdminFirst Name" required error={errors.adminFirstName}>
                 <EnhancedInput
                   value={formData.adminFirstName}
                   onChange={(e) => handleInputChange('adminFirstName', e.target.value)}
-                  placeholder="John"
+                  placeholder="First name"
                 />
               </FormField>
               
-              <FormField label="Last Name" required error={errors.adminLastName}>
+              <FormField label="Admin Last Name" required error={errors.adminLastName}>
                 <EnhancedInput
                   value={formData.adminLastName}
                   onChange={(e) => handleInputChange('adminLastName', e.target.value)}
-                  placeholder="Doe"
+                  placeholder="Last name"
                 />
               </FormField>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Admin Email" required error={errors.adminEmail}>
+            {/* Contact Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="AdminEmail" required error={errors.adminEmail}>
                 <EnhancedInput
                   type="email"
                   value={formData.adminEmail}
@@ -713,46 +916,44 @@ const BranchForm: React.FC = () => {
               </FormField>
             </div>
 
-            <FormField label="Admin Password" required error={errors.adminPassword}>
-              <div className="space-y-2">
-                <div className="flex space-x-2">
-                  <div className="relative flex-1">
-                    <EnhancedInput
-                      type={showPassword ? 'text' : 'password'}
-                      value={formData.adminPassword}
-                      onChange={(e) => handleInputChange('adminPassword', e.target.value)}
-                      placeholder="Minimum 8 characters"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1 h-7 w-7"
-                      onClick={() => setShowPassword(!showPassword)}
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </div>
+            {/* Password Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="Admin Password" required error={errors.adminPassword}>
+                <div className="relative">
+                  <EnhancedInput
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.adminPassword}
+                    onChange={(e) => handleInputChange('adminPassword', e.target.value)}
+                    placeholder="Min 8 chars, upper, lower, number"
+                  />
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={generatePassword}
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-6 w-6 hover:bg-gray-100"
+                    onClick={() => setShowPassword(!showPassword)}
                   >
-                    Generate
+                    {showPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                   </Button>
                 </div>
-                <div className="text-xs text-gray-500">
-                  Password must contain uppercase, lowercase, and number
-                </div>
-              </div>
-            </FormField>
+              </FormField>
+
+              <FormField label="Confirm Password" required error={errors.confirmPassword}>
+                <EnhancedInput
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                  placeholder="Confirm password"
+                />
+              </FormField>
+            </div>
           </div>
         );
 
       case 4: // Review & Submit
         return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
               <FormField label="Status" required>
                 <div className="flex items-center space-x-3">
                   <Switch
@@ -780,13 +981,13 @@ const BranchForm: React.FC = () => {
             </div>
 
             {/* Review Summary */}
-            <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-              <h3 className="font-semibold text-base mb-3">Review Branch Details</h3>
+            <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+              <h3 className="font-semibold text-base mb-2">Review Branch Details</h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Basic Information</h4>
-                  <div className="space-y-1 text-xs">
+                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Basic Information</h4>
+                  <div className="space-y-0.5 text-xs">
                     <p><span className="text-gray-600">Branch Name:</span> {formData.branchName}</p>
                     <p><span className="text-gray-600">Email:</span> {formData.email}</p>
                     <p><span className="text-gray-600">Phone:</span> {formData.phoneNumber}</p>
@@ -794,8 +995,8 @@ const BranchForm: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Location</h4>
-                  <div className="space-y-1 text-xs">
+                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Location</h4>
+                  <div className="space-y-0.5 text-xs">
                     <p><span className="text-gray-600">City:</span> {formData.city}, {formData.state}</p>
                     <p><span className="text-gray-600">Country:</span> {formData.country}</p>
                     <p><span className="text-gray-600">Address:</span> {formData.addressLine1}</p>
@@ -803,17 +1004,36 @@ const BranchForm: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Operations</h4>
-                  <div className="space-y-1 text-xs">
+                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Operations</h4>
+                  <div className="space-y-0.5 text-xs">
                     <p><span className="text-gray-600">Working Days:</span> {formData.workingDays.join(', ')}</p>
-                    <p><span className="text-gray-600">Hours:</span> {formData.workingHoursStart} - {formData.workingHoursEnd}</p>
                     <p><span className="text-gray-600">Timezone:</span> {formData.timezone}</p>
+                    <div className="mt-1">
+                      <p className="text-gray-600 mb-0.5">Working Hours:</p>
+                      {Object.entries(formData.workingDaySettings)
+                        .filter(([_, settings]) => settings.isWorking)
+                        .map(([day, settings]) => (
+                          <p key={day} className="ml-2 text-xs">
+                            <span className="text-gray-500">{day}:</span> {settings.startTime} - {settings.endTime} ({settings.dayType === 'full' ? 'Full Day' : 'Half Day'})
+                          </p>
+                        ))}
+                    </div>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="font-medium text-gray-900 mb-2 text-sm">Branch Admin</h4>
-                  <div className="space-y-1 text-xs">
+                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Bank Details</h4>
+                  <div className="space-y-0.5 text-xs">
+                    <p><span className="text-gray-600">Bank:</span> {formData.bankName}</p>
+                    <p><span className="text-gray-600">Account:</span> {formData.accountNumber}</p>
+                    <p><span className="text-gray-600">Holder:</span> {formData.accountHolderName}</p>
+                    <p><span className="text-gray-600">IFSC:</span> {formData.ifscCode}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-1 text-sm">Branch Admin</h4>
+                  <div className="space-y-0.5 text-xs">
                     <p><span className="text-gray-600">Name:</span> {formData.adminFirstName} {formData.adminLastName}</p>
                     <p><span className="text-gray-600">Email:</span> {formData.adminEmail}</p>
                     <p><span className="text-gray-600">Phone:</span> {formData.adminPhone}</p>
@@ -832,9 +1052,9 @@ const BranchForm: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-lg">
+      <div className="bg-white border-b border-gray-100 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-8">
+          <div className="flex justify-between items-center py-6">
                           <div className="flex items-center space-x-6">
               
                 <Separator orientation="vertical" className="h-8" />
@@ -855,17 +1075,17 @@ const BranchForm: React.FC = () => {
       </div>
 
       {/* Form Content */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Card className="bg-white shadow-2xl border-0 rounded-2xl overflow-hidden">
-          <CardContent className="p-10">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <Card className="bg-white shadow-lg border-0 rounded-xl overflow-hidden">
+          <CardContent className="p-4">
             {StepIndicator}
             
-            <div className="mt-10">
+            <div className="mt-4">
               {renderStepContent()}
             </div>
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between pt-10 mt-10 border-t border-gray-100">
+            <div className="flex justify-between pt-4 mt-4 border-t border-gray-100">
               <Button
                 variant="outline"
                 onClick={handlePrevious}

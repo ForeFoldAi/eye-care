@@ -54,6 +54,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useDepartments, DepartmentFormData, Department } from '@/contexts/DepartmentContext';
 import { useShifts, ShiftTiming } from '@/contexts/ShiftContext';
+import { useStaff } from '@/contexts/StaffContext';
 import { useToast } from '@/hooks/use-toast';
 import { authService } from '@/lib/auth';
 
@@ -70,6 +71,7 @@ interface StaffMember {
 const DepartmentManagement = () => {
   const { departments, addDepartment, isLoading, error } = useDepartments();
   const { shiftTimings, addShift, isLoading: shiftsLoading, error: shiftsError } = useShifts();
+  const { staff } = useStaff(); // Add staff context to get staff data
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -118,14 +120,61 @@ const DepartmentManagement = () => {
 
 
   const user = authService.getStoredUser();
-  // Filter departments by branchId
-  const branchDepartments = departments.filter(dept => dept.branchId === user?.branchId);
+  
+  // Debug logging to understand branch filtering
+  console.log('User branchId:', user?.branchId);
+  console.log('All departments:', departments.length);
+  console.log('Department branchIds:', departments.map(d => ({ 
+    name: d.name, 
+    branchId: d.branchId, 
+    branchIdType: typeof d.branchId 
+  })));
+  
+  // Filter departments by branchId - handle both string and ObjectId comparison
+  const branchDepartments = departments.filter(dept => {
+    // Handle different possible formats of branchId
+    const deptBranchId = typeof dept.branchId === 'object' ? dept.branchId._id || dept.branchId : dept.branchId;
+    const userBranchId = user?.branchId;
+    
+    const matches = deptBranchId === userBranchId || deptBranchId === userBranchId?.toString();
+    console.log(`Department ${dept.name}: deptBranchId=${deptBranchId}, userBranchId=${userBranchId}, matches=${matches}`);
+    
+    return matches;
+  });
+  
+  console.log('Filtered departments for branch:', branchDepartments.length);
+  
   // Remove duplicates by _id
   const uniqueDepartments = Array.from(
     new Map(branchDepartments.map(dept => [dept._id, dept])).values()
   );
+  
+  // Enhance departments with staff data
+  const departmentsWithStaff = uniqueDepartments.map(dept => {
+    // Find staff members that belong to this department
+    const departmentStaff = staff.filter(member => 
+      member.department && member.department.toLowerCase() === dept.name.toLowerCase()
+    );
+    
+    // Map staff to match the Department interface
+    const mappedStaff = departmentStaff.map(member => ({
+      _id: member._id,
+      firstName: member.firstName,
+      lastName: member.lastName,
+      role: member.role,
+      specialization: member.specialization || ''
+    }));
+    
+    return {
+      ...dept,
+      staff: mappedStaff,
+      staffCount: departmentStaff.length, // Update staff count with actual data
+      // Keep other properties as they are
+    };
+  });
+  
   // Use only unique, branch-level departments in the UI
-  const filteredDepartments = uniqueDepartments.filter((dept) => {
+  const filteredDepartments = departmentsWithStaff.filter((dept) => {
     const matchesSearch = 
       dept.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       dept.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -390,7 +439,14 @@ const DepartmentManagement = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Department Management</h1>
-          <p className="text-gray-600 mt-1">Organize and manage hospital departments</p>
+          <p className="text-gray-600 mt-1">
+            Organize and manage departments for your branch
+            {user?.branchId && (
+              <span className="ml-2 text-blue-600 font-medium">
+                (Branch ID: {user.branchId})
+              </span>
+            )}
+          </p>
         </div>
         <div className="flex space-x-3">
           <Button 
@@ -873,6 +929,28 @@ const DepartmentManagement = () => {
         </Card>
       )}
 
+      {/* Branch Info Card */}
+      {user?.branchId && (
+        <Card className="mb-4 border-blue-200 bg-blue-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-blue-900">Branch Filter Active</p>
+                <p className="text-xs text-blue-700">
+                  Showing departments for Branch ID: {user.branchId}
+                </p>
+                <p className="text-xs text-blue-600">
+                  {departmentsWithStaff.length} departments found in your branch
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -880,7 +958,7 @@ const DepartmentManagement = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Departments</p>
-                <p className="text-2xl font-bold text-blue-600">{departments.length}</p>
+                <p className="text-2xl font-bold text-blue-600">{departmentsWithStaff.length}</p>
               </div>
               <Building2 className="w-8 h-8 text-blue-500" />
             </div>
@@ -891,7 +969,7 @@ const DepartmentManagement = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Active Departments</p>
-                <p className="text-2xl font-bold text-green-600">{departments.filter(d => d.isActive).length}</p>
+                <p className="text-2xl font-bold text-green-600">{departmentsWithStaff.filter(d => d.isActive).length}</p>
               </div>
               <Activity className="w-8 h-8 text-green-500" />
             </div>
@@ -902,7 +980,7 @@ const DepartmentManagement = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Staff</p>
-                <p className="text-2xl font-bold text-purple-600">{departments.reduce((sum, d) => sum + d.staffCount, 0)}</p>
+                <p className="text-2xl font-bold text-purple-600">{departmentsWithStaff.reduce((sum, d) => sum + d.staffCount, 0)}</p>
               </div>
               <Users className="w-8 h-8 text-purple-500" />
             </div>
@@ -913,7 +991,7 @@ const DepartmentManagement = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Active Patients</p>
-                <p className="text-2xl font-bold text-orange-600">{departments.reduce((sum, d) => sum + d.activePatients, 0)}</p>
+                <p className="text-2xl font-bold text-orange-600">{departmentsWithStaff.reduce((sum, d) => sum + d.activePatients, 0)}</p>
               </div>
               <Heart className="w-8 h-8 text-orange-500" />
             </div>
@@ -978,7 +1056,7 @@ const DepartmentManagement = () => {
             <div>
               <CardTitle>Departments</CardTitle>
               <CardDescription>
-                {filteredDepartments.length} of {departments.length} department(s) found
+                {filteredDepartments.length} of {departmentsWithStaff.length} department(s) in your branch
                 {(searchTerm || statusFilter !== 'all' || sizeFilter !== 'all') && (
                   <span className="ml-2 text-blue-600">
                     (filtered)
@@ -1045,6 +1123,10 @@ const DepartmentManagement = () => {
                                 View Details
                               </DropdownMenuItem>
                               <DropdownMenuItem>
+                                <Users className="w-4 h-4 mr-2" />
+                                View All Staff ({department.staff.length})
+                              </DropdownMenuItem>
+                              <DropdownMenuItem>
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
@@ -1090,6 +1172,39 @@ const DepartmentManagement = () => {
                             </div>
                           </div>
                         )}
+                        
+                        {/* Staff Details */}
+                        {department.staff && department.staff.length > 0 && (
+                          <div className="mt-4 pt-4 border-t">
+                            <div className="mb-2">
+                              <div className="text-xs font-medium text-gray-900">Staff Members ({department.staff.length})</div>
+                            </div>
+                            <div className="space-y-2 max-h-24 overflow-y-auto">
+                              {department.staff.slice(0, 3).map((staffMember) => (
+                                <div key={staffMember._id} className="flex items-center space-x-2">
+                                  <Avatar className="w-5 h-5">
+                                    <AvatarFallback className="text-xs bg-blue-100 text-blue-700">
+                                      {staffMember.firstName[0]}{staffMember.lastName[0]}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-xs font-medium text-gray-900 truncate">
+                                      {staffMember.firstName} {staffMember.lastName}
+                                    </div>
+                                    <div className="text-xs text-gray-500 truncate">
+                                      {staffMember.role} {staffMember.specialization && `• ${staffMember.specialization}`}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              {department.staff.length > 3 && (
+                                <div className="text-xs text-gray-500 text-center">
+                                  +{department.staff.length - 3} more staff members
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   ))
@@ -1100,7 +1215,9 @@ const DepartmentManagement = () => {
                     <p className="text-gray-600 mb-4">
                       {searchTerm || statusFilter !== 'all' || sizeFilter !== 'all'
                         ? 'Try adjusting your search or filter criteria' 
-                        : 'Get started by creating your first department'
+                        : departmentsWithStaff.length === 0 
+                          ? 'No departments found for your branch. Get started by creating your first department.'
+                          : 'Get started by creating your first department'
                       }
                     </p>
                     {searchTerm || statusFilter !== 'all' || sizeFilter !== 'all' ? (

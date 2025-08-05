@@ -387,24 +387,24 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       }`}>
         {/* Desktop Header */}
         <div className="hidden lg:block bg-white border-b border-gray-200 flex-shrink-0">
-          <div className="flex items-center justify-between h-16 px-6">
-            <div className="flex items-center space-x-4 min-w-0 flex-1">
+          <div className="flex items-center justify-between h-14 px-4">
+            <div className="flex items-center min-w-0 flex-1">
               <Button
                 variant="ghost"
                 size="sm"
                 className="mr-2"
                 onClick={toggleSidebar}
               >
-                {sidebarOpen ? <PanelLeftClose className="w-5 h-5" /> : <PanelLeft className="w-5 h-5" />}
+                {sidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
               </Button>
               
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+              <div className="flex items-center min-w-0 flex-1">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0 mr-2">
                   {hospitalData?.logoUrl ? (
                     <img 
                       src={hospitalData.logoUrl}
                       alt={`${hospitalData.name} Logo`}
-                      className="w-10 h-10 object-contain rounded-lg"
+                      className="w-6 h-6 object-contain rounded"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         target.style.display = 'none';
@@ -412,85 +412,76 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                       }}
                     />
                   ) : (
-                    <Hospital className="w-7 h-7 text-white" />
+                    <Hospital className="w-5 h-5 text-white" />
                   )}
                 </div>
-                <div>
-                  <h1 className="text-xl font-semibold text-gray-900">
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-base font-semibold text-gray-900 truncate max-w-[50ch]">
                     {hospitalLoading ? 'Loading...' : hospitalData?.name || 'Hospital Management'}
                   </h1>
-                  
-                  {hospitalData?.description && (
-                    <p className="text-xs text-gray-500">{hospitalData.description}</p>
-                  )}
                 </div>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-900">Status</span>
-                <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+            
+            <div className="flex items-center space-x-2 flex-shrink-0">
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-medium text-gray-600">Account Status</span>
+                <div className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                   subscriptionData?.status === 'active' 
-                    ? 'bg-blue-600 text-white' 
-                    : 'bg-red-600 text-white'
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
                 }`}>
                   {subscriptionData?.status === 'active' ? 'Active' : 'Inactive'}
                 </div>
               </div>
               
               <Button 
-                variant="outline"
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowSupportModal(true)}
-                className="flex items-center gap-2"
+                className="h-8 px-2"
               >
                 <AlertCircle className="w-4 h-4" />
-                Support
               </Button>
 
               {/* Date and Time */}
-              <div className="hidden lg:flex items-center space-x-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 min-w-[120px]">
-                <div className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                <div className="text-sm min-w-0">
-                  <div className="font-medium text-gray-900 truncate">
-                    {currentTime.toLocaleTimeString('en-US', { 
-                      hour: '2-digit', 
-                      minute: '2-digit',
-                      hour12: true 
-                    })}
-                  </div>
-                  <div className="text-xs text-gray-500 truncate">
-                    {currentTime.toLocaleDateString('en-US', { 
-                      weekday: 'short', 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}
-                  </div>
+              <div className="hidden xl:flex items-center space-x-1 px-2 py-1 bg-gray-50 rounded border text-xs min-w-[100px]">
+                <div className="font-medium text-gray-900">
+                  {currentTime.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                  })}
+                </div>
+                <div className="text-gray-500">
+                  {currentTime.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric' 
+                  })}
                 </div>
               </div>
-            </div>
-            <div className="flex items-center space-x-4 flex-shrink-0">
+              
               <NotificationBell />
               
               {/* User Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-3 px-3 py-2 hover:bg-gray-100">
-                    <Avatar className="w-8 h-8">
+                  <Button variant="ghost" className="flex items-center space-x-2 px-2 py-1 h-8 hover:bg-gray-100">
+                    <Avatar className="w-6 h-6">
                       <AvatarImage src={user.profilePhotoUrl} alt={`${user.firstName} ${user.lastName}`} />
-                      <AvatarFallback className="bg-blue-100 text-blue-700 font-semibold text-sm">
+                      <AvatarFallback className="bg-blue-100 text-blue-700 font-semibold text-xs">
                         {user.firstName?.[0]}{user.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="hidden md:block text-left">
-                      <p className="text-sm font-medium text-gray-900">
+                    <div className="hidden lg:block text-left min-w-0">
+                      <p className="text-xs font-medium text-gray-900 truncate max-w-[20ch]">
                         {user.firstName} {user.lastName}
                       </p>
-                      <p className="text-xs text-gray-500">Hospital Administrator</p>
                     </div>
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <ChevronDown className="w-3 h-3 text-gray-400" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setShowProfileModal(true)}>
@@ -514,23 +505,31 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
 
         {/* Mobile Header */}
         <div className="sticky top-0 z-30 bg-white border-b border-gray-200 lg:hidden">
-          <div className="flex items-center justify-between h-16 px-4">
+          <div className="flex items-center justify-between h-12 px-3">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setSidebarOpen(true)}
+              className="p-1"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-4 h-4" />
             </Button>
-            <h1 className="text-lg font-semibold text-gray-900">Hospital Management</h1>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center min-w-0 flex-1 mx-2">
+              <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center mr-2 flex-shrink-0">
+                <Hospital className="w-4 h-4 text-white" />
+              </div>
+              <h1 className="text-sm font-semibold text-gray-900 truncate">
+                {hospitalLoading ? 'Loading...' : hospitalData?.name || 'Hospital Management'}
+              </h1>
+            </div>
+            <div className="flex items-center space-x-1">
               <NotificationBell />
               
               {/* Mobile User Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="p-1">
-                    <Avatar className="w-7 h-7">
+                    <Avatar className="w-6 h-6">
                       <AvatarImage src={user.profilePhotoUrl} alt={`${user.firstName} ${user.lastName}`} />
                       <AvatarFallback className="bg-blue-100 text-blue-700 font-semibold text-xs">
                         {user.firstName?.[0]}{user.lastName?.[0]}
@@ -538,7 +537,7 @@ const AdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-40">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setShowProfileModal(true)}>

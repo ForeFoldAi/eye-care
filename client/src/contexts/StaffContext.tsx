@@ -114,7 +114,7 @@ export const StaffProvider: React.FC<StaffProviderProps> = ({ children }) => {
   const queryClient = useQueryClient();
   const user = authService.getStoredUser();
 
-  // Fetch staff from API
+  // Fetch staff from API - only for roles that need staff management
   const { 
     data: staff = [], 
     isLoading, 
@@ -145,7 +145,7 @@ export const StaffProvider: React.FC<StaffProviderProps> = ({ children }) => {
         ['doctor', 'nurse', 'receptionist'].includes(user.role)
       );
     },
-    enabled: !!user?.branchId,
+    enabled: !!user?.branchId && ['admin', 'sub_admin'].includes(user?.role || ''),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 

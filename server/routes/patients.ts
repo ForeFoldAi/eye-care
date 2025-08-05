@@ -16,6 +16,32 @@ router.get('/', authenticateToken, enforceTenantIsolation, async (req: TenantReq
     const skip = (Number(page) - 1) * Number(limit);
     
     const tenantFilter = buildTenantFilter(req);
+    console.log('Tenant filter for patients:', tenantFilter);
+    console.log('User info:', {
+      id: req.user?.id,
+      role: req.user?.role,
+      hospitalId: req.user?.hospitalId,
+      branchId: req.user?.branchId
+    });
+    
+    // Debug mode: show all patients if requested
+    if (req.query.debug === 'true') {
+      console.log('Debug mode: fetching all patients');
+      const allPatients = await Patient.find({}).sort({ createdAt: -1 }).limit(10);
+      console.log('All patients in database:', allPatients.length);
+      console.log('Sample patient:', allPatients[0] ? allPatients[0].toObject() : 'No patients in DB');
+      return res.json({
+        data: {
+          patients: allPatients.map(p => ({
+            ...p.toObject(),
+            id: p._id.toString(),
+          })),
+          debug: true,
+          message: 'Debug mode: showing all patients'
+        },
+      });
+    }
+    
     let query = Patient.find(tenantFilter);
     
     // Add search functionality
@@ -32,6 +58,10 @@ router.get('/', authenticateToken, enforceTenantIsolation, async (req: TenantReq
       query.sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
       Patient.countDocuments(tenantFilter)
     ]);
+
+    console.log('Patients found:', patients.length);
+    console.log('Total patients in tenant:', total);
+    console.log('Sample patient:', patients[0] ? patients[0].toObject() : 'No patients found');
 
     await auditLogger.logRead('patient', {
       search,
@@ -100,10 +130,11 @@ router.get('/:id', authenticateToken, enforceTenantIsolation, async (req: Tenant
 });
 
 // Create new patient (tenant-isolated)
-router.post('/', authenticateToken, enforceTenantIsolation, authorizeRole(['receptionist']), async (req: TenantRequest, res) => {
+router.post('/', authenticateToken, enforceTenantIsolation, authorizeRole(['receptionist', 'admin', 'sub_admin']), async (req: TenantRequest, res) => {
   const auditLogger = createAuditLogger(req);
   
   try {
+    console.log('Received patient data:', JSON.stringify(req.body, null, 2));
     const patientData = insertPatientSchema.parse(req.body);
     
     // Check for existing patient within tenant scope
@@ -142,11 +173,159 @@ router.post('/', authenticateToken, enforceTenantIsolation, authorizeRole(['rece
   } catch (error) {
     console.error('Error creating patient:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // If it's a Zod validation error, provide more specific feedback
+    if (error && typeof error === 'object' && 'issues' in error) {
+      const zodError = error as any;
+      console.error('Zod validation errors:', zodError.issues);
+      await auditLogger.logError('CREATE', 'patient', {
+        requestData: req.body,
+        validationErrors: zodError.issues,
+        error: errorMessage
+      }, 'Validation error creating patient');
+      return res.status(400).json({ 
+        message: 'Validation failed', 
+        errors: zodError.issues.map((issue: any) => ({
+          field: issue.path.join('.'),
+          message: issue.message
+        }))
+      });
+    }
+    
     await auditLogger.logError('CREATE', 'patient', {
       requestData: req.body,
       error: errorMessage
     }, 'Error creating patient');
-    res.status(400).json({ message: 'Invalid request data' });
+    res.status(400).json({ message: errorMessage || 'Invalid request data' });
+  }
+});
+
+// Search patients (tenant-isolated) - used for phone number validation and general search
+router.get('/search', authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {
+  const auditLogger = createAuditLogger(req);
+  
+  try {
+    const { q, limit = 20 } = req.query;
+    
+    console.log('Patient search request:', {
+      query: q,
+      limit,
+      userRole: req.user?.role,
+      userHospitalId: req.user?.hospitalId,
+      userBranchId: req.user?.branchId
+    });
+
+    if (!q || typeof q !== 'string' || q.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query must be at least 2 characters long'
+      });
+    }
+
+    const tenantFilter = buildTenantFilter(req);
+    console.log('Tenant filter for search:', tenantFilter);
+    
+    // For now, let's search all patients if tenant filter is empty (for debugging)
+    // This will help us see if the issue is with tenant filtering
+    const searchQuery = {
+      ...(Object.keys(tenantFilter).length > 0 ? tenantFilter : {}),
+      $or: [
+        { firstName: { $regex: q, $options: 'i' } },
+        { lastName: { $regex: q, $options: 'i' } },
+        { phone: { $regex: q, $options: 'i' } },
+        { email: { $regex: q, $options: 'i' } },
+        // Exact phone match for validation
+        { phone: q }
+      ]
+    };
+
+    // Add full name search if query has spaces (likely a name search)
+    if (q.includes(' ')) {
+      searchQuery.$or.push({
+        $expr: { 
+          $regexMatch: { 
+            input: { $concat: ['$firstName', ' ', '$lastName'] }, 
+            regex: q, 
+            options: 'i' 
+          } 
+        }
+      });
+    }
+
+    console.log('Search query:', JSON.stringify(searchQuery, null, 2));
+
+    let patients;
+    try {
+      patients = await Patient.find(searchQuery)
+        .select('firstName lastName phone email createdAt')
+        .sort({ createdAt: -1 })
+        .limit(parseInt(limit as string));
+    } catch (searchError) {
+      console.error('Search with tenant filter failed:', searchError);
+      
+      // Fallback: search without tenant filter for debugging
+      console.log('Trying fallback search without tenant filter...');
+      patients = await Patient.find({
+        $or: [
+          { firstName: { $regex: q, $options: 'i' } },
+          { lastName: { $regex: q, $options: 'i' } },
+          { phone: { $regex: q, $options: 'i' } },
+          { email: { $regex: q, $options: 'i' } },
+          { phone: q }
+        ]
+      })
+        .select('firstName lastName phone email createdAt hospitalId branchId')
+        .sort({ createdAt: -1 })
+        .limit(parseInt(limit as string));
+    }
+
+    console.log('Search results:', {
+      query: q,
+      resultsCount: patients.length,
+      patients: patients.map(p => ({
+        id: p._id.toString(),
+        firstName: p.firstName,
+        lastName: p.lastName,
+        phone: p.phone,
+        hospitalId: p.hospitalId,
+        branchId: p.branchId
+      }))
+    });
+
+    await auditLogger.logRead('patient', {
+      searchQuery: q,
+      resultsCount: patients.length
+    });
+
+    res.json({
+      success: true,
+      data: patients.map(p => ({
+        ...p.toObject(),
+        id: p._id.toString(),
+      }))
+    });
+
+  } catch (error) {
+    console.error('Error searching patients:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Log detailed error information
+    console.error('Search error details:', {
+      query: req.query.q,
+      error: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    
+    await auditLogger.logError('READ', 'patient', { 
+      searchQuery: req.query.q,
+      error: errorMessage 
+    }, 'Error searching patients');
+    
+    res.status(500).json({ 
+      success: false,
+      message: 'Error searching patients',
+      error: errorMessage
+    });
   }
 });
 

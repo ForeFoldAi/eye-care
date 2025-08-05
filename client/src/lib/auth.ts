@@ -8,6 +8,7 @@ export interface User {
   firstName: string;
   lastName: string;
   specialization?: string;
+  department?: string;
   isActive: boolean;
   hospitalId?: string;
   branchId?: string;
@@ -289,6 +290,34 @@ export const authService = {
       hospitalId: user.hospitalId,
       branchId: user.branchId
     };
+  },
+
+  // Helper method for authenticated API requests
+  fetchWithAuth: async (url: string, options: RequestInit = {}) => {
+    const token = authService.getToken();
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...options,
+      headers: {
+        ...options.headers,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        authService.logout();
+        throw new Error('Authentication failed');
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Request failed with status ${response.status}`);
+    }
+
+    return response.json();
   }
 };
 

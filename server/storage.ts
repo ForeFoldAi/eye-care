@@ -1,6 +1,8 @@
 import bcrypt from "bcrypt";
 import PatientModel, { IPatient } from './models/patient';
 import User from './models/user';
+import { Appointment } from './models/appointment';
+import { DoctorAvailability } from './models/doctorAvailability';
 
 // Define interfaces for the storage layer
 export interface IUser {
@@ -40,20 +42,29 @@ export interface IInsertPatient {
 
 export interface IAppointment {
   _id: any;
-  patientId: number;
-  doctorId: number;
+  patientId: any; // mongoose.Types.ObjectId
+  doctorId: any; // mongoose.Types.ObjectId
   datetime: Date;
-  status: string;
+  type: 'consultation' | 'checkup' | 'follow-up';
+  status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  tokenNumber: number;
   notes?: string;
+  approved?: boolean;
+  followUpDate?: Date;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface IInsertAppointment {
-  patientId: number;
-  doctorId: number;
+  patientId: any; // mongoose.Types.ObjectId
+  doctorId: any; // mongoose.Types.ObjectId
   datetime: Date;
-  status?: string;
+  type: 'consultation' | 'checkup' | 'follow-up';
+  status?: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
+  tokenNumber: number;
   notes?: string;
+  approved?: boolean;
+  followUpDate?: Date;
 }
 
 export interface IPrescription {
@@ -107,20 +118,44 @@ export interface IInsertPayment {
 }
 
 export interface IDoctorAvailability {
-  id: number;
-  doctorId: number;
+  _id: any;
+  doctorId: string;
   dayOfWeek: number;
-  startTime: string;
-  endTime: string;
+  slots: Array<{
+    startTime: string;
+    endTime: string;
+    hoursAvailable: number;
+    tokenCount: number;
+    bookedTokens: number[];
+  }>;
   isAvailable: boolean;
+  isActive: boolean;
+  addedBy: {
+    userId: string;
+    role: string;
+    name: string;
+  };
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface IInsertDoctorAvailability {
-  doctorId: number;
+  doctorId: string;
   dayOfWeek: number;
-  startTime: string;
-  endTime: string;
+  slots: Array<{
+    startTime: string;
+    endTime: string;
+    hoursAvailable: number;
+    tokenCount: number;
+    bookedTokens?: number[];
+  }>;
   isAvailable?: boolean;
+  isActive?: boolean;
+  addedBy: {
+    userId: string;
+    role: string;
+    name: string;
+  };
 }
 
 export interface IStorage {
@@ -143,6 +178,7 @@ export interface IStorage {
   getAppointmentsByPatient(patientId: number): Promise<IAppointment[]>;
   getAppointmentsByDoctor(doctorId: number): Promise<IAppointment[]>;
   getAppointmentsByDate(date: string): Promise<IAppointment[]>;
+  getAllAppointments(): Promise<IAppointment[]>;
   updateAppointmentStatus(id: number, status: string): Promise<IAppointment | undefined>;
   
   // Prescription methods
@@ -158,7 +194,9 @@ export interface IStorage {
   
   // Doctor availability methods
   setDoctorAvailability(availability: IInsertDoctorAvailability): Promise<IDoctorAvailability>;
-  getDoctorAvailability(doctorId: number): Promise<IDoctorAvailability[]>;
+  getDoctorAvailability(doctorId: string): Promise<IDoctorAvailability[]>;
+  getDoctorAvailabilitiesByDay(dayOfWeek: number): Promise<IDoctorAvailability[]>;
+  getAllAvailabilities(): Promise<IDoctorAvailability[]>;
 }
 
 export class MongoDBStorage implements IStorage {
@@ -253,12 +291,58 @@ export class MongoDBStorage implements IStorage {
   }
 
   // Appointment methods
-  async createAppointment(appointment: IInsertAppointment): Promise<IAppointment> { throw new Error('Not implemented'); }
-  async getAppointmentById(id: number): Promise<IAppointment | undefined> { throw new Error('Not implemented'); }
-  async getAppointmentsByPatient(patientId: number): Promise<IAppointment[]> { throw new Error('Not implemented'); }
-  async getAppointmentsByDoctor(doctorId: number): Promise<IAppointment[]> { throw new Error('Not implemented'); }
-  async getAppointmentsByDate(date: string): Promise<IAppointment[]> { throw new Error('Not implemented'); }
-  async updateAppointmentStatus(id: number, status: string): Promise<IAppointment | undefined> { throw new Error('Not implemented'); }
+  async createAppointment(appointment: IInsertAppointment): Promise<IAppointment> { 
+    const doc = new Appointment({
+      ...appointment,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    const saved = await doc.save();
+    return saved.toObject();
+  }
+  
+  async getAppointmentById(id: number): Promise<IAppointment | undefined> { 
+    const appointment = await Appointment.findById(id);
+    return appointment ? appointment.toObject() : undefined;
+  }
+  
+  async getAppointmentsByPatient(patientId: number): Promise<IAppointment[]> { 
+    const appointments = await Appointment.find({ patientId });
+    return appointments.map(a => a.toObject());
+  }
+  
+  async getAppointmentsByDoctor(doctorId: number): Promise<IAppointment[]> { 
+    const appointments = await Appointment.find({ doctorId });
+    return appointments.map(a => a.toObject());
+  }
+  
+  async getAppointmentsByDate(date: string): Promise<IAppointment[]> { 
+    const startDate = new Date(date);
+    const endDate = new Date(date);
+    endDate.setDate(endDate.getDate() + 1);
+    
+    const appointments = await Appointment.find({
+      datetime: {
+        $gte: startDate,
+        $lt: endDate
+      }
+    });
+    return appointments.map(a => a.toObject());
+  }
+  
+  async getAllAppointments(): Promise<IAppointment[]> { 
+    const appointments = await Appointment.find();
+    return appointments.map(a => a.toObject());
+  }
+  
+  async updateAppointmentStatus(id: number, status: string): Promise<IAppointment | undefined> { 
+    const updated = await Appointment.findByIdAndUpdate(
+      id,
+      { $set: { status, updatedAt: new Date() } },
+      { new: true }
+    );
+    return updated ? updated.toObject() : undefined;
+  }
 
   // Prescription methods
   async createPrescription(prescription: IInsertPrescription): Promise<IPrescription> { throw new Error('Not implemented'); }
@@ -272,8 +356,30 @@ export class MongoDBStorage implements IStorage {
   async getPaymentsByDate(date: string): Promise<IPayment[]> { throw new Error('Not implemented'); }
 
   // Doctor availability methods
-  async setDoctorAvailability(availability: IInsertDoctorAvailability): Promise<IDoctorAvailability> { throw new Error('Not implemented'); }
-  async getDoctorAvailability(doctorId: number): Promise<IDoctorAvailability[]> { throw new Error('Not implemented'); }
+  async setDoctorAvailability(availability: IInsertDoctorAvailability): Promise<IDoctorAvailability> { 
+    const doc = new DoctorAvailability({
+      ...availability,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    const saved = await doc.save();
+    return saved.toObject();
+  }
+  
+  async getDoctorAvailability(doctorId: string): Promise<IDoctorAvailability[]> { 
+    const availabilities = await DoctorAvailability.find({ doctorId });
+    return availabilities.map(a => a.toObject());
+  }
+  
+  async getDoctorAvailabilitiesByDay(dayOfWeek: number): Promise<IDoctorAvailability[]> { 
+    const availabilities = await DoctorAvailability.find({ dayOfWeek });
+    return availabilities.map(a => a.toObject());
+  }
+  
+  async getAllAvailabilities(): Promise<IDoctorAvailability[]> { 
+    const availabilities = await DoctorAvailability.find();
+    return availabilities.map(a => a.toObject());
+  }
 }
 
 export const storage = new MongoDBStorage();

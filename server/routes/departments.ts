@@ -86,6 +86,44 @@ router.get('/hospital/:hospitalId', authenticateToken, async (req: AuthRequest, 
   }
 });
 
+// Get single department by ID
+router.get('/:id', authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const department = await Department.findById(req.params.id)
+      .populate('createdBy', 'firstName lastName email')
+      .populate('branchId', 'branchName');
+
+    if (!department) {
+      return res.status(404).json({ message: 'Department not found' });
+    }
+
+    // Check if user has access to this department
+    if (user.role === 'doctor' && user.department !== department.name) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    if (user.role === 'receptionist' && user.department && user.department !== department.name) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    if (user.role === 'admin' && user.hospitalId !== department.hospitalId.toString()) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    if (user.role === 'sub_admin' && user.branchId !== department.branchId.toString()) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    res.json(department);
+  } catch (error) {
+    console.error('Error fetching department:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Get all departments for a branch
 router.get('/branch/:branchId', authenticateToken, async (req: AuthRequest, res) => {
   try {

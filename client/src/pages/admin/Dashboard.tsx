@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { 
@@ -173,13 +173,37 @@ interface AnalyticsData {
   };
 }
 
+interface TodayMetrics {
+  patients: {
+    total: number;
+    new: number;
+    repeated: number;
+    followUps: number;
+  };
+  appointments: {
+    total: number;
+    completed: number;
+    upcoming: number;
+  };
+  doctors: {
+    total: number;
+    available: number;
+    unavailable: number;
+  };
+}
+
 const AdminDashboard: React.FC = () => {
   const [selectedHospital, setSelectedHospital] = useState<string>('');
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState<string>('all');
   const [selectedBranch, setSelectedBranch] = useState<string>('all');
-  const [timeRange, setTimeRange] = useState('30d');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+
+  // Reset department selection when branch changes
+  useEffect(() => {
+    setSelectedDepartment('all');
+  }, [selectedBranch]);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState<BranchData | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -433,23 +457,68 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const { data: hospitalStats, isLoading: statsLoading } = useQuery({
-    queryKey: ['admin', 'hospital-stats', user?.hospitalId],
+  // Fetch doctors data (same as DoctorAvailability.tsx)
+  const { data: doctors, isLoading: doctorsLoading } = useQuery({
+    queryKey: ['admin', 'doctors'],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/hospitals/${user?.hospitalId}/stats`, {
+      const response = await fetch(`${API_URL}/api/doctor-availability/doctors/list`, {
         headers: { 'Authorization': `Bearer ${authService.getToken()}` }
       });
       if (!response.ok) {
-        throw new Error('Failed to fetch hospital stats');
+        throw new Error('Failed to fetch doctors');
       }
-      const data = await response.json();
-      console.log('Hospital Stats API Response:', data);
-      return data;
-    },
-    enabled: !!user?.hospitalId
+      return response.json();
+    }
   });
 
-  const { data: branches, isLoading: branchesLoading } = useQuery({
+  // Fetch doctor availabilities (same as DoctorAvailability.tsx)
+  const { data: availabilities, isLoading: availabilitiesLoading } = useQuery({
+    queryKey: ['admin', 'doctor-availabilities'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/doctor-availability`, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch availabilities');
+      }
+      return response.json();
+    }
+  });
+
+  // Fetch today's key metrics
+  const { data: todayMetrics, isLoading: todayMetricsLoading } = useQuery({
+    queryKey: ['admin', 'today-metrics'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/dashboard/today-metrics`, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch today metrics');
+      }
+      const data = await response.json();
+      console.log('Today Metrics API Response:', data);
+      return data;
+    }
+  });
+
+  // Fetch patient trends data
+  const { data: patientTrends, isLoading: patientTrendsLoading } = useQuery({
+    queryKey: ['admin', 'patient-trends'],
+    queryFn: async () => {
+      const response = await fetch(`${API_URL}/api/dashboard/patient-trends?days=7`, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch patient trends');
+      }
+      const data = await response.json();
+      console.log('Patient Trends API Response:', data);
+      return data;
+    }
+  });
+
+  // Fetch branches data
+  const { data: branches } = useQuery({
     queryKey: ['admin', 'branches', user?.hospitalId],
     queryFn: async () => {
       const response = await fetch(`${API_URL}/api/branches/hospital/${user?.hospitalId}`, {
@@ -463,6 +532,47 @@ const AdminDashboard: React.FC = () => {
     enabled: !!user?.hospitalId
   });
 
+  // Fetch departments data (filtered by selected branch)
+  const { data: departments, isLoading: departmentsLoading } = useQuery({
+    queryKey: ['admin', 'departments', user?.hospitalId, selectedBranch],
+    queryFn: async () => {
+      let url = `${API_URL}/api/departments/hospital/${user?.hospitalId}`;
+      
+      // If a specific branch is selected, filter departments by branch
+      if (selectedBranch && selectedBranch !== 'all') {
+        url += `?branchId=${selectedBranch}`;
+      }
+      
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch departments');
+      }
+      return response.json();
+    },
+    enabled: !!user?.hospitalId
+  });
+
+  // Fetch doctor efficiency data
+  const { data: doctorEfficiency, isLoading: doctorEfficiencyLoading } = useQuery({
+    queryKey: ['admin', 'doctor-efficiency', selectedBranch, selectedDepartment],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        branch: selectedBranch,
+        department: selectedDepartment
+      });
+      const response = await fetch(`${API_URL}/api/dashboard/doctor-efficiency?${params}`, {
+        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch doctor efficiency');
+      }
+      const data = await response.json();
+      console.log('Doctor Efficiency API Response:', data);
+      return data;
+    }
+  });
 
   // Fetch staff members for current hospital only
   const { data: staffMembers, isLoading: staffLoading, error: staffError } = useQuery({
@@ -509,93 +619,9 @@ const AdminDashboard: React.FC = () => {
     enabled: !!user?.hospitalId
   });
 
-  // Fetch user statistics for current hospital only
-  const { data: userStats } = useQuery({
-    queryKey: ['admin', 'user-stats', user?.hospitalId],
-    queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/users/stats/overview`, {
-        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
-      });
-      if (!response.ok) {
-        throw new Error('Failed to fetch user statistics');
-      }
-      const stats = await response.json();
-      
-      // For admin role, return hospital-specific stats (indices 0-4)
-      // [subAdmins, doctors, receptionists, activeUsers, inactiveUsers]
-      return stats.slice(0, 4);
-    },
-    enabled: !!user?.hospitalId
-  });
 
-  // Fetch analytics data for current hospital only
-  const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
-    queryKey: ['admin', 'analytics', user?.hospitalId, timeRange],
-    queryFn: async () => {
-      const response = await fetch(`${API_URL}/api/analytics?hospitalId=${user?.hospitalId}&timeRange=${timeRange}`, {
-        headers: { 'Authorization': `Bearer ${authService.getToken()}` }
-      });
-      
-      if (!response.ok) {
-        // Return hospital-specific calculated data as fallback
-        return {
-          revenue: {
-            current: hospitalStats?.totalRevenue || 0,
-            previous: (hospitalStats?.totalRevenue || 0) * 0.9,
-            growth: 10,
-            monthlyData: []
-          },
-          patients: {
-            total: hospitalStats?.totalPatients || 0,
-            newThisMonth: Math.floor((hospitalStats?.totalPatients || 0) * 0.1),
-            growth: 8,
-            monthlyData: []
-          },
-          appointments: {
-            total: hospitalStats?.totalAppointments || 0,
-            completed: hospitalStats?.completedAppointments || 0,
-            cancelled: Math.floor((hospitalStats?.totalAppointments || 0) * 0.05),
-            completionRate: 95
-          },
-          performance: {
-            avgResponseTime: 245,
-            systemUptime: 99.8,
-            userSatisfaction: 4.6
-          }
-        };
-      }
-      
-      const data = await response.json();
-      
-      // Transform the analytics data to match our expected format
-      return {
-        revenue: {
-          current: data.overview?.totalRevenue || 0,
-          previous: (data.overview?.totalRevenue || 0) * 0.9,
-          growth: 10,
-          monthlyData: data.revenueChart?.data || []
-        },
-        patients: {
-          total: data.overview?.totalPatients || 0,
-          newThisMonth: Math.floor((data.overview?.totalPatients || 0) * 0.1),
-          growth: 8,
-          monthlyData: data.patientChart?.data || []
-        },
-        appointments: {
-          total: data.overview?.totalAppointments || 0,
-          completed: Math.floor((data.overview?.totalAppointments || 0) * 0.95),
-          cancelled: Math.floor((data.overview?.totalAppointments || 0) * 0.05),
-          completionRate: 95
-        },
-        performance: {
-          avgResponseTime: data.overview?.averageWaitTime || 245,
-          systemUptime: 99.8,
-          userSatisfaction: data.overview?.patientSatisfaction || 4.6
-        }
-      };
-    },
-    enabled: !!user?.hospitalId && !!hospitalStats
-  });
+
+
 
   // Helper functions
   const getRoleColor = (role: string) => {
@@ -625,6 +651,50 @@ const AdminDashboard: React.FC = () => {
       day: 'numeric'
     });
   };
+
+  // Helper functions from DoctorAvailability.tsx
+  const getDoctorAvailability = (doctorId: string) => {
+    return availabilities?.filter((av: any) => av.doctorId === doctorId) || [];
+  };
+
+  const getAvailabilityStatus = (availability: any) => {
+    if (!availability.isActive) return { status: 'Inactive', color: 'bg-gray-100 text-gray-600' };
+    if (!availability.isAvailable) return { status: 'Unavailable', color: 'bg-gray-100 text-gray-600' };
+
+    const totalTokens = availability.slots.reduce((sum: number, slot: any) => sum + slot.tokenCount, 0);
+    const bookedTokens = availability.slots.reduce((sum: number, slot: any) => sum + slot.bookedTokens.length, 0);
+
+    if (bookedTokens >= totalTokens) return { status: 'Full', color: 'bg-red-100 text-red-600' };
+    if (bookedTokens >= totalTokens * 0.8) return { status: 'Almost Full', color: 'bg-orange-100 text-orange-600' };
+    return { status: 'Available', color: 'bg-green-100 text-green-600' };
+  };
+
+  // Calculate doctor availability statistics
+  const doctorStats = useMemo(() => {
+    if (!doctors || !availabilities) {
+      return { total: 0, available: 0, unavailable: 0 };
+    }
+
+    const total = doctors.length;
+    let available = 0;
+    let unavailable = 0;
+
+    doctors.forEach((doctor: any) => {
+      const doctorAvailabilities = getDoctorAvailability(doctor._id);
+      const hasAvailableSlots = doctorAvailabilities.some((av: any) => {
+        const status = getAvailabilityStatus(av);
+        return status.status === 'Available' || status.status === 'Almost Full';
+      });
+
+      if (hasAvailableSlots) {
+        available++;
+      } else {
+        unavailable++;
+      }
+    });
+
+    return { total, available, unavailable };
+  }, [doctors, availabilities]);
 
   const filteredStaff = staffMembers?.filter((staff: StaffMember) => {
     const matchesSearch = staff.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -663,146 +733,302 @@ const AdminDashboard: React.FC = () => {
       {/* Header */}
      
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Key Metrics - Primary Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        {/* Today's Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+          {/* Today's Patients */}
           <Card 
             className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-blue-500 cursor-pointer hover:bg-blue-50"
-            onClick={() => navigate({ to: '/admin/branches' })}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Branches</CardTitle>
-              <Building2 className="h-6 w-6 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {statsLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  branches?.length || 0
-                )}
-              </div>
-              <p className="text-xs text-green-600 mt-1 flex items-center">
-                <TrendingUp className="inline w-3 h-3 mr-1" />
-                +{hospitalStats?.monthlyGrowth || 0}% this month
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-green-500 cursor-pointer hover:bg-green-50"
-            onClick={() => navigate({ to: '/admin/staff' })}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Staff</CardTitle>
-              <Users className="h-6 w-6 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {statsLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  filteredStaff.length || hospitalStats?.totalStaff || 0
-                )}
-              </div>
-              <div className="flex space-x-4 mt-2 text-xs">
-                <span className="text-blue-600">{filteredStaff.filter((s: StaffMember) => s.role === 'doctor').length} Doctors</span>
-                <span className="text-purple-600">{filteredStaff.filter((s: StaffMember) => s.role === 'receptionist').length} Staff</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-purple-500 cursor-pointer hover:bg-purple-50"
             onClick={() => navigate({ to: '/admin/analytics' })}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Patients</CardTitle>
-              <Users2 className="h-6 w-6 text-purple-600" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardTitle className="text-sm font-medium text-gray-600">Today's Patients</CardTitle>
+              <Users2 className="h-5 w-5 text-blue-600" />
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {statsLoading ? (
-                  <Skeleton className="h-8 w-16" />
+            <CardContent className="pt-2">
+              <div className="text-2xl font-bold text-gray-900">
+                {todayMetricsLoading ? (
+                  <Skeleton className="h-6 w-12" />
                 ) : (
-                  hospitalStats?.totalPatients || 0
+                  todayMetrics?.patients?.total || 0
                 )}
               </div>
-              <p className="text-xs text-blue-600 mt-1">
-                Across all branches
-              </p>
+              <div className="flex space-x-4 mt-1 text-xs">
+                <span className="text-green-600">{todayMetrics?.patients?.new || 0} New</span>
+                <span className="text-blue-600">{todayMetrics?.patients?.repeated || 0} Repeated</span>
+                <span className="text-purple-600">{todayMetrics?.patients?.followUps || 0} Follow-ups</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Today's Appointments */}
+          <Card 
+            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-green-500 cursor-pointer hover:bg-green-50"
+            onClick={() => navigate({ to: '/admin/analytics' })}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardTitle className="text-sm font-medium text-gray-600">Today's Appointments</CardTitle>
+              <Calendar className="h-5 w-5 text-green-600" />
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="text-2xl font-bold text-gray-900">
+                {todayMetricsLoading ? (
+                  <Skeleton className="h-6 w-12" />
+                ) : (
+                  todayMetrics?.appointments?.total || 0
+                )}
+              </div>
+              <div className="flex space-x-4 mt-1 text-xs">
+                <span className="text-green-600">{todayMetrics?.appointments?.completed || 0} Completed</span>
+                <span className="text-blue-600">{todayMetrics?.appointments?.upcoming || 0} Upcoming</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Hospital Doctors */}
+          <Card 
+            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-purple-500 cursor-pointer hover:bg-purple-50"
+            onClick={() => navigate({ to: '/admin/doctor-availability' })}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardTitle className="text-sm font-medium text-gray-600">Hospital Doctors</CardTitle>
+              <Stethoscope className="h-5 w-5 text-purple-600" />
+            </CardHeader>
+            <CardContent className="pt-2">
+              <div className="text-2xl font-bold text-gray-900">
+                {doctorsLoading || availabilitiesLoading ? (
+                  <Skeleton className="h-6 w-12" />
+                ) : (
+                  doctorStats.total
+                )}
+              </div>
+              <div className="flex space-x-4 mt-1 text-xs">
+                <span className="text-green-600">{doctorStats.available} Available</span>
+                <span className="text-red-600">{doctorStats.unavailable} Not Available</span>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Secondary Metrics Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          <Card 
-            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-indigo-500 cursor-pointer hover:bg-indigo-50"
-            onClick={() => navigate({ to: '/admin/doctor-availability' })}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Total Doctors</CardTitle>
-              <Stethoscope className="h-6 w-6 text-indigo-600" />
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          {/* Patient Trends Chart */}
+          <Card className="bg-white shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center text-base">
+                <BarChart className="w-4 h-4 mr-2 text-blue-600" />
+                Patient Trends (Last 7 Days)
+              </CardTitle>
+              <CardDescription className="text-sm">Daily breakdown of new, repeated, and follow-up patients</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {statsLoading ? (
-                  <Skeleton className="h-8 w-16" />
+            <CardContent className="pt-2">
+              <div className="h-64">
+                {patientTrendsLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : patientTrends && patientTrends.length > 0 ? (
+                  <div className="h-full p-4">
+                    <div className="grid grid-cols-7 gap-2 h-full">
+                      {patientTrends.map((day: any, index: number) => (
+                        <div key={index} className="flex flex-col justify-end space-y-1">
+                          <div className="text-xs text-gray-600 text-center">{day.day}</div>
+                          <div className="flex flex-col space-y-1">
+                            <div 
+                              className="bg-blue-500 rounded-t"
+                              style={{ height: `${Math.max(day.new * 3, 4)}px` }}
+                              title={`New: ${day.new}`}
+                            ></div>
+                            <div 
+                              className="bg-green-500"
+                              style={{ height: `${Math.max(day.repeated * 3, 4)}px` }}
+                              title={`Repeated: ${day.repeated}`}
+                            ></div>
+                            <div 
+                              className="bg-purple-500 rounded-b"
+                              style={{ height: `${Math.max(day.followUps * 3, 4)}px` }}
+                              title={`Follow-ups: ${day.followUps}`}
+                            ></div>
+                          </div>
+                          <div className="text-xs font-medium text-center">{day.total}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-center space-x-4 mt-4 text-xs">
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-blue-500 rounded mr-1"></div>
+                        <span>New</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-green-500 rounded mr-1"></div>
+                        <span>Repeated</span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-3 h-3 bg-purple-500 rounded mr-1"></div>
+                        <span>Follow-ups</span>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  filteredStaff.filter((s: StaffMember) => s.role === 'doctor').length || hospitalStats?.activeDoctors || 0
-                )}
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <BarChart className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500">No patient trends data available</p>
+                      <p className="text-sm text-gray-400">Data will appear here once patients are registered</p>
               </div>
-              <div className="flex space-x-4 mt-2 text-xs">
-                <span className="text-green-600">{filteredStaff.filter((s: StaffMember) => s.role === 'doctor' && s.isActive).length} Active</span>
-                <span className="text-blue-600">Across all branches</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          <Card 
-            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-yellow-500 cursor-pointer hover:bg-yellow-50"
-            onClick={() => navigate({ to: '/admin/financial' })}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Payments</CardTitle>
-              <IndianRupee className="h-6 w-6 text-yellow-600" />
+          {/* Doctor Efficiency Chart */}
+          <Card className="bg-white shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center text-base">
+                    <TrendingUp className="w-4 h-4 mr-2 text-green-600" />
+                    Doctor Efficiency
+                  </CardTitle>
+                  <CardDescription className="text-sm">Scheduled vs treated patients this week</CardDescription>
+                </div>
+                <div className="flex space-x-2">
+                  <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Branches</SelectItem>
+                      {branches?.map((branch: any) => (
+                        <SelectItem key={branch._id} value={branch._id}>
+                          {branch.branchName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder={departmentsLoading ? "Loading..." : "Department"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Departments</SelectItem>
+                      {departmentsLoading ? (
+                        <SelectItem value="loading" disabled>
+                          Loading departments...
+                        </SelectItem>
+                      ) : departments && departments.length > 0 ? (
+                        departments.map((department: any) => (
+                          <SelectItem key={department._id} value={department._id}>
+                            {department.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-departments" disabled>
+                          {selectedBranch === 'all' ? 'No departments found' : 'No departments in this branch'}
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {statsLoading ? (
-                  <Skeleton className="h-8 w-16" />
+            <CardContent className="pt-2">
+              <div className="h-64">
+                {doctorEfficiencyLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                  </div>
+                ) : doctorEfficiency && doctorEfficiency.length > 0 ? (
+                  <div className="h-full p-4">
+                    {/* Bar Chart with Doctor Names on Y-axis */}
+                    <div className="relative h-full">
+                      <div className="flex h-full">
+                        {/* Y-axis (Doctor Names) */}
+                        <div className="flex flex-col justify-between py-2 pr-4 w-32 flex-shrink-0">
+                          {doctorEfficiency.map((doctor: any, index: number) => (
+                            <div key={index} className="flex items-center h-12">
+                              <div className="text-right w-full">
+                                <div className="text-xs font-medium text-gray-900 truncate" title={doctor.doctorName}>
+                                  {doctor.doctorName}
+                                </div>
+                                <div className="text-xs text-gray-500 truncate" title={doctor.specialization}>
+                                  {doctor.specialization}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        {/* Chart Area */}
+                        <div className="flex-1 relative">
+                          {/* Grid lines */}
+                          <div className="absolute inset-0 flex flex-col justify-between py-2">
+                            {doctorEfficiency.map((_: any, index: number) => (
+                              <div key={index} className="h-12 border-b border-gray-100 last:border-b-0"></div>
+                            ))}
+                          </div>
+                          
+                          {/* Bars */}
+                          <div className="relative flex flex-col justify-between py-2 h-full">
+                            {doctorEfficiency.map((doctor: any, index: number) => (
+                              <div key={index} className="flex items-center h-12 px-2">
+                                <div className="flex items-center w-full">
+                                  {/* Efficiency Bar */}
+                                  <div className="flex-1 relative">
+                                    <div className="w-full bg-gray-200 rounded-full h-6">
+                                      <div 
+                                        className="bg-gradient-to-r from-green-400 to-green-600 h-6 rounded-full transition-all duration-500 flex items-center justify-end pr-2"
+                                        style={{ width: `${Math.min(doctor.efficiency || 0, 100)}%` }}
+                                      >
+                                        <span className="text-white text-xs font-semibold">
+                                          {doctor.efficiency || 0}%
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Stats */}
+                                  <div className="ml-3 text-xs text-gray-600 min-w-[80px]">
+                                    <div>{doctor.treated || 0}/{doctor.scheduled || 0}</div>
+                                    <div className="text-gray-400">T/S</div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          
+                          {/* X-axis labels */}
+                          <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-gray-500 mt-2 px-2">
+                            <span>0%</span>
+                            <span>25%</span>
+                            <span>50%</span>
+                            <span>75%</span>
+                            <span>100%</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Legend */}
+                      <div className="absolute bottom-0 right-0 bg-white p-2 rounded-lg border border-gray-200 text-xs">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-3 h-3 bg-gradient-to-r from-green-400 to-green-600 rounded"></div>
+                          <span>Efficiency %</span>
+                        </div>
+                        <div className="text-gray-500 mt-1">T/S = Treated/Scheduled</div>
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  formatCurrency(hospitalStats?.completedPayments || 0)
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center">
+                      <TrendingUp className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500">No doctor efficiency data available</p>
+                      <p className="text-sm text-gray-400">Try changing branch or department filters</p>
+                    </div>
+                  </div>
                 )}
               </div>
-              <div className="flex space-x-4 mt-2 text-xs">
-                <span className="text-green-600">{hospitalStats?.completedPayments || 0} Completed</span>
-                <span className="text-red-600">{hospitalStats?.pendingPayments || 0} Pending</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="bg-white shadow-sm hover:shadow-lg transition-shadow border-l-4 border-l-cyan-500 cursor-pointer hover:bg-cyan-50"
-            onClick={() => navigate({ to: '/admin/analytics' })}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">User Satisfaction</CardTitle>
-              <Star className="h-6 w-6 text-cyan-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-gray-900">
-                {analyticsLoading ? (
-                  <Skeleton className="h-8 w-16" />
-                ) : (
-                  `${analyticsData?.performance?.userSatisfaction || 4.6}/5`
-                )}
-              </div>
-              <p className="text-xs text-green-600 mt-1 flex items-center">
-                <TrendingUp className="inline w-3 h-3 mr-1" />
-                Excellent rating
-              </p>
             </CardContent>
           </Card>
         </div>
@@ -811,32 +1037,32 @@ const AdminDashboard: React.FC = () => {
         
 
         {/* Quick Actions Section */}
-        <div className="mb-8">
+        <div className="mb-6">
               <Card className="bg-white shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-xl">
-                    <Zap className="w-6 h-6 mr-2" />
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center text-lg">
+                    <Zap className="w-5 h-5 mr-2" />
                     Quick Actions
                   </CardTitle>
-                  <CardDescription>Common administrative tasks</CardDescription>
+                  <CardDescription className="text-sm">Common administrative tasks</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => navigate({ to: '/admin/staff' })}>
-                  <UserPlus className="w-6 h-6 mb-2 text-blue-600" />
-                  <span className="text-sm font-medium">Add Staff</span>
+                <CardContent className="pt-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Button variant="outline" className="h-16 flex flex-col items-center justify-center hover:bg-blue-50 hover:border-blue-200 transition-colors" onClick={() => navigate({ to: '/admin/staff' })}>
+                  <UserPlus className="w-5 h-5 mb-1 text-blue-600" />
+                  <span className="text-xs font-medium">Add Staff</span>
                     </Button>
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-green-50 hover:border-green-200 transition-colors" onClick={() => navigate({ to: '/admin/add-branch' })}>
-                  <Building2 className="w-6 h-6 mb-2 text-green-600" />
-                  <span className="text-sm font-medium">Add Branch</span>
+                <Button variant="outline" className="h-16 flex flex-col items-center justify-center hover:bg-green-50 hover:border-green-200 transition-colors" onClick={() => navigate({ to: '/admin/add-branch' })}>
+                  <Building2 className="w-5 h-5 mb-1 text-green-600" />
+                  <span className="text-xs font-medium">Add Branch</span>
                     </Button>
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-purple-50 hover:border-purple-200 transition-colors" onClick={() => navigate({ to: '/admin/analytics' })}>
-                  <BarChart3 className="w-6 h-6 mb-2 text-purple-600" />
-                  <span className="text-sm font-medium">View Reports</span>
+                <Button variant="outline" className="h-16 flex flex-col items-center justify-center hover:bg-purple-50 hover:border-purple-200 transition-colors" onClick={() => navigate({ to: '/admin/analytics' })}>
+                  <BarChart3 className="w-5 h-5 mb-1 text-purple-600" />
+                  <span className="text-xs font-medium">View Reports</span>
                     </Button>
-                <Button variant="outline" className="h-20 flex flex-col items-center justify-center hover:bg-orange-50 hover:border-orange-200 transition-colors" onClick={() => navigate({ to: '/admin/settings' })}>
-                  <Settings className="w-6 h-6 mb-2 text-orange-600" />
-                  <span className="text-sm font-medium">System Config</span>
+                <Button variant="outline" className="h-16 flex flex-col items-center justify-center hover:bg-orange-50 hover:border-orange-200 transition-colors" onClick={() => navigate({ to: '/admin/settings' })}>
+                  <Settings className="w-5 h-5 mb-1 text-orange-600" />
+                  <span className="text-xs font-medium">System Config</span>
                     </Button>
                   </div>
                 </CardContent>

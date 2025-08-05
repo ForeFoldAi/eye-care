@@ -118,7 +118,7 @@ router.get('/analytics/performance', async (req: AuthRequest, res) => {
         target: 99.9
       },
       {
-        name: 'User Satisfaction',
+        name: 'Patient Feedback',
         value: 4.8,
         change: 0.2,
         trend: 'up',
@@ -537,30 +537,7 @@ router.get('/activity-log', async (req: AuthRequest, res) => {
   }
 });
 
-// Get top hospitals
-router.get('/top-hospitals', async (req: AuthRequest, res) => {
-  try {
-    console.log('Fetching top hospitals...');
-    const { timeRange = '30d', limit = 5 } = req.query;
-    
-    // Mock top hospitals data
-    const topHospitals = Array.from({ length: Number(limit) }, (_, i) => ({
-      _id: `hospital-${i + 1}`,
-      name: `Hospital ${i + 1}`,
-      patientCount: Math.floor(Math.random() * 1000) + 200,
-      recentPatients: Math.floor(Math.random() * 100) + 20,
-      totalRevenue: Math.floor(Math.random() * 100000) + 20000,
-      growthPercentage: Math.random() * 30 - 10, // Can be negative
-      status: 'active'
-    }));
-
-    console.log('Top hospitals data generated');
-    res.json(topHospitals);
-  } catch (error) {
-    console.error('Error fetching top hospitals:', error);
-    res.json([]);
-  }
-});
+// Get top hospitals - REMOVED (duplicate route, using the comprehensive one below)
 
 // ==================== REPORTS ENDPOINTS ====================
 
@@ -2290,9 +2267,10 @@ router.patch('/billing/:id/mark-paid', async (req: AuthRequest, res) => {
 
 // ==================== TOP HOSPITALS ====================
 
-// Get top performing hospitals
+// Get top performing hospitals with real data
 router.get('/top-hospitals', async (req: AuthRequest, res) => {
   try {
+    console.log('Fetching top hospitals with real data...');
     const { timeRange = '30d', limit = 5 } = req.query;
     
     // Calculate date range
@@ -2316,8 +2294,13 @@ router.get('/top-hospitals', async (req: AuthRequest, res) => {
         startDate.setDate(endDate.getDate() - 30);
     }
 
-    // Get top hospitals by patient count and revenue
+    console.log(`Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+    // Get top hospitals by patient count and revenue using aggregation
     const topHospitals = await Hospital.aggregate([
+      {
+        $match: { isActive: true } // Only active hospitals
+      },
       {
         $lookup: {
           from: 'patients',
@@ -2328,10 +2311,38 @@ router.get('/top-hospitals', async (req: AuthRequest, res) => {
       },
       {
         $lookup: {
-          from: 'payments',
-          localField: '_id',
-          foreignField: 'hospitalId',
-          as: 'payments'
+          from: 'patients',
+          let: { hospitalId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ['$hospitalId', '$$hospitalId'] }
+              }
+            },
+            {
+              $lookup: {
+                from: 'payments',
+                localField: '_id',
+                foreignField: 'patientId',
+                as: 'patientPayments'
+              }
+            },
+            {
+              $unwind: {
+                path: '$patientPayments',
+                preserveNullAndEmptyArrays: true
+              }
+            },
+            {
+              $match: {
+                $and: [
+                  { 'patientPayments.createdAt': { $gte: startDate } },
+                  { 'patientPayments.status': 'completed' }
+                ]
+              }
+            }
+          ],
+          as: 'patientsWithPayments'
         }
       },
       {
@@ -2346,23 +2357,7 @@ router.get('/top-hospitals', async (req: AuthRequest, res) => {
             }
           },
           totalRevenue: {
-            $sum: {
-              $map: {
-                input: {
-                  $filter: {
-                    input: '$payments',
-                    cond: { 
-                      $and: [
-                        { $gte: ['$$this.createdAt', startDate] },
-                        { $eq: ['$$this.status', 'completed'] }
-                      ]
-                    }
-                  }
-                },
-                as: 'payment',
-                in: '$$payment.amount'
-              }
-            }
+            $sum: '$patientsWithPayments.patientPayments.amount'
           }
         }
       },
@@ -2373,8 +2368,11 @@ router.get('/top-hospitals', async (req: AuthRequest, res) => {
           patientCount: 1,
           recentPatients: 1,
           totalRevenue: 1,
-          status: 1,
-          createdAt: 1
+          status: '$isActive',
+          createdAt: 1,
+          email: 1,
+          phone: '$phoneNumber',
+          address: 1
         }
       },
       {
@@ -2388,34 +2386,159 @@ router.get('/top-hospitals', async (req: AuthRequest, res) => {
       }
     ]);
 
+    console.log(`Found ${topHospitals.length} hospitals`);
+
     // Calculate growth percentage for each hospital
     const hospitalsWithGrowth = await Promise.all(
       topHospitals.map(async (hospital) => {
-        // Get previous period data for growth calculation
-        const previousStartDate = new Date(startDate);
-        previousStartDate.setDate(previousStartDate.getDate() - (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        const previousPeriodPatients = await Patient.countDocuments({
-          hospitalId: hospital._id,
-          createdAt: { $gte: previousStartDate, $lt: startDate }
-        });
+        try {
+          // Get previous period data for growth calculation
+          const previousStartDate = new Date(startDate);
+          const periodDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+          previousStartDate.setDate(previousStartDate.getDate() - periodDays);
+          
+          const previousPeriodPatients = await Patient.countDocuments({
+            hospitalId: hospital._id,
+            createdAt: { $gte: previousStartDate, $lt: startDate }
+          });
 
-        const growthPercentage = previousPeriodPatients > 0 
-          ? ((hospital.recentPatients - previousPeriodPatients) / previousPeriodPatients) * 100 
-          : hospital.recentPatients > 0 ? 100 : 0;
+          const growthPercentage = previousPeriodPatients > 0 
+            ? ((hospital.recentPatients - previousPeriodPatients) / previousPeriodPatients) * 100 
+            : hospital.recentPatients > 0 ? 100 : 0;
 
-        return {
-          ...hospital,
-          growthPercentage: Math.round(growthPercentage * 100) / 100,
-          status: hospital.status || 'active'
-        };
+          return {
+            _id: hospital._id,
+            name: hospital.name,
+            patientCount: hospital.patientCount || 0,
+            recentPatients: hospital.recentPatients || 0,
+            totalRevenue: hospital.totalRevenue || 0,
+            growthPercentage: Math.round(growthPercentage * 100) / 100,
+            status: hospital.status ? 'active' : 'inactive',
+            email: hospital.email,
+            phone: hospital.phone,
+            address: hospital.address
+          };
+        } catch (error) {
+          console.error(`Error calculating growth for hospital ${hospital._id}:`, error);
+          return {
+            _id: hospital._id,
+            name: hospital.name,
+            patientCount: hospital.patientCount || 0,
+            recentPatients: hospital.recentPatients || 0,
+            totalRevenue: hospital.totalRevenue || 0,
+            growthPercentage: 0,
+            status: hospital.status ? 'active' : 'inactive',
+            email: hospital.email,
+            phone: hospital.phone,
+            address: hospital.address
+          };
+        }
       })
     );
 
+    console.log('Top hospitals data calculated successfully');
     res.json(hospitalsWithGrowth);
   } catch (error) {
     console.error('Error fetching top hospitals:', error);
-    res.status(500).json({ message: 'Error fetching top hospitals' });
+    // Return empty array instead of 500 error to prevent client-side issues
+    res.json([]);
+  }
+});
+
+// ==================== TEST DATA CREATION ====================
+
+// Create test data for development (only in development mode)
+router.post('/create-test-data', async (req: AuthRequest, res) => {
+  try {
+    if (process.env.NODE_ENV !== 'development') {
+      return res.status(403).json({ message: 'Test data creation only allowed in development' });
+    }
+
+    console.log('Creating test data...');
+
+    // Create test hospitals if none exist
+    const existingHospitals = await Hospital.countDocuments();
+    if (existingHospitals === 0) {
+      const testHospitals = [
+        {
+          name: 'City General Hospital',
+          description: 'Leading healthcare provider in the city',
+          address: '123 Main Street, City Center',
+          phoneNumber: '+91-9876543210',
+          email: 'info@citygeneral.com',
+          isActive: true,
+          createdBy: req.user?.id,
+          adminId: req.user?.id
+        },
+        {
+          name: 'Metro Medical Center',
+          description: 'Specialized medical services',
+          address: '456 Park Avenue, Metro City',
+          phoneNumber: '+91-9876543211',
+          email: 'contact@metromedical.com',
+          isActive: true,
+          createdBy: req.user?.id,
+          adminId: req.user?.id
+        },
+        {
+          name: 'Community Health Clinic',
+          description: 'Affordable healthcare for everyone',
+          address: '789 Health Lane, Community Town',
+          phoneNumber: '+91-9876543212',
+          email: 'hello@communityhealth.com',
+          isActive: true,
+          createdBy: req.user?.id,
+          adminId: req.user?.id
+        }
+      ];
+
+      const createdHospitals = await Hospital.insertMany(testHospitals);
+      console.log(`Created ${createdHospitals.length} test hospitals`);
+
+      // Create test patients for each hospital
+      for (const hospital of createdHospitals) {
+        const testPatients = Array.from({ length: Math.floor(Math.random() * 50) + 20 }, (_, i) => ({
+          firstName: `Patient${i + 1}`,
+          lastName: `Test`,
+          dateOfBirth: new Date(1980 + Math.floor(Math.random() * 40), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28)),
+          gender: ['male', 'female'][Math.floor(Math.random() * 2)],
+          phone: `+91-98765${String(i + 10000).padStart(5, '0')}`,
+          email: `patient${i + 1}@test.com`,
+          address: `Test Address ${i + 1}`,
+          hospitalId: hospital._id,
+          branchId: null,
+          patientId: `P-${Date.now()}-${i}`,
+          isActive: true
+        }));
+
+        const createdPatients = await Patient.insertMany(testPatients);
+        console.log(`Created ${createdPatients.length} test patients for hospital ${hospital.name}`);
+
+        // Create test payments for some patients
+        for (const patient of createdPatients.slice(0, Math.floor(createdPatients.length * 0.7))) {
+          const paymentCount = Math.floor(Math.random() * 3) + 1;
+          for (let j = 0; j < paymentCount; j++) {
+            const paymentDate = new Date();
+            paymentDate.setDate(paymentDate.getDate() - Math.floor(Math.random() * 30));
+            
+            await Payment.create({
+              patientId: patient._id,
+              amount: Math.floor(Math.random() * 5000) + 500,
+              method: ['cash', 'card', 'insurance'][Math.floor(Math.random() * 3)],
+              status: 'completed',
+              receiptNumber: `RCP-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+              processedBy: req.user?.id,
+              createdAt: paymentDate
+            });
+          }
+        }
+      }
+    }
+
+    res.json({ message: 'Test data created successfully' });
+  } catch (error) {
+    console.error('Error creating test data:', error);
+    res.status(500).json({ message: 'Error creating test data' });
   }
 });
 

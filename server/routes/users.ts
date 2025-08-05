@@ -96,13 +96,50 @@ router.get('/hospital/:hospitalId', authenticateToken, authorizeRole(['admin']),
   }
 });
 
-// Get users by branch (sub-admin only)
-router.get('/branch/:branchId', authenticateToken, authorizeRole(['sub_admin']), async (req: AuthRequest, res) => {
+// Get users by branch (sub-admin, doctor, receptionist)
+router.get('/branch/:branchId', authenticateToken, authorizeRole(['sub_admin', 'doctor', 'receptionist']), async (req: AuthRequest, res) => {
   try {
-    // Verify sub-admin has access to this branch
+    console.log('Branch access request:', {
+      branchId: req.params.branchId,
+      userRole: req.user?.role,
+      userId: req.user?.id,
+      userBranchId: req.user?.branchId,
+      userHospitalId: req.user?.hospitalId
+    });
+
+    // Verify user has access to this branch
     const branch = await Branch.findById(req.params.branchId);
-    if (!branch || branch.subAdminId.toString() !== req.user?.id) {
-      return res.status(403).json({ message: 'Access denied' });
+    if (!branch) {
+      console.log('Branch not found:', req.params.branchId);
+      return res.status(404).json({ message: 'Branch not found' });
+    }
+
+    console.log('Branch found:', {
+      branchId: branch._id.toString(),
+      branchName: branch.branchName,
+      subAdminId: branch.subAdminId?.toString(),
+      hospitalId: branch.hospitalId?.toString()
+    });
+
+    // Check access based on user role
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+
+    if (userRole === 'sub_admin') {
+      // Sub-admin can only access their assigned branch
+      if (branch.subAdminId?.toString() !== userId) {
+        console.log('Sub-admin access denied: branch.subAdminId !== userId');
+        return res.status(403).json({ message: 'Access denied to other branches' });
+      }
+    } else if (['doctor', 'receptionist'].includes(userRole || '')) {
+      // Doctor/Receptionist can access their assigned branch
+      if (branch._id.toString() !== req.user?.branchId) {
+        console.log('Doctor/Receptionist access denied: branch._id !== user.branchId');
+        return res.status(403).json({ message: 'Access denied to other branches' });
+      }
+    } else {
+      console.log('Insufficient permissions for role:', userRole);
+      return res.status(403).json({ message: 'Insufficient permissions' });
     }
 
     const users = await User.find({ branchId: req.params.branchId })
@@ -111,6 +148,18 @@ router.get('/branch/:branchId', authenticateToken, authorizeRole(['sub_admin']),
       .populate('createdBy', 'firstName lastName email')
       .select('-password')
       .sort({ createdAt: -1 });
+    
+    console.log('Users found for branch:', {
+      branchId: req.params.branchId,
+      userCount: users.length,
+      users: users.map(u => ({
+        id: u._id.toString(),
+        firstName: u.firstName,
+        lastName: u.lastName,
+        role: u.role,
+        email: u.email
+      }))
+    });
     
     res.json(users);
   } catch (error) {
