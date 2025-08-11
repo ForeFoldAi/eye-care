@@ -40,7 +40,8 @@ import {
   Zap,
   UserPlus,
   Plus,
-  Database
+  Database,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -90,6 +91,16 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
   const [showSupportModal, setShowSupportModal] = React.useState(false);
   const [showSettingsModal, setShowSettingsModal] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(new Date());
+  const [supportTicketData, setSupportTicketData] = React.useState({
+    subject: '',
+    description: '',
+    category: 'general' as 'technical' | 'feature' | 'bug' | 'training' | 'general',
+    priority: 'medium' as 'low' | 'medium' | 'high' | 'urgent',
+    contactEmail: '',
+    contactPhone: '',
+    isUrgent: false
+  });
+  const [isCreatingTicket, setIsCreatingTicket] = React.useState(false);
 
   // Profile settings state
   const [profileData, setProfileData] = React.useState({
@@ -271,6 +282,103 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
     navigate({ to: '/sub-admin/settings' });
     // Note: In a real implementation, you might want to pass a query parameter
     // to focus on the security tab, but for now we'll just navigate to settings
+  };
+
+  const resetSupportTicketForm = () => {
+    setSupportTicketData({
+      subject: '',
+      description: '',
+      category: 'general',
+      priority: 'medium',
+      contactEmail: '',
+      contactPhone: '',
+      isUrgent: false
+    });
+  };
+
+  const handleCreateSupportTicket = async () => {
+    try {
+      setIsCreatingTicket(true);
+      
+      // Validate required fields
+      if (!supportTicketData.subject.trim()) {
+        toast({
+          title: "Error",
+          description: "Subject is required",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      if (!supportTicketData.description.trim()) {
+        toast({
+          title: "Error",
+          description: "Description is required",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Map frontend category to backend category
+      const categoryMap = {
+        'technical': 'technical',
+        'feature': 'feature_request',
+        'bug': 'bug_report',
+        'training': 'training',
+        'general': 'general'
+      } as const;
+
+      // Map frontend priority to backend priority
+      const priorityMap = {
+        'low': 'low',
+        'medium': 'medium',
+        'high': 'high',
+        'urgent': 'critical'
+      } as const;
+
+      const ticketPayload = {
+        subject: supportTicketData.subject,
+        description: supportTicketData.description,
+        category: categoryMap[supportTicketData.category],
+        priority: priorityMap[supportTicketData.priority],
+        tags: supportTicketData.isUrgent ? ['urgent'] : []
+      };
+
+      const response = await fetch(`${API_URL}/api/support`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authService.getToken()}`
+        },
+        body: JSON.stringify(ticketPayload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create support ticket');
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "Support Ticket Created",
+        description: `Ticket ${result.ticket?.ticketId} has been created successfully. We'll get back to you within 24 hours.`,
+      });
+
+      // Reset form and close modal
+      resetSupportTicketForm();
+      setShowSupportModal(false);
+
+    } catch (error) {
+      console.error('Error creating support ticket:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create support ticket",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingTicket(false);
+    }
   };
 
   const toggleSidebar = () => {
@@ -762,7 +870,12 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
       </Dialog>
 
       {/* Support Modal */}
-      <Dialog open={showSupportModal} onOpenChange={setShowSupportModal}>
+      <Dialog open={showSupportModal} onOpenChange={(open) => {
+        setShowSupportModal(open);
+        if (!open) {
+          resetSupportTicketForm();
+        }
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Create Support Ticket</DialogTitle>
@@ -775,7 +888,13 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="ticketType">Ticket Type</Label>
-                <Select>
+                <Select 
+                  value={supportTicketData.category}
+                  onValueChange={(value) => setSupportTicketData(prev => ({ 
+                    ...prev, 
+                    category: value as 'technical' | 'feature' | 'bug' | 'training' | 'general'
+                  }))}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select ticket type" />
                   </SelectTrigger>
@@ -790,7 +909,13 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
               </div>
               <div>
                 <Label htmlFor="priority">Priority</Label>
-                <Select>
+                <Select 
+                  value={supportTicketData.priority}
+                  onValueChange={(value) => setSupportTicketData(prev => ({ 
+                    ...prev, 
+                    priority: value as 'low' | 'medium' | 'high' | 'urgent'
+                  }))}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
@@ -810,6 +935,8 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                 id="subject" 
                 placeholder="Brief description of your issue"
                 className="mt-1"
+                value={supportTicketData.subject}
+                onChange={(e) => setSupportTicketData(prev => ({ ...prev, subject: e.target.value }))}
               />
             </div>
             
@@ -820,6 +947,8 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                 placeholder="Please provide detailed information about your issue, including steps to reproduce if applicable..."
                 rows={4}
                 className="mt-1"
+                value={supportTicketData.description}
+                onChange={(e) => setSupportTicketData(prev => ({ ...prev, description: e.target.value }))}
               />
             </div>
             
@@ -831,6 +960,8 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                   type="email"
                   placeholder="your.email@hospital.com"
                   className="mt-1"
+                  value={supportTicketData.contactEmail}
+                  onChange={(e) => setSupportTicketData(prev => ({ ...prev, contactEmail: e.target.value }))}
                 />
               </div>
               <div>
@@ -840,6 +971,8 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                   type="tel"
                   placeholder="+1 (555) 123-4567"
                   className="mt-1"
+                  value={supportTicketData.contactPhone}
+                  onChange={(e) => setSupportTicketData(prev => ({ ...prev, contactPhone: e.target.value }))}
                 />
               </div>
             </div>
@@ -849,29 +982,45 @@ const SubAdminLayoutContent: React.FC<{ user: AuthUser }> = ({ user }) => {
                 type="checkbox" 
                 id="urgent" 
                 className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                checked={supportTicketData.isUrgent}
+                onChange={(e) => setSupportTicketData(prev => ({ ...prev, isUrgent: e.target.checked }))}
               />
               <Label htmlFor="urgent" className="text-sm">
                 Mark as urgent (for critical system issues)
               </Label>
             </div>
             
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowSupportModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={() => {
-                toast({
-                  title: "Support Ticket Submitted",
-                  description: "Your support ticket has been submitted successfully. We'll get back to you within 24 hours.",
-                });
-                setShowSupportModal(false);
-              }}>
-                <Mail className="w-4 h-4 mr-2" />
-                Submit Ticket
-              </Button>
+            <div className="flex justify-between items-center pt-4">
+              
+              
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowSupportModal(false);
+                    resetSupportTicketForm();
+                  }}
+                  disabled={isCreatingTicket}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateSupportTicket}
+                  disabled={isCreatingTicket}
+                >
+                  {isCreatingTicket ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Submit Ticket
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

@@ -2317,12 +2317,12 @@ router.get('/top-hospitals', async (req: AuthRequest, res) => {
             {
               $match: {
                 $expr: { $eq: ['$hospitalId', '$$hospitalId'] }
-              }
-            },
-            {
-              $lookup: {
-                from: 'payments',
-                localField: '_id',
+        }
+      },
+      {
+        $lookup: {
+          from: 'payments',
+          localField: '_id',
                 foreignField: 'patientId',
                 as: 'patientPayments'
               }
@@ -2392,27 +2392,27 @@ router.get('/top-hospitals', async (req: AuthRequest, res) => {
     const hospitalsWithGrowth = await Promise.all(
       topHospitals.map(async (hospital) => {
         try {
-          // Get previous period data for growth calculation
-          const previousStartDate = new Date(startDate);
+        // Get previous period data for growth calculation
+        const previousStartDate = new Date(startDate);
           const periodDays = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
           previousStartDate.setDate(previousStartDate.getDate() - periodDays);
-          
-          const previousPeriodPatients = await Patient.countDocuments({
-            hospitalId: hospital._id,
-            createdAt: { $gte: previousStartDate, $lt: startDate }
-          });
+        
+        const previousPeriodPatients = await Patient.countDocuments({
+          hospitalId: hospital._id,
+          createdAt: { $gte: previousStartDate, $lt: startDate }
+        });
 
-          const growthPercentage = previousPeriodPatients > 0 
-            ? ((hospital.recentPatients - previousPeriodPatients) / previousPeriodPatients) * 100 
-            : hospital.recentPatients > 0 ? 100 : 0;
+        const growthPercentage = previousPeriodPatients > 0 
+          ? ((hospital.recentPatients - previousPeriodPatients) / previousPeriodPatients) * 100 
+          : hospital.recentPatients > 0 ? 100 : 0;
 
-          return {
+        return {
             _id: hospital._id,
             name: hospital.name,
             patientCount: hospital.patientCount || 0,
             recentPatients: hospital.recentPatients || 0,
             totalRevenue: hospital.totalRevenue || 0,
-            growthPercentage: Math.round(growthPercentage * 100) / 100,
+          growthPercentage: Math.round(growthPercentage * 100) / 100,
             status: hospital.status ? 'active' : 'inactive',
             email: hospital.email,
             phone: hospital.phone,
@@ -2431,7 +2431,7 @@ router.get('/top-hospitals', async (req: AuthRequest, res) => {
             email: hospital.email,
             phone: hospital.phone,
             address: hospital.address
-          };
+        };
         }
       })
     );

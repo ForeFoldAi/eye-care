@@ -635,8 +635,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Dashboard stats error:', error);
       res.status(500).json({ message: "Internal server error", error: error instanceof Error ? error.message : 'Unknown error' });
-    }
-  });
+          }
+    });
 
   // Today's Key Metrics endpoint - Simple version like DoctorAvailability
   app.get("/api/dashboard/today-metrics", authenticateToken, enforceTenantIsolation, async (req: TenantRequest, res) => {

@@ -17,5 +17,5 @@ export * from './supportTicket';
 export * from './chat';
 export * from './billing';
 export * from './analytics';
-export * from './subscriptionPlan';
+export * from './subscriptionPlan'; 
 export * from './prescription'; 

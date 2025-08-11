@@ -646,74 +646,74 @@ const BranchForm: React.FC = () => {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <FormField label="Country" required error={errors.country}>
-                  <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
-                    <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
-                      <SelectValue placeholder="Select country" />
-                    </SelectTrigger>
-                    <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
-                      {countries.map((country) => (
-                        <SelectItem key={country.value} value={country.value}>
-                          {country.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
-                
-                <FormField label="State / Province" required error={errors.state}>
-                  <EnhancedInput
-                    value={formData.state}
-                    onChange={(e) => handleInputChange('state', e.target.value)}
-                    placeholder="e.g., California"
-                  />
-                </FormField>
-                
-                <FormField label="City" required error={errors.city}>
-                  <EnhancedInput
-                    value={formData.city}
-                    onChange={(e) => handleInputChange('city', e.target.value)}
-                    placeholder="e.g., Los Angeles"
-                  />
-                </FormField>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <FormField label="Address Line 1" required error={errors.addressLine1}>
-                  <EnhancedInput
-                    value={formData.addressLine1}
-                    onChange={(e) => handleInputChange('addressLine1', e.target.value)}
-                    placeholder="Street address, building info"
-                  />
-                </FormField>
-                
-                <FormField label="Address Line 2" error={errors.addressLine2}>
-                  <EnhancedInput
-                    value={formData.addressLine2}
-                    onChange={(e) => handleInputChange('addressLine2', e.target.value)}
-                    placeholder="Landmark, optional details"
-                  />
-                </FormField>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <FormField label="ZIP / Postal Code" required error={errors.postalCode}>
-                  <EnhancedInput
-                    value={formData.postalCode}
-                    onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                    placeholder="e.g., 90210"
-                  />
-                </FormField>
-                
-                <FormField label="Google Map Link / GPS" error={errors.googleMapLink}>
-                  <EnhancedInput
-                    value={formData.googleMapLink}
-                    onChange={(e) => handleInputChange('googleMapLink', e.target.value)}
-                    placeholder="https://maps.google.com/..."
-                  />
-                </FormField>
-              </div>
+              <FormField label="Country" required error={errors.country}>
+                <Select value={formData.country} onValueChange={(value) => handleInputChange('country', value)}>
+                  <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
+                    {countries.map((country) => (
+                      <SelectItem key={country.value} value={country.value}>
+                        {country.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              
+              <FormField label="State / Province" required error={errors.state}>
+                <EnhancedInput
+                  value={formData.state}
+                  onChange={(e) => handleInputChange('state', e.target.value)}
+                  placeholder="e.g., California"
+                />
+              </FormField>
+              
+              <FormField label="City" required error={errors.city}>
+                <EnhancedInput
+                  value={formData.city}
+                  onChange={(e) => handleInputChange('city', e.target.value)}
+                  placeholder="e.g., Los Angeles"
+                />
+              </FormField>
             </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="Address Line 1" required error={errors.addressLine1}>
+                <EnhancedInput
+                  value={formData.addressLine1}
+                  onChange={(e) => handleInputChange('addressLine1', e.target.value)}
+                  placeholder="Street address, building info"
+                />
+              </FormField>
+              
+              <FormField label="Address Line 2" error={errors.addressLine2}>
+                <EnhancedInput
+                  value={formData.addressLine2}
+                  onChange={(e) => handleInputChange('addressLine2', e.target.value)}
+                  placeholder="Landmark, optional details"
+                />
+              </FormField>
+            </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <FormField label="ZIP / Postal Code" required error={errors.postalCode}>
+                <EnhancedInput
+                  value={formData.postalCode}
+                  onChange={(e) => handleInputChange('postalCode', e.target.value)}
+                  placeholder="e.g., 90210"
+                />
+              </FormField>
+              
+              <FormField label="Google Map Link / GPS" error={errors.googleMapLink}>
+                <EnhancedInput
+                  value={formData.googleMapLink}
+                  onChange={(e) => handleInputChange('googleMapLink', e.target.value)}
+                  placeholder="https://maps.google.com/..."
+                />
+              </FormField>
+            </div>
+          </div>
 
             <Separator className="my-4" />
 
@@ -728,25 +728,25 @@ const BranchForm: React.FC = () => {
                 <div className="space-y-3">
                   {weekDays.map((day) => {
                     const daySettings = formData.workingDaySettings[day];
-                    return (
+        return (
                       <div key={day} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center space-x-3">
-                            <Checkbox
-                              id={day}
+                    <Checkbox
+                      id={day}
                               checked={daySettings.isWorking}
-                              onCheckedChange={(checked) => handleWorkingDayChange(day, checked as boolean)}
-                            />
+                      onCheckedChange={(checked) => handleWorkingDayChange(day, checked as boolean)}
+                    />
                             <Label htmlFor={day} className="font-medium text-gray-900">
                               {day}
-                            </Label>
-                          </div>
+                    </Label>
+                  </div>
                           {daySettings.isWorking && (
                             <Badge variant={daySettings.dayType === 'full' ? 'default' : 'secondary'} className="text-xs">
                               {daySettings.dayType === 'full' ? 'Full Day' : 'Half Day'}
                             </Badge>
                           )}
-                        </div>
+              </div>
                         
                         {daySettings.isWorking && (
                           <div className="space-y-2 ml-6">
@@ -778,21 +778,21 @@ const BranchForm: React.FC = () => {
                             <div className="grid grid-cols-2 gap-2">
                               <div>
                                 <Label className="text-xs text-gray-600">Start Time</Label>
-                                <EnhancedInput
-                                  type="time"
+                <EnhancedInput
+                  type="time"
                                   value={daySettings.startTime || ''}
                                   onChange={(e) => handleDayTimeChange(day, 'startTime', e.target.value)}
                                   className="h-8 text-xs"
-                                />
+                />
                               </div>
                               <div>
                                 <Label className="text-xs text-gray-600">End Time</Label>
-                                <EnhancedInput
-                                  type="time"
+                <EnhancedInput
+                  type="time"
                                   value={daySettings.endTime || ''}
                                   onChange={(e) => handleDayTimeChange(day, 'endTime', e.target.value)}
                                   className="h-8 text-xs"
-                                />
+                />
                               </div>
                             </div>
                           </div>
@@ -802,22 +802,22 @@ const BranchForm: React.FC = () => {
                   })}
                 </div>
               </FormField>
-
+              
               <div className="grid grid-cols-1 md:grid-cols-1 gap-3">
-                <FormField label="Timezone" required error={errors.timezone}>
-                  <Select value={formData.timezone} onValueChange={(value) => handleInputChange('timezone', value)}>
-                    <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
-                      <SelectValue placeholder="Select timezone" />
-                    </SelectTrigger>
-                    <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
-                      {timezones.map((tz) => (
-                        <SelectItem key={tz.value} value={tz.value}>
-                          {tz.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
+              <FormField label="Timezone" required error={errors.timezone}>
+                <Select value={formData.timezone} onValueChange={(value) => handleInputChange('timezone', value)}>
+                  <SelectTrigger className="h-10 text-sm border-2 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 rounded-lg hover:border-gray-300">
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent className="border-2 border-gray-200 rounded-lg shadow-lg">
+                    {timezones.map((tz) => (
+                      <SelectItem key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
               </div>
             </div>
           </div>
@@ -842,7 +842,7 @@ const BranchForm: React.FC = () => {
                   placeholder="Enter account number"
                 />
               </FormField>
-            </div>
+              </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <FormField label="Account Holder Name" required error={errors.accountHolderName}>
@@ -918,7 +918,7 @@ const BranchForm: React.FC = () => {
 
             {/* Password Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <FormField label="Admin Password" required error={errors.adminPassword}>
+            <FormField label="Admin Password" required error={errors.adminPassword}>
                 <div className="relative">
                   <EnhancedInput
                     type={showPassword ? 'text' : 'password'}
@@ -935,17 +935,17 @@ const BranchForm: React.FC = () => {
                   >
                     {showPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                   </Button>
-                </div>
-              </FormField>
+              </div>
+            </FormField>
 
-              <FormField label="Confirm Password" required error={errors.confirmPassword}>
+            <FormField label="Confirm Password" required error={errors.confirmPassword}>
                 <EnhancedInput
                   type={showPassword ? 'text' : 'password'}
                   value={formData.confirmPassword}
                   onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                   placeholder="Confirm password"
                 />
-              </FormField>
+            </FormField>
             </div>
           </div>
         );

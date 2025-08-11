@@ -402,17 +402,17 @@ export default function DoctorDashboard() {
   useEffect(() => {
     // Only initialize once when we have appointments and haven't initialized yet
     if (todaysAppointments.length > 0 && !initializedRef.current) {
-      const initialStates = todaysAppointments.reduce((acc, appointment) => ({
-        ...acc,
-        [appointment.id]: {
-            ...appointment,
-            isModified: false,
-            isPendingSave: false,
-            originalStatus: appointment.status,
-            isApproved: false
-        }
-      }), {} as { [key: string]: AppointmentState });
-      setAppointmentStates(initialStates);
+    const initialStates = todaysAppointments.reduce((acc, appointment) => ({
+      ...acc,
+      [appointment.id]: {
+          ...appointment,
+          isModified: false,
+          isPendingSave: false,
+          originalStatus: appointment.status,
+          isApproved: false
+      }
+    }), {} as { [key: string]: AppointmentState });
+    setAppointmentStates(initialStates);
       initializedRef.current = true;
     }
   }, [todaysAppointments]);
@@ -713,7 +713,7 @@ export default function DoctorDashboard() {
     actions: appointment.id,
   }));
 
-  return (
+    return (
     <div className="p-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -1176,5 +1176,5 @@ export default function DoctorDashboard() {
           {/* Chat Widget - Fixed Bottom Right */}
           <ChatWidget />
     </div>
-  );
+        );
 }

@@ -946,19 +946,19 @@ const AdminDashboard: React.FC = () => {
                       <div className="flex h-full">
                         {/* Y-axis (Doctor Names) */}
                         <div className="flex flex-col justify-between py-2 pr-4 w-32 flex-shrink-0">
-                          {doctorEfficiency.map((doctor: any, index: number) => (
+                      {doctorEfficiency.map((doctor: any, index: number) => (
                             <div key={index} className="flex items-center h-12">
                               <div className="text-right w-full">
                                 <div className="text-xs font-medium text-gray-900 truncate" title={doctor.doctorName}>
                                   {doctor.doctorName}
-                                </div>
+                            </div>
                                 <div className="text-xs text-gray-500 truncate" title={doctor.specialization}>
                                   {doctor.specialization}
-                                </div>
-                              </div>
+                            </div>
+                          </div>
                             </div>
                           ))}
-                        </div>
+                            </div>
                         
                         {/* Chart Area */}
                         <div className="flex-1 relative">
@@ -977,7 +977,7 @@ const AdminDashboard: React.FC = () => {
                                   {/* Efficiency Bar */}
                                   <div className="flex-1 relative">
                                     <div className="w-full bg-gray-200 rounded-full h-6">
-                                      <div 
+                              <div 
                                         className="bg-gradient-to-r from-green-400 to-green-600 h-6 rounded-full transition-all duration-500 flex items-center justify-end pr-2"
                                         style={{ width: `${Math.min(doctor.efficiency || 0, 100)}%` }}
                                       >
@@ -992,10 +992,10 @@ const AdminDashboard: React.FC = () => {
                                   <div className="ml-3 text-xs text-gray-600 min-w-[80px]">
                                     <div>{doctor.treated || 0}/{doctor.scheduled || 0}</div>
                                     <div className="text-gray-400">T/S</div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                           </div>
                           
                           {/* X-axis labels */}
